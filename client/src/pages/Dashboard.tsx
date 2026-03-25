@@ -1,16 +1,17 @@
 /**
- * Dashboard — V9 Production MVP
- * Changes from V8:
- * - Cold Start: merged welcome + checklist into one card. "Hire first Agent" is a checklist item, not a separate hero.
- * - Has Agent: What's Next uses same CheckItem component as Cold Start (unified checklist style).
- * - Scale item also rendered as a CheckItem for visual consistency.
+ * Dashboard — V10 Production MVP
+ * - Cold Start: single card with welcome header + checklist
+ * - Has Agent: Metrics → Analytics link → What's Next (Improve checklist + Scale section, visually separated)
+ * - Status copy: shows current config state only (e.g. "3 articles", "2 skills enabled")
+ * - CheckItem component shared across both states for visual consistency
  */
 import { useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import {
-  Bot, ArrowRight, CheckCircle2,
+  Bot, ArrowRight, CheckCircle2, Plus,
   MessageCircle, Users, Gauge, SmilePlus,
+  Mail, Instagram,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -46,7 +47,6 @@ function ColdStartState() {
       <motion.div variants={iV}>
         <Card className="shadow-sm">
           <CardContent className="p-5">
-            {/* Header: icon + welcome text */}
             <div className="flex items-start gap-3 mb-4">
               <div className="w-9 h-9 rounded-lg bg-teal-50 flex items-center justify-center shrink-0 mt-0.5">
                 <Bot className="w-4.5 h-4.5 text-teal-600" />
@@ -56,13 +56,11 @@ function ColdStartState() {
                 <p className="text-sm text-muted-foreground">Complete these steps to deploy your first agent. Takes less than 5 minutes.</p>
               </div>
             </div>
-
-            {/* Unified checklist */}
             <div className="space-y-0.5">
               <CheckItem done label="Account created" />
-              <CheckItem done label="Order system connected" note="Partial sync — full sync recommended" noteHref="/settings" />
+              <CheckItem done label="Order system connected" note="Partial sync" noteHref="/settings" />
               <CheckItem label="Hire your first AI Agent" href="/agents/new" />
-              <CheckItem label="Add knowledge articles" href="/knowledge" note="0 of 5 articles" />
+              <CheckItem label="Add knowledge articles" href="/knowledge" status="0 articles" />
             </div>
           </CardContent>
         </Card>
@@ -114,15 +112,36 @@ function HasAgentState() {
         </Link>
       </motion.div>
 
-      {/* ── What's Next — unified checklist style ── */}
+      {/* ── What's Next ── */}
       <motion.div variants={iV}>
         <p className="text-xs font-medium text-muted-foreground tracking-wide uppercase mb-2">What's next</p>
         <Card className="shadow-sm">
-          <CardContent className="p-4 space-y-0.5">
-            <CheckItem label="Sync all orders" href="/settings" note="Partial sync" />
-            <CheckItem label="Enrich knowledge base" href="/knowledge" note="3 of 20+ articles" />
-            <CheckItem label="Activate skills" href="/knowledge" note="2 of 8 enabled" />
-            <CheckItem label="Hire another agent" href="/agents/new" note="Email, Social Messaging, or Live Chat" />
+          <CardContent className="p-4">
+            {/* Improve section */}
+            <div className="space-y-0.5">
+              <CheckItem label="Sync all orders" href="/settings" status="Partial sync" />
+              <CheckItem label="Enrich knowledge base" href="/knowledge" status="3 articles" />
+              <CheckItem label="Activate skills" href="/knowledge" status="2 skills enabled" />
+            </div>
+
+            {/* Divider */}
+            <div className="my-3 border-t border-border/50" />
+
+            {/* Scale section */}
+            <Link href="/agents/new">
+              <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/40 transition-colors cursor-pointer group">
+                <div className="w-5 h-5 rounded-full border-2 border-dashed border-muted-foreground/20 flex items-center justify-center shrink-0">
+                  <Plus className="w-2.5 h-2.5 text-muted-foreground/40" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-sm font-medium group-hover:text-teal-700 transition-colors leading-tight">Hire another agent</p>
+                    <span className="text-[11px] text-muted-foreground leading-tight">Email, Social Messaging, or Live Chat</span>
+                  </div>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/20 group-hover:text-teal-500 transition-colors shrink-0" />
+              </div>
+            </Link>
           </CardContent>
         </Card>
       </motion.div>
@@ -152,8 +171,8 @@ function MetricCard({ icon: Icon, label, value, sub, change }: {
   );
 }
 
-function CheckItem({ done, label, note, noteHref, href }: {
-  done?: boolean; label: string; note?: string; noteHref?: string; href?: string;
+function CheckItem({ done, label, note, noteHref, status, href }: {
+  done?: boolean; label: string; note?: string; noteHref?: string; status?: string; href?: string;
 }) {
   const inner = (
     <div className={cn(
@@ -169,14 +188,15 @@ function CheckItem({ done, label, note, noteHref, href }: {
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2">
           <p className={cn("text-sm leading-tight", done ? "text-muted-foreground" : "font-medium")}>{label}</p>
-          {note && !noteHref && (
-            <span className="text-[11px] text-muted-foreground leading-tight shrink-0">{note}</span>
-          )}
+          {status && <span className="text-[11px] text-muted-foreground leading-tight shrink-0">{status}</span>}
         </div>
         {note && noteHref && (
           <Link href={noteHref}>
             <span className="text-[11px] text-amber-600 hover:underline">{note}</span>
           </Link>
+        )}
+        {note && !noteHref && (
+          <p className="text-[11px] text-muted-foreground">{note}</p>
         )}
       </div>
       {!done && href && <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/20 shrink-0" />}
