@@ -1,19 +1,19 @@
 /**
- * AgentDetail V8 — Redesigned Setting Up view
- * - Setup Progress: Build → Test → Deploy (no progress bar, compact checklist)
- * - Build steps are channel-specific (e.g. Zendesk config for Email)
- * - Skills section with default-on skills + Add Skill dialog
- * - Live/Paused/ReadyToTest views preserved from V7
+ * AgentDetail V9 — Redesigned Setup as step-by-step wizard
+ * Each setup step is a full action section (not a checklist item).
+ * Zendesk config (OAuth, Trigger guide, Reply Mode, Escalation Group) is Step 1-2.
  */
 import { useState } from "react";
 import { useParams, Link } from "wouter";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, MessageSquare, BarChart3, CheckCircle2,
   Send, Zap, BookOpen, Mail, MessageCircle, Bot,
   Target, Power, Eye, Play, Instagram,
   ExternalLink, Pencil, Globe, Plus, X,
   Loader2, ArrowRight, Package, Shield, ShoppingCart,
+  Lock, Copy, HelpCircle, RefreshCw, ChevronDown, ChevronRight,
+  AlertTriangle, Info,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -40,18 +42,10 @@ interface Skill {
   successRate?: number;
 }
 
-interface BuildStep {
-  id: string;
-  label: string;
-  done: boolean;
-  desc?: string;
-}
-
 interface AgentData {
   name: string;
   status: AgentStatus;
   channel: { type: string; label: string; provider: string; integration: string };
-  buildSteps: BuildStep[];
   skills: Skill[];
   csat: number;
   resolutionRate: number;
@@ -78,9 +72,6 @@ const agentsDb: Record<string, AgentData> = {
     name: "RC Live Chat Agent",
     status: "live",
     channel: { type: "chat", label: "Live Chat", provider: "RC Widget", integration: "RC Widget" },
-    buildSteps: [
-      { id: "connect", label: "Connect RC Widget", done: true, desc: "Auto-connected" },
-    ],
     skills: [
       { id: "s1", name: "Post-purchase Claims", desc: "Handle refund requests", enabled: true, isDefault: true, conversations: 276, successRate: 94.2 },
       { id: "s2", name: "Where Is My Order (WISMO)", desc: "Track order status", enabled: true, isDefault: true, conversations: 342, successRate: 97.1 },
@@ -105,11 +96,6 @@ const agentsDb: Record<string, AgentData> = {
     name: "Email Support Agent",
     status: "setting-up",
     channel: { type: "email", label: "Email", provider: "Zendesk", integration: "Zendesk Email" },
-    buildSteps: [
-      { id: "connect", label: "Connect Zendesk", done: false, desc: "Enter your Zendesk subdomain and authorize access" },
-      { id: "routing", label: "Configure email routing", done: false, desc: "Set up forwarding rules for incoming tickets" },
-      { id: "verify", label: "Verify connection", done: false, desc: "System will test the integration automatically" },
-    ],
     skills: [
       { id: "s1", name: "Post-purchase Claims", desc: "Handle refund requests, damaged items, and missing orders", enabled: true, isDefault: true },
       { id: "s2", name: "Where Is My Order (WISMO)", desc: "Track order status, provide shipping updates, and handle delivery inquiries", enabled: true, isDefault: true },
@@ -173,32 +159,44 @@ export default function AgentDetail() {
 }
 
 /* ═══════════════════════════════════════════ */
-/* ── Setting Up View — Build / Test / Deploy ── */
+/* ── Setting Up View — Step-by-step Wizard ── */
 /* ═══════════════════════════════════════════ */
 function SettingUpView({ agent }: { agent: AgentData }) {
-  const [buildSteps, setBuildSteps] = useState(agent.buildSteps);
-  const [connecting, setConnecting] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [stepsCompleted, setStepsCompleted] = useState<Record<number, boolean>>({ 1: false, 2: false, 3: false, 4: false });
+
+  // Step 1: Connect Zendesk
+  const [zdConnected, setZdConnected] = useState(false);
   const [zdSubdomain, setZdSubdomain] = useState("");
-  const [showZdForm, setShowZdForm] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+
+  // Step 2: Configure
+  const [replyMode, setReplyMode] = useState("internal_note");
+  const [escalationGroup, setEscalationGroup] = useState("tier-2-support");
+  const [triggerGuideOpen, setTriggerGuideOpen] = useState(false);
+
+  // Step 3: Skills
   const [skills, setSkills] = useState<Skill[]>(agent.skills);
   const [showAddSkill, setShowAddSkill] = useState(false);
 
-  const allBuildDone = buildSteps.every(s => s.done);
-  const buildPhase = !allBuildDone ? "build" : "test";
+  const totalSteps = 4;
+  const completedCount = Object.values(stepsCompleted).filter(Boolean).length;
 
   const handleConnectZendesk = () => {
     if (!zdSubdomain.trim()) return;
     setConnecting(true);
     setTimeout(() => {
       setConnecting(false);
-      setShowZdForm(false);
-      setBuildSteps(prev => prev.map(s => s.id === "connect" ? { ...s, done: true, desc: `Connected to ${zdSubdomain}.zendesk.com` } : s));
-      toast.success("Zendesk connected successfully");
+      setZdConnected(true);
+      toast.success(`Connected to ${zdSubdomain}.zendesk.com`);
     }, 1200);
   };
 
-  const handleCompleteStep = (stepId: string) => {
-    setBuildSteps(prev => prev.map(s => s.id === stepId ? { ...s, done: true } : s));
+  const completeStep = (step: number) => {
+    setStepsCompleted(prev => ({ ...prev, [step]: true }));
+    if (step < totalSteps) {
+      setCurrentStep(step + 1);
+    }
     toast.success("Step completed");
   };
 
@@ -214,136 +212,328 @@ function SettingUpView({ agent }: { agent: AgentData }) {
 
   const availableToAdd = allSkills.filter(s => !skills.find(existing => existing.id === s.id));
 
+  const steps = [
+    { num: 1, title: "Connect Zendesk", desc: "Authorize Seel to access your Zendesk account" },
+    { num: 2, title: "Configure Channel", desc: "Set up how the agent interacts with Zendesk" },
+    { num: 3, title: "Review Skills", desc: "Choose which skills this agent can use" },
+    { num: 4, title: "Test Agent", desc: "Verify your agent works as expected" },
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* ── Setup Progress ── */}
-      <Card>
-        <CardContent className="p-6">
-          <p className="text-sm font-semibold mb-4">Setup Progress</p>
-
-          <div className="space-y-5">
-            {/* Phase 1: Build */}
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <PhaseIndicator phase="build" current={buildPhase === "build"} done={allBuildDone} />
-                <p className={cn("text-sm font-medium", allBuildDone ? "text-muted-foreground" : "")}>Build</p>
+    <div className="space-y-5">
+      {/* ── Step Navigation ── */}
+      <div className="flex items-center gap-1">
+        {steps.map((step, i) => (
+          <div key={step.num} className="flex items-center">
+            <button
+              onClick={() => setCurrentStep(step.num)}
+              className={cn(
+                "flex items-center gap-2 px-3 py-2 rounded-lg transition-all text-left",
+                currentStep === step.num
+                  ? "bg-primary/10 border border-primary/20"
+                  : stepsCompleted[step.num]
+                    ? "hover:bg-muted/50"
+                    : "hover:bg-muted/30 opacity-70"
+              )}
+            >
+              <div className={cn(
+                "w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-semibold",
+                stepsCompleted[step.num]
+                  ? "bg-primary text-white"
+                  : currentStep === step.num
+                    ? "bg-primary/20 text-primary border border-primary/30"
+                    : "bg-muted text-muted-foreground"
+              )}>
+                {stepsCompleted[step.num] ? <CheckCircle2 className="w-3.5 h-3.5" /> : step.num}
               </div>
-              <div className="ml-7 space-y-1">
-                {buildSteps.map((step) => {
-                  const isNext = !step.done && buildSteps.findIndex(s => !s.done) === buildSteps.indexOf(step);
-                  return (
-                    <div key={step.id} className={cn(
-                      "flex items-start gap-3 p-2.5 rounded-lg",
-                      isNext ? "bg-amber-50/80 border border-amber-200/60" : ""
-                    )}>
-                      <div className={cn(
-                        "w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5",
-                        step.done ? "bg-primary" : "border-2 border-muted-foreground/20"
-                      )}>
-                        {step.done && <CheckCircle2 className="w-2.5 h-2.5 text-white" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={cn("text-sm", step.done ? "text-muted-foreground" : "font-medium")}>{step.label}</p>
-                        {step.desc && <p className="text-xs text-muted-foreground mt-0.5">{step.desc}</p>}
+              <div className="hidden sm:block">
+                <p className={cn("text-xs font-medium leading-tight", currentStep === step.num ? "text-primary" : "")}>{step.title}</p>
+              </div>
+            </button>
+            {i < steps.length - 1 && (
+              <div className={cn("w-6 h-px mx-1", stepsCompleted[step.num] ? "bg-primary/40" : "bg-border")} />
+            )}
+          </div>
+        ))}
+      </div>
 
-                        {/* Zendesk connect form — inline */}
-                        {isNext && step.id === "connect" && agent.channel.provider === "Zendesk" && (
-                          <div className="mt-3">
-                            {!showZdForm ? (
-                              <Button size="sm" variant="outline" className="text-xs gap-1.5" onClick={() => setShowZdForm(true)}>
-                                <ExternalLink className="w-3 h-3" /> Connect Zendesk
-                              </Button>
-                            ) : (
-                              <div className="space-y-2 p-3 rounded-lg border bg-background">
-                                <div>
-                                  <label className="text-xs text-muted-foreground mb-1 block">Subdomain</label>
-                                  <div className="flex items-center gap-2">
-                                    <Input value={zdSubdomain} onChange={e => setZdSubdomain(e.target.value)} placeholder="your-company" className="h-8 text-xs flex-1 max-w-[200px]" />
-                                    <span className="text-xs text-muted-foreground">.zendesk.com</span>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Button size="sm" className="text-xs gap-1" onClick={handleConnectZendesk} disabled={!zdSubdomain.trim() || connecting}>
-                                    {connecting ? <><Loader2 className="w-3 h-3 animate-spin" /> Connecting...</> : "Authorize"}
-                                  </Button>
-                                  <Button size="sm" variant="ghost" className="text-xs" onClick={() => setShowZdForm(false)}>Cancel</Button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
+      {/* Progress summary */}
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
+          <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${(completedCount / totalSteps) * 100}%` }} />
+        </div>
+        <span>{completedCount} of {totalSteps} completed</span>
+      </div>
 
-                        {/* Generic "Complete" button for non-connect steps */}
-                        {isNext && step.id !== "connect" && (
-                          <Button size="sm" variant="outline" className="text-xs mt-2 gap-1" onClick={() => handleCompleteStep(step.id)}>
-                            Complete <ArrowRight className="w-3 h-3" />
-                          </Button>
-                        )}
+      {/* ── Step Content ── */}
+      <AnimatePresence mode="wait">
+        <motion.div key={currentStep} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
+
+          {/* ══ Step 1: Connect Zendesk ══ */}
+          {currentStep === 1 && (
+            <Card>
+              <CardContent className="p-6 space-y-5">
+                <div>
+                  <h2 className="text-base font-semibold flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                      <Mail className="w-4 h-4 text-blue-500" />
+                    </div>
+                    Connect Zendesk
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1 ml-10">Authorize Seel to access your Zendesk account via the Seel App. This uses OAuth — no API tokens needed.</p>
+                </div>
+
+                {!zdConnected ? (
+                  <div className="ml-10 space-y-4">
+                    <div>
+                      <Label className="text-sm">Zendesk Subdomain</Label>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <Input
+                          value={zdSubdomain}
+                          onChange={e => setZdSubdomain(e.target.value)}
+                          placeholder="your-company"
+                          className="max-w-[220px] h-9"
+                        />
+                        <span className="text-sm text-muted-foreground">.zendesk.com</span>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Phase 2: Test */}
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <PhaseIndicator phase="test" current={allBuildDone} done={false} />
-                <p className={cn("text-sm font-medium", !allBuildDone ? "text-muted-foreground/50" : "")}>Test</p>
-              </div>
-              {!allBuildDone && (
-                <p className="ml-7 text-xs text-muted-foreground/50">Complete Build steps to unlock testing</p>
-              )}
-              {allBuildDone && (
-                <p className="ml-7 text-xs text-muted-foreground">Send test messages to verify your agent's behavior</p>
-              )}
-            </div>
-
-            {/* Phase 3: Deploy */}
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <PhaseIndicator phase="deploy" current={false} done={false} />
-                <p className="text-sm font-medium text-muted-foreground/50">Deploy</p>
-              </div>
-              <p className="ml-7 text-xs text-muted-foreground/50">Test your agent before deploying it live</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ── Skills Configuration ── */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className="text-sm font-semibold">Skills</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Capabilities your agent can use to resolve inquiries</p>
-            </div>
-            <Button size="sm" variant="outline" className="text-xs gap-1.5" onClick={() => setShowAddSkill(true)}>
-              <Plus className="w-3 h-3" /> Add Skill
-            </Button>
-          </div>
-
-          <div className="space-y-2">
-            {skills.map(skill => (
-              <div key={skill.id} className="flex items-start gap-3 p-3 rounded-lg border">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium">{skill.name}</p>
-                    {skill.isDefault && <Badge variant="secondary" className="text-[9px] px-1.5 py-0">Default</Badge>}
+                    <Button onClick={handleConnectZendesk} disabled={!zdSubdomain.trim() || connecting} className="gap-2">
+                      {connecting ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" /> Connecting...</>
+                      ) : (
+                        <><ExternalLink className="w-4 h-4" /> Authorize with Zendesk</>
+                      )}
+                    </Button>
+                    <p className="text-[11px] text-muted-foreground">
+                      This will redirect you to Zendesk to approve the Seel App. Permissions include: read/write tickets, read users, read groups.
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">{skill.desc}</p>
+                ) : (
+                  <div className="ml-10 space-y-4">
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/15">
+                      <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium">Connected to {zdSubdomain}.zendesk.com</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">Authorized via Seel App (OAuth)</p>
+                      </div>
+                    </div>
+
+                    {!stepsCompleted[1] && (
+                      <Button onClick={() => completeStep(1)} className="gap-1.5">
+                        Continue <ArrowRight className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ══ Step 2: Configure Channel ══ */}
+          {currentStep === 2 && (
+            <Card>
+              <CardContent className="p-6 space-y-6">
+                <div>
+                  <h2 className="text-base font-semibold flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                      <Zap className="w-4 h-4 text-amber-600" />
+                    </div>
+                    Configure Channel
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1 ml-10">Set up how tickets are routed and how the agent responds.</p>
                 </div>
-                <Switch
-                  checked={skill.enabled}
-                  onCheckedChange={() => handleToggleSkill(skill.id)}
-                />
-              </div>
-            ))}
+
+                {/* Trigger Setup */}
+                <div className="ml-10 p-4 rounded-lg border border-amber-200/60 bg-amber-50/30 space-y-3">
+                  <div className="flex items-start gap-2">
+                    <Zap className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Zendesk Trigger Setup</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        You need to create a Trigger in your Zendesk admin panel to route tickets to Seel. This is a one-time setup in your Zendesk account.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => setTriggerGuideOpen(true)}>
+                      <BookOpen className="w-3 h-3" /> View Setup Guide
+                    </Button>
+                    <a
+                      href="https://support.zendesk.com/hc/en-us/articles/203662246"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+                    >
+                      <ExternalLink className="w-3 h-3" /> Zendesk Docs
+                    </a>
+                  </div>
+                </div>
+
+                {/* Reply Mode */}
+                <div className="ml-10 space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <Label className="text-sm font-medium">Reply Mode</Label>
+                    <Tooltip delayDuration={0}>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3 h-3 text-muted-foreground/60 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="text-xs max-w-[280px]">
+                        "Public reply" is visible to the customer. "Internal note" is only visible to your team — recommended for initial rollout.
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Select value={replyMode} onValueChange={setReplyMode}>
+                    <SelectTrigger className="max-w-sm h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="public_reply">
+                        <span className="flex items-center gap-2">
+                          <Globe className="w-3.5 h-3.5 text-primary" />
+                          Public Reply — visible to customer
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="internal_note">
+                        <span className="flex items-center gap-2">
+                          <Lock className="w-3.5 h-3.5 text-amber-500" />
+                          Internal Note — team only (recommended)
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {replyMode === "internal_note" && (
+                    <p className="text-[11px] text-amber-600 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      Human agents will review AI drafts before sending to customers.
+                    </p>
+                  )}
+                  {replyMode === "public_reply" && (
+                    <p className="text-[11px] text-primary flex items-center gap-1">
+                      <Zap className="w-3 h-3" />
+                      AI responses go directly to customers. Ensure guardrails are configured.
+                    </p>
+                  )}
+                </div>
+
+                {/* Escalation Group */}
+                <div className="ml-10 space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <Label className="text-sm font-medium">Escalation Group</Label>
+                    <Tooltip delayDuration={0}>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3 h-3 text-muted-foreground/60 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="text-xs max-w-[280px]">
+                        When the agent can't resolve an issue, the ticket is reassigned to this Zendesk group with an internal note.
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Select value={escalationGroup} onValueChange={setEscalationGroup}>
+                    <SelectTrigger className="max-w-sm h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="tier-2-support">Tier 2 Support</SelectItem>
+                      <SelectItem value="senior-agents">Senior Agents</SelectItem>
+                      <SelectItem value="cx-managers">CX Managers</SelectItem>
+                      <SelectItem value="billing-team">Billing Team</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground">
+                    Groups are synced from your Zendesk account.{" "}
+                    <button className="text-primary hover:underline" onClick={() => toast.success("Groups refreshed")}>Refresh</button>
+                  </p>
+                </div>
+
+                {/* Continue */}
+                {!stepsCompleted[2] && (
+                  <div className="ml-10 pt-2">
+                    <Button onClick={() => completeStep(2)} className="gap-1.5">
+                      Continue <ArrowRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ══ Step 3: Review Skills ══ */}
+          {currentStep === 3 && (
+            <Card>
+              <CardContent className="p-6 space-y-5">
+                <div>
+                  <h2 className="text-base font-semibold flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Target className="w-4 h-4 text-primary" />
+                    </div>
+                    Review Skills
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1 ml-10">Choose which skills this agent can use. Default skills are pre-enabled based on your setup.</p>
+                </div>
+
+                <div className="ml-10 space-y-2">
+                  {skills.map(skill => (
+                    <div key={skill.id} className={cn(
+                      "flex items-start gap-3 p-3 rounded-lg border transition-all",
+                      skill.enabled ? "border-border" : "border-border/50 opacity-60"
+                    )}>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium">{skill.name}</p>
+                          {skill.isDefault && <Badge variant="secondary" className="text-[9px] px-1.5 py-0">Default</Badge>}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">{skill.desc}</p>
+                      </div>
+                      <Switch
+                        checked={skill.enabled}
+                        onCheckedChange={() => handleToggleSkill(skill.id)}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="ml-10 flex items-center gap-3">
+                  <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => setShowAddSkill(true)}>
+                    <Plus className="w-3 h-3" /> Add Skill
+                  </Button>
+                  <Link href="/playbook/skills">
+                    <span className="text-xs text-primary hover:underline cursor-pointer">Manage all skills →</span>
+                  </Link>
+                </div>
+
+                {!stepsCompleted[3] && (
+                  <div className="ml-10 pt-2">
+                    <Button onClick={() => completeStep(3)} className="gap-1.5">
+                      Continue <ArrowRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ══ Step 4: Test Agent ══ */}
+          {currentStep === 4 && (
+            <TestStep agent={agent} onComplete={() => completeStep(4)} completed={stepsCompleted[4]} />
+          )}
+        </motion.div>
+      </AnimatePresence>
+
+      {/* ── All steps done banner ── */}
+      {completedCount === totalSteps && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between p-4 rounded-lg bg-primary/5 border border-primary/20">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 text-primary" />
+            <div>
+              <p className="text-sm font-semibold text-primary">Setup Complete</p>
+              <p className="text-xs text-muted-foreground">Your agent is ready to go live.</p>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+          <Button className="gap-1.5" onClick={() => toast.success(`${agent.name} is now Live!`)}>
+            <Play className="w-4 h-4" /> Deploy Live
+          </Button>
+        </motion.div>
+      )}
 
       {/* ── Add Skill Dialog ── */}
       <Dialog open={showAddSkill} onOpenChange={setShowAddSkill}>
@@ -370,24 +560,165 @@ function SettingUpView({ agent }: { agent: AgentData }) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ── Trigger Setup Guide Dialog ── */}
+      <Dialog open={triggerGuideOpen} onOpenChange={setTriggerGuideOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-primary" />
+              Zendesk Trigger Setup Guide
+            </DialogTitle>
+            <DialogDescription>
+              Follow these steps to route tickets to Seel AI Agent.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-5 pt-2">
+            <GuideStep num={1} title="Open Zendesk Admin Center">
+              <p className="text-xs text-muted-foreground">
+                Navigate to <code className="bg-muted px-1 rounded text-[11px]">Admin Center &gt; Objects and rules &gt; Business rules &gt; Triggers</code>
+              </p>
+            </GuideStep>
+
+            <GuideStep num={2} title="Create a New Trigger">
+              <p className="text-xs text-muted-foreground mb-2">Click "Add trigger" and configure:</p>
+              <div className="p-3 rounded-lg bg-muted/20 border border-border/50 space-y-2 text-xs">
+                <div>
+                  <p className="font-medium text-[11px]">Trigger Name</p>
+                  <code className="bg-muted px-2 py-0.5 rounded text-[11px]">Seel AI Agent - Route New Tickets</code>
+                </div>
+                <div>
+                  <p className="font-medium text-[11px]">Conditions (Meet ALL)</p>
+                  <ul className="text-muted-foreground mt-1 space-y-0.5 ml-3 list-disc text-[11px]">
+                    <li>Ticket: Status is New</li>
+                    <li>Ticket: Channel is Email (or preferred channels)</li>
+                    <li>Ticket: Tags does not contain <code className="bg-muted px-1 rounded">seel_skip</code></li>
+                  </ul>
+                </div>
+                <div>
+                  <p className="font-medium text-[11px]">Actions</p>
+                  <ul className="text-muted-foreground mt-1 space-y-0.5 ml-3 list-disc text-[11px]">
+                    <li>Notify target: <code className="bg-muted px-1 rounded">Seel AI Webhook</code></li>
+                    <li>Add tags: <code className="bg-muted px-1 rounded">seel_ai_processing</code></li>
+                  </ul>
+                </div>
+              </div>
+            </GuideStep>
+
+            <GuideStep num={3} title="Create the Webhook Target">
+              <p className="text-xs text-muted-foreground mb-2">
+                In <code className="bg-muted px-1 rounded text-[11px]">Admin Center &gt; Apps and integrations &gt; Webhooks</code>:
+              </p>
+              <div className="p-3 rounded-lg bg-muted/20 border border-border/50 space-y-2 text-xs">
+                <div>
+                  <p className="font-medium text-[11px]">Endpoint URL</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <code className="bg-muted px-2 py-0.5 rounded text-[11px] flex-1">https://api.seel.com/webhooks/zendesk/acme</code>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { navigator.clipboard.writeText("https://api.seel.com/webhooks/zendesk/acme"); toast.success("Copied"); }}>
+                      <Copy className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex gap-6">
+                  <div><p className="font-medium text-[11px]">Method</p><code className="bg-muted px-2 py-0.5 rounded text-[11px]">POST</code></div>
+                  <div><p className="font-medium text-[11px]">Format</p><code className="bg-muted px-2 py-0.5 rounded text-[11px]">JSON</code></div>
+                </div>
+              </div>
+            </GuideStep>
+
+            <GuideStep num={4} title="Test the Trigger">
+              <p className="text-xs text-muted-foreground">
+                Create a test ticket in Zendesk and verify the webhook is received. You can check the connection status in Step 1.
+              </p>
+            </GuideStep>
+
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/15">
+              <HelpCircle className="w-4 h-4 text-primary shrink-0" />
+              <p className="text-xs text-primary">
+                Need help? Contact <a href="mailto:support@seel.com" className="underline">support@seel.com</a>
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function PhaseIndicator({ phase, current, done }: { phase: string; current: boolean; done: boolean }) {
+/* ── Guide Step helper ── */
+function GuideStep({ num, title, children }: { num: number; title: string; children: React.ReactNode }) {
   return (
-    <div className={cn(
-      "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
-      done ? "bg-primary" : current ? "bg-amber-400" : "bg-muted"
-    )}>
-      {done ? (
-        <CheckCircle2 className="w-3 h-3 text-white" />
-      ) : (
-        <span className={cn("text-[10px] font-semibold", current ? "text-white" : "text-muted-foreground")}>
-          {phase === "build" ? "1" : phase === "test" ? "2" : "3"}
-        </span>
-      )}
+    <div className="flex gap-3">
+      <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold shrink-0">{num}</div>
+      <div className="flex-1">
+        <p className="text-sm font-semibold">{title}</p>
+        <div className="mt-1">{children}</div>
+      </div>
     </div>
+  );
+}
+
+/* ── Test Step Component ── */
+function TestStep({ agent, onComplete, completed }: { agent: AgentData; onComplete: () => void; completed: boolean }) {
+  const [testInput, setTestInput] = useState("");
+  const [messages, setMessages] = useState(testMessages);
+
+  const handleSend = () => {
+    if (!testInput.trim()) return;
+    setMessages(prev => [...prev, { role: "customer" as const, text: testInput, time: "Test" }]);
+    setTestInput("");
+    setTimeout(() => {
+      setMessages(prev => [...prev, {
+        role: "agent" as const,
+        text: "Thank you for reaching out. Let me look into that for you. I can see the details of your order and I'll help resolve this right away.",
+        time: "Test",
+      }]);
+    }, 1000);
+  };
+
+  return (
+    <Card>
+      <CardContent className="p-6 space-y-5">
+        <div>
+          <h2 className="text-base font-semibold flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+              <MessageSquare className="w-4 h-4 text-blue-500" />
+            </div>
+            Test Your Agent
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1 ml-10">Send test messages to verify your agent responds correctly before going live.</p>
+        </div>
+
+        <div className="ml-10">
+          <div className="border rounded-lg overflow-hidden">
+            <div className="h-[280px] overflow-y-auto p-3 space-y-2.5 bg-muted/10">
+              {messages.map((msg, i) => (
+                <div key={i} className={cn("flex", msg.role === "customer" ? "justify-end" : "justify-start")}>
+                  <div className={cn("max-w-[75%] rounded-xl px-3 py-2",
+                    msg.role === "customer" ? "bg-muted" : "bg-primary/10 border border-primary/15"
+                  )}>
+                    <p className="text-[10px] font-medium text-muted-foreground mb-0.5">{msg.role === "customer" ? "Test Customer" : agent.name}</p>
+                    <p className="text-xs leading-relaxed">{msg.text}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 p-2 border-t bg-background">
+              <Input value={testInput} onChange={e => setTestInput(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSend()} placeholder="Type a test message as a customer..." className="text-xs h-8" />
+              <Button size="sm" onClick={handleSend} className="h-8 px-3"><Send className="w-3.5 h-3.5" /></Button>
+            </div>
+          </div>
+        </div>
+
+        {!completed && (
+          <div className="ml-10 pt-2">
+            <Button onClick={onComplete} className="gap-1.5">
+              Mark as Tested <CheckCircle2 className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -625,7 +956,7 @@ function LiveView({ agent }: { agent: AgentData }) {
               </div>
               {agent.channel.type === "chat" && (
                 <div className="space-y-3 pt-3 border-t">
-                  <div><Label className="text-xs">Welcome Message</Label><Textarea defaultValue="Hi there! How can I help you today?" rows={2} className="mt-1" /></div>
+                  <div><Label className="text-xs">Welcome Message</Label><Textarea defaultValue={"Hi there! I'm your support assistant. How can I help you today?"} rows={2} className="mt-1" /></div>
                   <div className="flex items-center justify-between"><Label className="text-xs">Typing Indicator</Label><Switch defaultChecked /></div>
                 </div>
               )}
