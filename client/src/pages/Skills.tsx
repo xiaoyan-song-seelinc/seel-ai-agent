@@ -1,8 +1,10 @@
 /**
  * Skills — Playbook > Skills sub-tab
- * List view: 3 preset Skill cards
- * Detail view: Scenario-centric — each scenario shows its handling logic,
- *   editable business rules, and associated actions with toggles, all on one page.
+ * V20: Removed "How the agent handles this" section from ScenarioCard.
+ * Each Scenario now shows only Business Rules (editable) and Actions (with toggles).
+ * Action descriptions enhanced to convey what the agent does.
+ * Disabled write actions show fallback behavior hint.
+ * Business rules absorb handling context so nothing is lost.
  */
 import { useState } from "react";
 import { motion } from "framer-motion";
@@ -29,12 +31,12 @@ interface SkillAction {
   type: "read" | "write";
   connector: string;
   enabled: boolean;
+  disabledHint?: string;
 }
 
 interface Scenario {
   id: string;
   intent: string;
-  handling: string;
   rules: string;
   actions: SkillAction[];
   escalation?: string;
@@ -67,8 +69,8 @@ const initialSkills: Skill[] = [
       {
         id: "ot-s1",
         intent: "Where is my order?",
-        handling: "Look up order by email or order number, return current fulfillment status and tracking link.",
-        rules: `- Always verify customer identity before sharing order details (email or order number required).
+        rules: `- Verify customer identity before sharing order details (email or order number required).
+- Look up order by email or order number, return current fulfillment status and tracking link.
 - If tracking shows "In Transit" for more than 7 business days past estimated delivery, escalate to human agent.
 - Do not speculate on delivery dates beyond what carrier data shows.`,
         actions: [
@@ -80,8 +82,8 @@ const initialSkills: Skill[] = [
       {
         id: "ot-s2",
         intent: "When will my order arrive?",
-        handling: "Check carrier tracking data and provide estimated delivery date based on latest carrier update.",
-        rules: `- Only provide estimated dates that come directly from carrier tracking data.
+        rules: `- Check carrier tracking data and provide estimated delivery date based on latest carrier update.
+- Only provide estimated dates that come directly from carrier tracking data.
 - If no estimated date is available, inform customer that tracking updates may be delayed and provide carrier contact info.
 - Do not make promises about delivery timing.`,
         actions: [
@@ -91,7 +93,6 @@ const initialSkills: Skill[] = [
       {
         id: "ot-s3",
         intent: "My order shows delivered but I didn't receive it.",
-        handling: "Verify delivery status with carrier. Advise customer to check with neighbors or building management.",
         rules: `- Verify delivery confirmation details (date, time, location) from carrier data.
 - Advise customer to check with neighbors, building management, or other household members.
 - Do not issue refund or replacement directly — this requires human review.`,
@@ -116,7 +117,6 @@ const initialSkills: Skill[] = [
       {
         id: "sp-s1",
         intent: "What does my Seel protection cover?",
-        handling: "Retrieve the customer's policy details and explain coverage scope, limits, and expiration date.",
         rules: `- Always look up the specific policy before answering — do not provide generic coverage information.
 - Clearly state the coverage period and any exclusions.
 - If no active policy is found, inform the customer and suggest they check their order confirmation.`,
@@ -127,21 +127,19 @@ const initialSkills: Skill[] = [
       {
         id: "sp-s2",
         intent: "I want to file a claim.",
-        handling: "Collect claim details, validate against policy terms, and initiate the claim process.",
-        rules: `- Claims must be filed within the coverage period specified in the policy. Reject claims outside this window with a clear explanation.
+        rules: `- Claims must be filed within the coverage period. Reject claims outside this window with a clear explanation.
 - Required information: order number, description of the issue, date the issue was discovered.
 - Photos are recommended but not mandatory for MVP.
 - Never disclose internal claim approval criteria or scoring logic to the customer.`,
         actions: [
           { id: "sp-a1b", name: "Look up protection policy", description: "Verify customer has an active policy and check eligibility.", type: "read", connector: "Seel API", enabled: true },
-          { id: "sp-a3", name: "File a claim", description: "Initiate a new protection claim with order and issue details.", type: "write", connector: "Seel API", enabled: true },
+          { id: "sp-a3", name: "File a claim", description: "Initiate a new protection claim with order and issue details.", type: "write", connector: "Seel API", enabled: true, disabledHint: "Agent will collect claim details and escalate to human agent for manual filing." },
         ],
         escalation: "If claim is disputed or involves partial damage with unclear liability, escalate to human agent.",
       },
       {
         id: "sp-s3",
         intent: "What's the status of my claim?",
-        handling: "Look up existing claim and provide current status, next steps, and expected timeline.",
         rules: `- Provide factual status updates only — do not predict claim outcomes.
 - If the claim has been pending for more than 5 business days, acknowledge the delay and provide an updated timeline.`,
         actions: [
@@ -151,13 +149,12 @@ const initialSkills: Skill[] = [
       {
         id: "sp-s4",
         intent: "I want to cancel my protection policy.",
-        handling: "Check cancellation eligibility. If within window, process cancellation and confirm refund.",
         rules: `- Policy cancellation is only allowed within 30 days of purchase and before any claim has been filed.
 - If outside the cancellation window, explain the policy terms clearly.
 - After successful cancellation, confirm the refund amount and expected timeline.`,
         actions: [
           { id: "sp-a1c", name: "Look up protection policy", description: "Check policy status and cancellation eligibility.", type: "read", connector: "Seel API", enabled: true },
-          { id: "sp-a4", name: "Cancel protection policy", description: "Process policy cancellation and trigger refund if eligible.", type: "write", connector: "Seel API", enabled: true },
+          { id: "sp-a4", name: "Cancel protection policy", description: "Process policy cancellation and trigger refund if eligible.", type: "write", connector: "Seel API", enabled: true, disabledHint: "Agent will confirm eligibility and escalate to human agent for manual cancellation." },
         ],
         escalation: "If customer disputes the cancellation policy terms, escalate to human agent.",
       },
@@ -176,7 +173,6 @@ const initialSkills: Skill[] = [
       {
         id: "om-s1",
         intent: "I want to cancel my order.",
-        handling: "Check order fulfillment status. If unfulfilled, confirm with customer and proceed with cancellation.",
         rules: `- Only cancel orders that have NOT been fulfilled or shipped.
 - If the order is already fulfilled, inform the customer and suggest they initiate a return instead.
 - Always confirm the specific order and cancellation intent with the customer before proceeding.
@@ -184,33 +180,31 @@ const initialSkills: Skill[] = [
 - Log the cancellation reason for analytics.`,
         actions: [
           { id: "om-a1", name: "Check order status", description: "Verify order fulfillment status and cancellation eligibility.", type: "read", connector: "Shopify", enabled: true },
-          { id: "om-a2", name: "Cancel order", description: "Cancel an unfulfilled order and trigger refund to original payment method.", type: "write", connector: "Shopify", enabled: false },
+          { id: "om-a2", name: "Cancel order", description: "Cancel an unfulfilled order and trigger refund to original payment method.", type: "write", connector: "Shopify", enabled: false, disabledHint: "Agent will verify eligibility and escalate to human agent for manual cancellation." },
         ],
         escalation: "If cancellation fails due to system error, escalate to human agent immediately.",
       },
       {
         id: "om-s2",
         intent: "Can I still cancel? I just placed it.",
-        handling: "Check order status immediately. If unfulfilled, process cancellation with priority.",
-        rules: `- Same cancellation rules apply as above.
+        rules: `- Same cancellation rules apply — check fulfillment status first.
 - Prioritize speed — customer expectation is that a just-placed order should be easy to cancel.
 - If the order has already entered fulfillment pipeline, inform the customer honestly.`,
         actions: [
           { id: "om-a1b", name: "Check order status", description: "Verify order fulfillment status and cancellation eligibility.", type: "read", connector: "Shopify", enabled: true },
-          { id: "om-a2b", name: "Cancel order", description: "Cancel an unfulfilled order and trigger refund.", type: "write", connector: "Shopify", enabled: false },
+          { id: "om-a2b", name: "Cancel order", description: "Cancel an unfulfilled order and trigger refund.", type: "write", connector: "Shopify", enabled: false, disabledHint: "Agent will verify eligibility and escalate to human agent for manual cancellation." },
         ],
       },
       {
         id: "om-s3",
         intent: "I changed my mind about my purchase.",
-        handling: "Confirm which order the customer wants to cancel, verify eligibility, and process if allowed.",
-        rules: `- Confirm the exact order before taking any action — customer may have multiple orders.
+        rules: `- Confirm which order the customer wants to cancel, then verify eligibility.
 - Apply the same fulfillment-status check before cancellation.
 - Log reason as "changed mind" for analytics purposes.
 - If the order contains multiple items and customer wants partial cancellation, escalate to human agent.`,
         actions: [
           { id: "om-a1c", name: "Check order status", description: "Verify order details and fulfillment status.", type: "read", connector: "Shopify", enabled: true },
-          { id: "om-a2c", name: "Cancel order", description: "Cancel an unfulfilled order and trigger refund.", type: "write", connector: "Shopify", enabled: false },
+          { id: "om-a2c", name: "Cancel order", description: "Cancel an unfulfilled order and trigger refund.", type: "write", connector: "Shopify", enabled: false, disabledHint: "Agent will verify eligibility and escalate to human agent for manual cancellation." },
         ],
         escalation: "Partial cancellation (cancel some items but not others) is not supported — escalate to human agent.",
       },
@@ -264,14 +258,8 @@ function ScenarioCard({
       {/* Expanded content */}
       {open && (
         <div className="border-t border-border px-4 pb-4 space-y-4">
-          {/* Handling logic */}
+          {/* Business Rules — the single editable area */}
           <div className="pt-3">
-            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">How the agent handles this</p>
-            <p className="text-sm text-foreground/80">{scenario.handling}</p>
-          </div>
-
-          {/* Business Rules */}
-          <div>
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-1.5">
                 <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Business Rules</p>
@@ -279,7 +267,7 @@ function ScenarioCard({
                   <TooltipTrigger asChild>
                     <Info className="w-3 h-3 text-muted-foreground/60 cursor-help" />
                   </TooltipTrigger>
-                  <TooltipContent className="text-xs max-w-[240px]">Edit these rules in natural language to match your business policies. The agent will follow them when handling this scenario.</TooltipContent>
+                  <TooltipContent className="text-xs max-w-[260px]">These rules define how your agent handles this scenario — including verification steps, conditions, and response guidelines. Edit in natural language.</TooltipContent>
                 </Tooltip>
               </div>
               {!editingRules ? (
@@ -327,7 +315,12 @@ function ScenarioCard({
             <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Actions</p>
             <div className="space-y-1.5">
               {scenario.actions.map(action => (
-                <div key={action.id} className="flex items-center gap-3 p-2.5 rounded-md border border-border/60 hover:bg-muted/10 transition-colors">
+                <div key={action.id} className={cn(
+                  "flex items-center gap-3 p-2.5 rounded-md border transition-colors",
+                  !action.enabled && action.type === "write"
+                    ? "border-border/60 bg-muted/10"
+                    : "border-border/60 hover:bg-muted/10"
+                )}>
                   <div className={cn(
                     "w-7 h-7 rounded flex items-center justify-center shrink-0",
                     action.type === "read" ? "bg-blue-50" : "bg-amber-50"
@@ -339,7 +332,7 @@ function ScenarioCard({
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <p className="text-xs font-medium">{action.name}</p>
+                      <p className={cn("text-xs font-medium", !action.enabled && "text-muted-foreground")}>{action.name}</p>
                       <Badge variant="outline" className={cn(
                         "text-[8px]",
                         action.type === "read" ? "bg-blue-50 text-blue-600 border-blue-200" : "bg-amber-50 text-amber-600 border-amber-200"
@@ -353,6 +346,12 @@ function ScenarioCard({
                       <p className="text-[10px] text-amber-600 mt-0.5 flex items-center gap-1">
                         <AlertTriangle className="w-2.5 h-2.5" />
                         Will modify data in {action.connector}
+                      </p>
+                    )}
+                    {action.type === "write" && !action.enabled && action.disabledHint && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1 italic">
+                        <Info className="w-2.5 h-2.5 shrink-0" />
+                        {action.disabledHint}
                       </p>
                     )}
                   </div>
@@ -403,7 +402,6 @@ export default function Skills() {
   const detailSkill = skills.find(s => s.id === detailId);
 
   const handleTestScenario = (intent: string) => {
-    // Navigate to Performance > Conversations with test intent pre-filled
     navigate(`/performance?test=${encodeURIComponent(intent)}`);
   };
 
@@ -496,7 +494,7 @@ export default function Skills() {
               <TooltipTrigger asChild>
                 <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
               </TooltipTrigger>
-              <TooltipContent className="text-xs max-w-[280px]">Each scenario represents a customer intent. It includes the handling logic, your business rules (editable), and the actions the agent can perform.</TooltipContent>
+              <TooltipContent className="text-xs max-w-[280px]">Each scenario represents a customer intent. It includes your business rules (editable) and the actions the agent can perform.</TooltipContent>
             </Tooltip>
           </div>
           <div className="space-y-3">
@@ -548,7 +546,7 @@ export default function Skills() {
       {/* Global hint */}
       <motion.div variants={iV} className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/15">
         <Target className="w-4 h-4 text-primary shrink-0" />
-        <p className="text-xs text-primary">Skills define <strong>business scenarios</strong> your agents can handle. Each scenario includes handling logic, business rules you can customize, and the actions the agent is allowed to perform.</p>
+        <p className="text-xs text-primary">Skills define <strong>business scenarios</strong> your agents can handle. Each scenario includes business rules you can customize and the actions the agent is allowed to perform.</p>
       </motion.div>
 
       {/* Summary */}
