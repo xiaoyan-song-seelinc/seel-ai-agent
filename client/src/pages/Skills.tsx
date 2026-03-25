@@ -50,7 +50,6 @@ interface Skill {
   guidance: string;
   /** Actions available for this skill */
   actions: SkillAction[];
-  escalation?: string;
 }
 
 /* ── Preset Skills Data ── */
@@ -96,12 +95,20 @@ Use the order number or email to retrieve the current fulfillment status and tra
 - Suggest checking with neighbors, building management, or other household members.
 - **IF** the customer confirms they still haven't received the package, **THEN** escalate to a human agent.
 
-**Note:** Do not speculate on delivery dates beyond what carrier data shows. Do not issue refund or replacement for non-receipt — this requires human review.`,
+**Note:** Do not speculate on delivery dates beyond what carrier data shows. Do not issue refund or replacement for non-receipt — this requires human review.
+
+---
+
+### Escalation
+
+**Escalate to a human agent** in any of the following situations:
+- Tracking data has been unavailable for more than **48 hours**
+- Delivery delay exceeds **7 business days** past estimated date
+- Customer confirms non-receipt despite delivery confirmation`,
     actions: [
       { id: "ot-a1", name: "Look up order status", description: "Query order details including current fulfillment status and line items.", type: "read", connector: "Shopify", enabled: true },
       { id: "ot-a2", name: "Get tracking information", description: "Retrieve carrier tracking number, URL, and latest tracking events.", type: "read", connector: "Shopify", enabled: true },
     ],
-    escalation: "Escalate if tracking data is unavailable for 48+ hours, or if delivery delay exceeds 7 business days, or if customer confirms non-receipt.",
   },
   {
     id: "seel-protection",
@@ -186,14 +193,22 @@ Look up the policy and verify cancellation eligibility:
 
 **IF** eligible, process the cancellation and confirm:
 - Refund amount
-- Expected refund timeline`,
+- Expected refund timeline
+
+---
+
+### Escalation
+
+**Escalate to a human agent** in any of the following situations:
+- Claim is disputed by the customer
+- Partial damage with unclear liability
+- Customer disputes the cancellation policy terms`,
     actions: [
       { id: "sp-a1", name: "Look up protection policy", description: "Retrieve customer's Seel protection policy details, coverage scope, and status.", type: "read", connector: "Seel API", enabled: true },
       { id: "sp-a2", name: "Check claim status", description: "Query existing claim details including current status and resolution timeline.", type: "read", connector: "Seel API", enabled: true },
       { id: "sp-a3", name: "File a claim", description: "Initiate a new protection claim with order and issue details.", type: "write", connector: "Seel API", enabled: true, disabledHint: "Agent will collect claim details and escalate to human agent for manual filing." },
       { id: "sp-a4", name: "Cancel protection policy", description: "Process policy cancellation and trigger refund if eligible.", type: "write", connector: "Seel API", enabled: true, disabledHint: "Agent will confirm eligibility and escalate to human agent for manual cancellation." },
     ],
-    escalation: "Escalate if claim is disputed, involves partial damage with unclear liability, or if customer disputes cancellation policy terms.",
   },
   {
     id: "order-cancellation",
@@ -233,12 +248,19 @@ Confirm which order the customer wants to cancel. Ask for the order number if no
 
 For orders placed within the last few minutes, prioritize speed — the customer expects a just-placed order to be easy to cancel. Follow the same eligibility check but communicate with urgency.
 
-**Note:** Do not process cancellations without explicit customer confirmation.`,
+**Note:** Do not process cancellations without explicit customer confirmation.
+
+---
+
+### Escalation
+
+**Escalate to a human agent** in any of the following situations:
+- Customer requests partial cancellation (not currently supported)
+- Cancellation fails due to a system error`,
     actions: [
       { id: "om-a1", name: "Check order status", description: "Verify order fulfillment status and cancellation eligibility.", type: "read", connector: "Shopify", enabled: true },
       { id: "om-a2", name: "Cancel order", description: "Cancel an unfulfilled order and trigger refund to original payment method.", type: "write", connector: "Shopify", enabled: false, disabledHint: "Agent will verify eligibility and escalate to human agent for manual cancellation." },
     ],
-    escalation: "Escalate if partial cancellation requested, or if cancellation fails due to system error.",
   },
 ];
 
@@ -296,7 +318,20 @@ export default function Skills() {
   const toggleAction = (skillId: string, actionId: string) => {
     setSkills(prev => prev.map(s => {
       if (s.id !== skillId) return s;
-      return { ...s, actions: s.actions.map(a => a.id === actionId ? { ...a, enabled: !a.enabled } : a) };
+      const updatedActions = s.actions.map(a => {
+        if (a.id !== actionId) return a;
+        const newEnabled = !a.enabled;
+        // Show feedback toast when toggling write actions
+        if (a.type === "write") {
+          if (!newEnabled && a.disabledHint) {
+            toast.info(`"${a.name}" disabled — ${a.disabledHint}`, { duration: 4000 });
+          } else if (newEnabled) {
+            toast.warning(`"${a.name}" enabled — this action can modify data in ${a.connector}.`, { duration: 4000 });
+          }
+        }
+        return { ...a, enabled: newEnabled };
+      });
+      return { ...s, actions: updatedActions };
     }));
   };
 
@@ -408,17 +443,6 @@ export default function Skills() {
             </div>
           )}
         </div>
-
-        {/* Escalation */}
-        {detailSkill.escalation && (
-          <div className="flex items-start gap-2 p-3 rounded-lg bg-orange-50/50 border border-orange-200/40">
-            <AlertTriangle className="w-3.5 h-3.5 text-orange-500 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-xs font-medium text-orange-700">Escalation Rules</p>
-              <p className="text-xs text-orange-600 mt-0.5">{detailSkill.escalation}</p>
-            </div>
-          </div>
-        )}
 
         {/* Actions section */}
         <div>
