@@ -165,9 +165,8 @@ function SettingUpView({ agent }: { agent: AgentData }) {
   const [connecting, setConnecting] = useState(false);
 
   // Channel config
-  const [replyMode, setReplyMode] = useState("internal_note");
+  const [deployMode, setDeployMode] = useState("shadow");
   const [escalationGroup, setEscalationGroup] = useState("tier-2-support");
-  const [confidenceThreshold, setConfidenceThreshold] = useState([80]);
 
   // Webhook status
   const [webhookStatus, setWebhookStatus] = useState<"waiting" | "connected" | "testing">("waiting");
@@ -205,17 +204,19 @@ function SettingUpView({ agent }: { agent: AgentData }) {
   const availableToAdd = allSkills.filter(s => !skills.find(existing => existing.id === s.id));
 
   return (
-    <div className="space-y-6">
-      {/* ── Section: Zendesk Connection ── */}
-      <section className="space-y-4">
-        <h2 className="text-sm font-semibold">Zendesk connection</h2>
+    <div className="space-y-8">
 
-        {!zdConnected ? (
-          <Card>
-            <CardContent className="p-5">
+      {/* ═══ Integration ═══ */}
+      <section>
+        <h2 className="text-base font-semibold mb-4">Integration</h2>
+
+        {/* Zendesk connection */}
+        <div className="space-y-5">
+          <div>
+            <h3 className="text-sm font-medium text-muted-foreground mb-2">Zendesk account</h3>
+            {!zdConnected ? (
               <div className="flex items-end gap-3">
                 <div className="flex-1 max-w-[260px]">
-                  <Label className="text-xs mb-1.5 block">Subdomain</Label>
                   <div className="flex items-center gap-1.5">
                     <Input
                       value={zdSubdomain}
@@ -230,35 +231,25 @@ function SettingUpView({ agent }: { agent: AgentData }) {
                   {connecting ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Connecting</> : <><ExternalLink className="w-3.5 h-3.5" /> Authorize</>}
                 </Button>
               </div>
-              <p className="text-[11px] text-muted-foreground mt-2">OAuth via the Seel App. Permissions: read/write tickets, read users, read groups.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardContent className="p-4 flex items-center gap-3">
-              <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-              <span className="text-sm font-medium flex-1">{zdSubdomain}.zendesk.com</span>
-              <Badge variant="outline" className="text-[10px] text-primary border-primary/20">Connected</Badge>
-              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => { setZdConnected(false); setZdSubdomain(""); }}>Disconnect</Button>
-            </CardContent>
-          </Card>
-        )}
-      </section>
+            ) : (
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                <span className="text-sm flex-1">{zdSubdomain}.zendesk.com</span>
+                <Badge variant="outline" className="text-[10px] text-primary border-primary/20">Connected</Badge>
+                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => { setZdConnected(false); setZdSubdomain(""); }}>Disconnect</Button>
+              </div>
+            )}
+          </div>
 
-      {/* ── Section: Ticket routing ── */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Ticket routing</h2>
-          <Button variant="outline" size="sm" className="text-xs gap-1.5 h-7" onClick={() => setTriggerGuideOpen(true)}>
-            <BookOpen className="w-3 h-3" /> Setup guide
-          </Button>
-        </div>
-
-        <Card>
-          <CardContent className="p-5 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Ticket routing */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-muted-foreground">Ticket routing</h3>
+              <button className="text-xs text-primary hover:underline" onClick={() => setTriggerGuideOpen(true)}>Setup guide</button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs mb-1.5 block">Webhook URL</Label>
+                <Label className="text-[11px] text-muted-foreground mb-1 block">Webhook URL</Label>
                 <div className="flex items-center gap-1.5">
                   <Input readOnly value="https://api.seel.com/webhooks/zendesk/acme" className="h-8 text-xs bg-muted/30 font-mono" />
                   <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => { navigator.clipboard.writeText("https://api.seel.com/webhooks/zendesk/acme"); toast.success("Copied"); }}>
@@ -267,7 +258,7 @@ function SettingUpView({ agent }: { agent: AgentData }) {
                 </div>
               </div>
               <div>
-                <Label className="text-xs mb-1.5 block">Webhook Secret</Label>
+                <Label className="text-[11px] text-muted-foreground mb-1 block">Webhook Secret</Label>
                 <div className="flex items-center gap-1.5">
                   <Input readOnly value="whsec_••••••••••••" className="h-8 text-xs bg-muted/30 font-mono" />
                   <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => { navigator.clipboard.writeText("whsec_abc123xyz"); toast.success("Copied"); }}>
@@ -276,124 +267,115 @@ function SettingUpView({ agent }: { agent: AgentData }) {
                 </div>
               </div>
             </div>
-            <div className="flex items-center justify-between pt-2 border-t">
-              <div className="flex items-center gap-2">
-                <div className={cn("w-2 h-2 rounded-full", webhookStatus === "connected" ? "bg-primary" : webhookStatus === "testing" ? "bg-amber-400 animate-pulse" : "bg-muted-foreground/30")} />
-                <span className="text-[11px] text-muted-foreground">
-                  {webhookStatus === "connected" ? "Last received: 2 min ago" : webhookStatus === "testing" ? "Testing..." : "Waiting for first webhook..."}
-                </span>
-              </div>
-              <Button variant="ghost" size="sm" className="text-xs h-7 gap-1" onClick={() => {
+            <div className="flex items-center gap-2 mt-2">
+              <div className={cn("w-1.5 h-1.5 rounded-full", webhookStatus === "connected" ? "bg-primary" : webhookStatus === "testing" ? "bg-amber-400 animate-pulse" : "bg-muted-foreground/30")} />
+              <span className="text-[11px] text-muted-foreground flex-1">
+                {webhookStatus === "connected" ? "Last received: 2 min ago" : webhookStatus === "testing" ? "Testing..." : "Waiting for first webhook..."}
+              </span>
+              <button className="text-[11px] text-primary hover:underline flex items-center gap-1" onClick={() => {
                 setWebhookStatus("testing");
                 setTimeout(() => { setWebhookStatus("connected"); toast.success("Webhook connection verified"); }, 1500);
               }}>
-                <RefreshCw className="w-3 h-3" /> Test connection
-              </Button>
+                <RefreshCw className="w-3 h-3" /> Test
+              </button>
             </div>
-            <p className="text-[11px] text-muted-foreground">
-              Create a Trigger in Zendesk to send new tickets to this webhook.{" "}
-              <button className="text-primary hover:underline" onClick={() => setTriggerGuideOpen(true)}>View guide</button>
-            </p>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* ── Section: Reply settings ── */}
-      <section className="space-y-4">
-        <h2 className="text-sm font-semibold">Reply settings</h2>
-
-        <Card>
-          <CardContent className="p-5 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs mb-1.5 block">Reply mode</Label>
-                <Select value={replyMode} onValueChange={setReplyMode}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="public_reply">Public reply</SelectItem>
-                    <SelectItem value="internal_note">Internal note</SelectItem>
-                  </SelectContent>
-                </Select>
-                {replyMode === "internal_note" && (
-                  <p className="text-[11px] text-muted-foreground mt-1">Human agents review AI drafts before sending.</p>
-                )}
-              </div>
-              <div>
-                <Label className="text-xs mb-1.5 block">Escalation group</Label>
-                <Select value={escalationGroup} onValueChange={setEscalationGroup}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="tier-2-support">Tier 2 Support</SelectItem>
-                    <SelectItem value="senior-agents">Senior Agents</SelectItem>
-                    <SelectItem value="cx-managers">CX Managers</SelectItem>
-                    <SelectItem value="billing-team">Billing Team</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-[11px] text-muted-foreground mt-1">Unresolved tickets are reassigned to this group.</p>
-              </div>
-            </div>
-            <div className="pt-3 border-t">
-              <div className="flex items-center justify-between mb-2">
-                <Label className="text-xs">Confidence threshold</Label>
-                <span className="text-xs font-mono font-medium">{confidenceThreshold[0]}%</span>
-              </div>
-              <Slider value={confidenceThreshold} onValueChange={setConfidenceThreshold} min={50} max={99} step={1} className="w-full" />
-              <p className="text-[11px] text-muted-foreground mt-1.5">Below this confidence level, the agent escalates to the human group instead of replying.</p>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* ── Section: Skills ── */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Skills</h2>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="text-xs gap-1.5 h-7" onClick={() => setShowAddSkill(true)}>
-              <Plus className="w-3 h-3" /> Add
-            </Button>
-            <Link href="/playbook/skills">
-              <span className="text-xs text-primary hover:underline cursor-pointer">Manage →</span>
-            </Link>
           </div>
         </div>
-
-        <Card>
-          <CardContent className="p-0">
-            {skills.map((skill, i) => (
-              <div key={skill.id} className={cn(
-                "flex items-center gap-3 px-4 py-3",
-                i < skills.length - 1 && "border-b"
-              )}>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">{skill.name}</span>
-                    {skill.isDefault && <Badge variant="secondary" className="text-[9px] px-1.5 py-0">Default</Badge>}
-                  </div>
-                </div>
-                <Switch
-                  checked={skill.enabled}
-                  onCheckedChange={() => handleToggleSkill(skill.id)}
-                />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
       </section>
 
-      {/* ── Actions bar ── */}
-      <div className="flex items-center justify-between pt-2 border-t">
-        <Button variant="outline" className="gap-1.5" onClick={() => setTestOpen(true)}>
-          <MessageSquare className="w-4 h-4" /> Test Agent
+      <hr className="border-border" />
+
+      {/* ═══ Agent behavior ═══ */}
+      <section>
+        <h2 className="text-base font-semibold mb-4">Agent behavior</h2>
+
+        <div className="space-y-5">
+          {/* Deploy mode */}
+          <div>
+            <h3 className="text-sm font-medium text-muted-foreground mb-2">Deploy mode</h3>
+            <div className="space-y-2">
+              <label className={cn(
+                "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                deployMode === "shadow" ? "border-primary/40 bg-primary/5" : "border-border hover:border-border/80"
+              )} onClick={() => setDeployMode("shadow")}>
+                <div className={cn("w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center",
+                  deployMode === "shadow" ? "border-primary" : "border-muted-foreground/30"
+                )}>
+                  {deployMode === "shadow" && <div className="w-2 h-2 rounded-full bg-primary" />}
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Shadow</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">AI drafts are added as internal notes. Human agents review and send.</p>
+                </div>
+              </label>
+              <label className={cn(
+                "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                deployMode === "autopilot" ? "border-primary/40 bg-primary/5" : "border-border hover:border-border/80"
+              )} onClick={() => setDeployMode("autopilot")}>
+                <div className={cn("w-4 h-4 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center",
+                  deployMode === "autopilot" ? "border-primary" : "border-muted-foreground/30"
+                )}>
+                  {deployMode === "autopilot" && <div className="w-2 h-2 rounded-full bg-primary" />}
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Autopilot</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">AI replies directly to customers. No human review required.</p>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* Escalation */}
+          <div>
+            <h3 className="text-sm font-medium text-muted-foreground mb-2">Escalation group</h3>
+            <Select value={escalationGroup} onValueChange={setEscalationGroup}>
+              <SelectTrigger className="h-9 max-w-[280px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tier-2-support">Tier 2 Support</SelectItem>
+                <SelectItem value="senior-agents">Senior Agents</SelectItem>
+                <SelectItem value="cx-managers">CX Managers</SelectItem>
+                <SelectItem value="billing-team">Billing Team</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground mt-1">Tickets the agent can't resolve are reassigned to this group.</p>
+          </div>
+
+          {/* Skills */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-muted-foreground">Skills</h3>
+              <div className="flex items-center gap-2">
+                <button className="text-xs text-primary hover:underline" onClick={() => setShowAddSkill(true)}>+ Add</button>
+                <Link href="/playbook/skills"><span className="text-xs text-muted-foreground hover:underline cursor-pointer">Manage</span></Link>
+              </div>
+            </div>
+            <div className="space-y-0 border rounded-lg divide-y">
+              {skills.map(skill => (
+                <div key={skill.id} className="flex items-center gap-3 px-3 py-2.5">
+                  <span className="text-sm flex-1">{skill.name}</span>
+                  {skill.isDefault && <Badge variant="secondary" className="text-[9px] px-1.5 py-0">Default</Badge>}
+                  <Switch
+                    checked={skill.enabled}
+                    onCheckedChange={() => handleToggleSkill(skill.id)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ Actions bar ═══ */}
+      <div className="flex items-center justify-between pt-4 border-t">
+        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setTestOpen(true)}>
+          <MessageSquare className="w-3.5 h-3.5" /> Test Agent
         </Button>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={() => toast.success("Settings saved")}>Save</Button>
-          <Button className="gap-1.5" onClick={() => toast.success(`${agent.name} is now Live!`)}>
-            <Play className="w-4 h-4" /> Deploy
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => toast.success("Settings saved")}>Save</Button>
+          <Button size="sm" className="gap-1.5" disabled={!zdConnected} onClick={() => toast.success(`${agent.name} deployed in ${deployMode === "shadow" ? "Shadow" : "Autopilot"} mode!`)}>
+            <Play className="w-3.5 h-3.5" /> Deploy
           </Button>
         </div>
       </div>
