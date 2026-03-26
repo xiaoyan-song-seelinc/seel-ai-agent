@@ -378,7 +378,30 @@ export default function Agents() {
         </div>
       </motion.div>
 
+      {/* V3 Prototype Demo */}
+      <motion.div variants={iV}>
+        <div className="rounded-xl border border-dashed border-primary/30 bg-primary/[0.02] p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Sparkles className="w-4.5 h-4.5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">V3 Prototype Demo</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">New architecture: Management HQ + Zendesk Sidebar · Single Agent · SOP + Ticket Analysis Onboarding</p>
+              </div>
+            </div>
+            <a href="/prototype/index.html" target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs border-primary/30 text-primary hover:bg-primary/5">
+                Open Demo <ArrowUpRight className="w-3 h-3" />
+              </Button>
+            </a>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Create Agent Dialog */}
+
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-[540px]">
           <DialogHeader>

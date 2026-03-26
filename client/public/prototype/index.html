@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Support Agent</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ═══════ LOADING SCREEN ═══════ -->
+<div id="loading-screen">
+  <div class="logo-text">AI Support Agent</div>
+  <div class="logo-sub">Intelligent Customer Service Management</div>
+  <div class="loading-spinner"></div>
+</div>
+
+<!-- ═══════ LOGIN SCREEN ═══════ -->
+<div id="login-screen">
+  <div class="login-container">
+    <div class="login-left">
+      <h1>Your AI Employee,<br>Managed Like a Pro</h1>
+      <p>Configure, monitor, and continuously improve your AI support agent — all from one place.</p>
+      <div class="login-stats">
+        <div class="login-stat">
+          <div class="stat-value">87%</div>
+          <div class="stat-label">Auto-Resolution</div>
+        </div>
+        <div class="login-stat">
+          <div class="stat-value">4.6★</div>
+          <div class="stat-label">Avg CSAT</div>
+        </div>
+        <div class="login-stat">
+          <div class="stat-value">5.8s</div>
+          <div class="stat-label">Avg Response</div>
+        </div>
+      </div>
+    </div>
+    <div class="login-right">
+      <div class="login-form">
+        <div class="demo-badge">✦ Interactive Demo</div>
+        <h2>Welcome back</h2>
+        <p class="subtitle">Sign in to your AI Support Agent dashboard</p>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="login-email" value="sarah@debenhams.com" />
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="login-password" value="••••••••" />
+        </div>
+        <button class="btn btn-primary btn-full btn-lg" onclick="App.login()">Sign In</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ ONBOARDING SCREEN ═══════ -->
+<div id="onboarding-screen">
+  <div class="onboarding-container">
+    <div class="onboarding-header">
+      <h1>Set Up Your AI Agent</h1>
+      <p>Let's get your AI employee ready to work. This takes about 5 minutes.</p>
+    </div>
+
+    <!-- Progress Steps -->
+    <div class="progress-steps">
+      <div class="progress-step active" data-step="1">
+        <div class="step-circle">1</div>
+        <div class="step-label">Zendesk</div>
+      </div>
+      <div class="progress-step" data-step="2">
+        <div class="step-circle">2</div>
+        <div class="step-label">Shopify</div>
+      </div>
+      <div class="progress-step" data-step="3">
+        <div class="step-circle">3</div>
+        <div class="step-label">Knowledge</div>
+      </div>
+      <div class="progress-step" data-step="4">
+        <div class="step-circle">4</div>
+        <div class="step-label">Configure</div>
+      </div>
+      <div class="progress-step" data-step="5">
+        <div class="step-circle">5</div>
+        <div class="step-label">Audit</div>
+      </div>
+    </div>
+
+    <!-- Step 1: Connect Zendesk -->
+    <div class="step-content active" id="step-1">
+      <div class="step-card">
+        <h3>Connect Your Ticket System</h3>
+        <p>We'll integrate with your existing ticket system so your AI agent can work alongside your team.</p>
+        <div class="integration-cards">
+          <div class="integration-card" id="card-zendesk" onclick="Onboarding.selectIntegration('zendesk')">
+            <div class="card-icon">🎫</div>
+            <div class="card-title">Zendesk</div>
+            <div class="card-desc">Full API integration</div>
+          </div>
+          <div class="integration-card disabled">
+            <div class="card-icon">💬</div>
+            <div class="card-title">Intercom</div>
+            <div class="card-desc">Chat & tickets</div>
+            <div class="coming-soon">Coming Soon</div>
+          </div>
+          <div class="integration-card disabled">
+            <div class="card-icon">🛒</div>
+            <div class="card-title">Gorgias</div>
+            <div class="card-desc">E-commerce focused</div>
+            <div class="coming-soon">Coming Soon</div>
+          </div>
+          <div class="integration-card disabled">
+            <div class="card-icon">☁️</div>
+            <div class="card-title">Freshdesk</div>
+            <div class="card-desc">Helpdesk suite</div>
+            <div class="coming-soon">Coming Soon</div>
+          </div>
+        </div>
+        <div id="zendesk-connection" class="hidden mt-2">
+          <div class="form-group">
+            <label>Zendesk Subdomain</label>
+            <input type="text" value="debenhams.zendesk.com" />
+          </div>
+          <button class="btn btn-primary" onclick="Onboarding.connectZendesk()">Connect Zendesk</button>
+          <div id="zendesk-result" class="hidden">
+            <div class="connection-result">
+              <div class="result-header">✓ Connected to Zendesk</div>
+              <div class="result-grid">
+                <div class="result-item"><span class="label">Agents:</span> <span class="value">12 active</span></div>
+                <div class="result-item"><span class="label">Tickets (30d):</span> <span class="value">4,821</span></div>
+                <div class="result-item"><span class="label">Avg CSAT:</span> <span class="value">4.2★</span></div>
+                <div class="result-item"><span class="label">Avg Response:</span> <span class="value">2.4 hours</span></div>
+              </div>
+            </div>
+            <button class="btn btn-primary mt-2" onclick="Onboarding.nextStep(2)">Continue →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Connect Shopify -->
+    <div class="step-content" id="step-2">
+      <div class="step-card">
+        <h3>Connect Your Store</h3>
+        <p>Connect your e-commerce platform so the AI agent can look up orders, process refunds, and take actions.</p>
+        <div class="integration-cards">
+          <div class="integration-card" onclick="Onboarding.connectShopify()">
+            <div class="card-icon">🛍️</div>
+            <div class="card-title">Shopify</div>
+            <div class="card-desc">Orders, refunds, inventory</div>
+          </div>
+          <div class="integration-card disabled">
+            <div class="card-icon">🏪</div>
+            <div class="card-title">WooCommerce</div>
+            <div class="card-desc">WordPress store</div>
+            <div class="coming-soon">Coming Soon</div>
+          </div>
+        </div>
+        <div id="shopify-result" class="hidden mt-2">
+          <div class="connection-result">
+            <div class="result-header">✓ Connected to Shopify</div>
+            <div class="result-grid">
+              <div class="result-item"><span class="label">Store:</span> <span class="value">Debenhams UK</span></div>
+              <div class="result-item"><span class="label">Products:</span> <span class="value">2,847</span></div>
+              <div class="result-item"><span class="label">Orders (30d):</span> <span class="value">8,392</span></div>
+              <div class="result-item"><span class="label">Returns (30d):</span> <span class="value">412</span></div>
+            </div>
+          </div>
+          <button class="btn btn-primary mt-2" onclick="Onboarding.nextStep(3)">Continue →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: Knowledge (SOP + Ticket Analysis) -->
+    <div class="step-content" id="step-3">
+      <div class="step-card">
+        <h3>Teach Your AI Agent</h3>
+        <p>Upload your SOPs and we'll also analyse your historical tickets to build a comprehensive knowledge base.</p>
+
+        <!-- Upload Zone -->
+        <div class="upload-zone" onclick="Onboarding.simulateUpload()">
+          <div class="upload-icon">📄</div>
+          <div><strong>Drop files here</strong> or click to upload</div>
+          <div class="text-muted" style="font-size:0.8rem; margin-top:0.25rem;">PDF, DOCX, TXT supported</div>
+        </div>
+        <div id="uploaded-files" class="uploaded-files hidden"></div>
+
+        <!-- Parsing Progress -->
+        <div id="parsing-progress" class="parsing-progress">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem;">
+            <span style="font-size:0.85rem; font-weight:500;">Analysing documents & historical tickets...</span>
+            <span id="parsing-pct" style="font-size:0.85rem; font-weight:600; color:var(--primary);">0%</span>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="parsing-bar"></div>
+          </div>
+          <div class="parsing-log" id="parsing-log"></div>
+        </div>
+
+        <!-- Parsing Results -->
+        <div id="parsing-results" class="parsing-results">
+          <h3 style="margin-bottom:0.75rem;">📋 Extraction Results</h3>
+          <div class="rule-categories">
+            <div class="rule-category"><div class="cat-count">18</div><div><div class="cat-name">Prompt Rules</div><div class="cat-label">Agent behaviour</div></div></div>
+            <div class="rule-category"><div class="cat-count">12</div><div><div class="cat-name">Guardrails</div><div class="cat-label">Safety limits</div></div></div>
+            <div class="rule-category"><div class="cat-count">9</div><div><div class="cat-name">Actions</div><div class="cat-label">Executable ops</div></div></div>
+            <div class="rule-category"><div class="cat-count">8</div><div><div class="cat-name">Escalation Rules</div><div class="cat-label">Handoff triggers</div></div></div>
+          </div>
+
+          <div class="warning-list">
+            <div class="warning-item"><span class="warning-icon">⚠</span> Return window: "30 days" vs "28 calendar days" found in different documents</div>
+            <div class="warning-item"><span class="warning-icon">⚠</span> No international returns policy found in SOP</div>
+            <div class="warning-item"><span class="warning-icon">⚠</span> No gift card refund rules found in SOP</div>
+          </div>
+
+          <!-- Gap Analysis from Tickets -->
+          <h3 style="margin:1.5rem 0 0.5rem;">🔍 SOP vs Actual Practice — Gap Analysis</h3>
+          <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">We analysed 500 recent tickets and found differences between your SOP and how your team actually operates. Please make a decision on each:</p>
+
+          <div class="decision-points" id="decision-points">
+            <!-- Populated by JS -->
+          </div>
+
+          <button class="btn btn-primary mt-2" id="step3-continue" onclick="Onboarding.nextStep(4)" disabled>Continue →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4: Configure Agent -->
+    <div class="step-content" id="step-4">
+      <div class="step-card">
+        <h3>Configure Your AI Agent</h3>
+        <p>Set the basic parameters for how your AI agent should behave.</p>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:1rem;">
+          <div class="form-group">
+            <label>Agent Name</label>
+            <input type="text" value="AI Assistant" id="config-name" />
+          </div>
+          <div class="form-group">
+            <label>Personality</label>
+            <select style="width:100%; padding:0.65rem 0.85rem; border:1.5px solid var(--border); border-radius:var(--radius); font-size:0.95rem; background:#fff;">
+              <option selected>Warm & Professional</option>
+              <option>Formal & Precise</option>
+              <option>Friendly & Casual</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Language</label>
+            <select style="width:100%; padding:0.65rem 0.85rem; border:1.5px solid var(--border); border-radius:var(--radius); font-size:0.95rem; background:#fff;">
+              <option selected>English (British)</option>
+              <option>English (American)</option>
+              <option>French</option>
+              <option>German</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Refund Cap (£)</label>
+            <input type="number" value="80" />
+          </div>
+        </div>
+
+        <h4 style="margin-top:1.5rem; margin-bottom:0.75rem; font-size:0.95rem;">Allowed Actions</h4>
+        <div id="action-toggles" style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+          <!-- Populated by JS -->
+        </div>
+
+        <div style="margin-top:1.5rem;">
+          <h4 style="margin-bottom:0.5rem; font-size:0.95rem;">Initial Mode</h4>
+          <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.75rem;">Shadow Mode: AI drafts responses but doesn't send them. You review and approve each one.<br>Production Mode: AI handles tickets autonomously within its guardrails.</p>
+          <div style="display:flex; gap:0.75rem;">
+            <button class="btn btn-secondary mode-btn active" onclick="Onboarding.selectMode(this, 'shadow')">👁️ Shadow Mode (Recommended)</button>
+            <button class="btn btn-secondary mode-btn" onclick="Onboarding.selectMode(this, 'production')">⚡ Production Mode</button>
+          </div>
+        </div>
+
+        <button class="btn btn-primary mt-2" onclick="Onboarding.nextStep(5)">Run Readiness Audit →</button>
+      </div>
+    </div>
+
+    <!-- Step 5: Readiness Audit -->
+    <div class="step-content" id="step-5">
+      <div class="step-card">
+        <h3>Readiness Audit</h3>
+        <p>Testing your AI agent against historical tickets to measure readiness.</p>
+
+        <div id="audit-animation" class="audit-animation active">
+          <div class="loading-spinner" style="margin:0 auto 1rem;"></div>
+          <div>Running simulation on <strong>500</strong> historical tickets...</div>
+          <div class="audit-counter" id="audit-counter">0 / 500</div>
+        </div>
+
+        <div id="audit-results" class="audit-results">
+          <div style="text-align:center; margin-bottom:1.5rem;">
+            <div class="readiness-gauge">
+              <div class="gauge-value">89%</div>
+              <div class="gauge-label">Ready</div>
+            </div>
+          </div>
+
+          <div class="audit-metrics">
+            <div class="audit-metric"><div class="metric-value" style="color:var(--primary);">87%</div><div class="metric-label">Coverage</div></div>
+            <div class="audit-metric"><div class="metric-value" style="color:var(--success);">94%</div><div class="metric-label">Accuracy</div></div>
+            <div class="audit-metric"><div class="metric-value" style="color:var(--info);">91%</div><div class="metric-label">Compliance</div></div>
+            <div class="audit-metric"><div class="metric-value" style="color:var(--warning);">13%</div><div class="metric-label">Escalation</div></div>
+          </div>
+
+          <h4 style="margin-bottom:0.75rem; font-size:0.9rem;">Performance by Category</h4>
+          <div class="category-bars" id="category-bars">
+            <!-- Populated by JS -->
+          </div>
+
+          <div style="background:var(--info-light); border:1px solid #bfdbfe; border-radius:var(--radius); padding:1rem; margin-bottom:1.5rem; font-size:0.85rem; color:#1e40af;">
+            <strong>💡 Recommendation:</strong> AI Agent is ready for production on high-confidence categories (WISMO, Cancellations, Address Changes). Consider Shadow Mode for Complaints until resolution rate improves.
+          </div>
+
+          <button class="btn btn-success btn-lg btn-full" onclick="Onboarding.launch()">🚀 Launch AI Agent</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ AHA MOMENT OVERLAY ═══════ -->
+<div id="aha-overlay">
+  <div class="aha-card">
+    <div class="aha-icon">🚀</div>
+    <h2>Your AI Agent is Live!</h2>
+    <p>AI Assistant is now handling tickets in Shadow Mode. You'll review its responses before they're sent to customers.</p>
+    <div class="aha-stats">
+      <div class="aha-stat"><div class="stat-value">89%</div><div class="stat-label">Readiness Score</div></div>
+      <div class="aha-stat"><div class="stat-value">47</div><div class="stat-label">Rules Loaded</div></div>
+      <div class="aha-stat"><div class="stat-value">6</div><div class="stat-label">Actions Enabled</div></div>
+    </div>
+    <button class="btn btn-primary btn-lg" onclick="App.enterDashboard()">Go to Dashboard →</button>
+  </div>
+</div>
+
+<!-- ═══════ DASHBOARD ═══════ -->
+<div id="dashboard-screen">
+  <!-- Sidebar -->
+  <div class="dashboard-sidebar">
+    <div class="sidebar-logo">
+      <span class="logo-icon">🤖</span>
+      <span class="logo-name">AI Support Agent</span>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main</div>
+      <div class="nav-item active" data-page="overview" onclick="App.navigate('overview')">
+        <span class="nav-icon">📊</span> Overview
+      </div>
+      <div class="nav-item" data-page="conversations" onclick="App.navigate('conversations')">
+        <span class="nav-icon">💬</span> Conversations
+        <span class="nav-badge">2</span>
+      </div>
+      <div class="nav-item" data-page="performance" onclick="App.navigate('performance')">
+        <span class="nav-icon">📈</span> Performance
+      </div>
+      <div class="nav-section-label">Configure</div>
+      <div class="nav-item" data-page="knowledge" onclick="App.navigate('knowledge')">
+        <span class="nav-icon">📚</span> Knowledge
+      </div>
+      <div class="nav-item" data-page="agent-config" onclick="App.navigate('agent-config')">
+        <span class="nav-icon">⚙️</span> Agent Config
+      </div>
+      <div class="nav-section-label">Demo</div>
+      <div class="nav-item" data-page="zendesk-demo" onclick="App.navigate('zendesk-demo')">
+        <span class="nav-icon">🎫</span> Zendesk Sidebar
+      </div>
+    </nav>
+    <div class="sidebar-agent">
+      <div class="agent-avatar">🤖</div>
+      <div>
+        <div class="agent-name">AI Assistant</div>
+        <div class="agent-status">Online — Production</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="dashboard-main">
+    <div class="dashboard-header">
+      <h2 id="page-title">Overview</h2>
+      <div class="header-actions">
+        <button class="btn btn-ghost btn-sm" onclick="App.showToast('Notifications coming soon', 'info')">🔔</button>
+        <button class="btn btn-secondary btn-sm">Sarah M.</button>
+      </div>
+    </div>
+    <div class="dashboard-content" id="dashboard-content">
+
+      <!-- ═══ OVERVIEW PAGE ═══ -->
+      <div class="page-view active" id="page-overview">
+        <div class="kpi-row">
+          <div class="kpi-card">
+            <div class="kpi-label">Tickets Today</div>
+            <div class="kpi-value">61</div>
+            <div class="kpi-trend positive">↑ 8% vs last week</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Auto-Resolution</div>
+            <div class="kpi-value">87.3%</div>
+            <div class="kpi-trend positive">↑ 2.1% vs last week</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">CSAT</div>
+            <div class="kpi-value">4.6★</div>
+            <div class="kpi-trend positive">↑ 0.1 vs last week</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Avg Response</div>
+            <div class="kpi-value">5.8s</div>
+            <div class="kpi-trend positive">↓ 1.2s vs last week</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Cost / Ticket</div>
+            <div class="kpi-value">£0.72</div>
+            <div class="kpi-trend positive">85% less than human</div>
+          </div>
+        </div>
+
+        <div class="overview-grid">
+          <div class="card">
+            <div class="card-header">
+              <h3>Ticket Volume (This Week)</h3>
+            </div>
+            <div class="chart-container" id="volume-chart">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h3>Alerts & Recommendations</h3>
+            </div>
+            <div id="alerts-container">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ CONVERSATIONS PAGE ═══ -->
+      <div class="page-view" id="page-conversations">
+        <div class="conversations-layout">
+          <!-- Ticket List -->
+          <div class="ticket-list-panel">
+            <div class="ticket-list-header">
+              <h3>AI Conversations</h3>
+              <div class="ticket-filters">
+                <div class="ticket-filter active" onclick="Conversations.filter('all', this)">All</div>
+                <div class="ticket-filter" onclick="Conversations.filter('pending', this)">Pending</div>
+                <div class="ticket-filter" onclick="Conversations.filter('solved', this)">Solved</div>
+              </div>
+            </div>
+            <div class="ticket-list" id="ticket-list">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- Thread -->
+          <div class="conversation-panel" id="conversation-panel">
+            <div style="flex:1; display:flex; align-items:center; justify-content:center; color:var(--text-muted);">
+              Select a conversation to view details
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ PERFORMANCE PAGE ═══ -->
+      <div class="page-view" id="page-performance">
+        <div class="performance-header">
+          <div></div>
+          <div class="time-selector">
+            <button class="time-btn active">7 Days</button>
+            <button class="time-btn">30 Days</button>
+            <button class="time-btn">90 Days</button>
+          </div>
+        </div>
+
+        <div class="kpi-row" style="grid-template-columns: repeat(4, 1fr);">
+          <div class="kpi-card">
+            <div class="kpi-label">Total Tickets</div>
+            <div class="kpi-value">404</div>
+            <div class="kpi-trend positive">↑ 12% vs prior period</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Auto-Resolved</div>
+            <div class="kpi-value">365</div>
+            <div class="kpi-trend positive">90.3% resolution rate</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Escalated</div>
+            <div class="kpi-value">39</div>
+            <div class="kpi-trend">9.7% escalation rate</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Cost Saved</div>
+            <div class="kpi-value">£1,651</div>
+            <div class="kpi-trend positive">vs human handling</div>
+          </div>
+        </div>
+
+        <div class="perf-grid">
+          <div class="card">
+            <div class="card-header"><h3>Daily Trend</h3></div>
+            <div class="chart-container" id="perf-chart">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>Resolution by Category</h3></div>
+            <table class="perf-table">
+              <thead><tr><th>Category</th><th>Share</th><th>Resolution</th><th></th></tr></thead>
+              <tbody id="category-table">
+                <!-- Populated by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ KNOWLEDGE PAGE ═══ -->
+      <div class="page-view" id="page-knowledge">
+        <div class="knowledge-tabs">
+          <div class="knowledge-tab active" onclick="Knowledge.switchTab('documents', this)">Documents</div>
+          <div class="knowledge-tab" onclick="Knowledge.switchTab('teach', this)">Teach AI</div>
+          <div class="knowledge-tab" onclick="Knowledge.switchTab('gaps', this)">Knowledge Gaps <span style="background:var(--warning-light); color:#92400e; font-size:0.65rem; padding:0.1rem 0.4rem; border-radius:10px; font-weight:600; margin-left:0.35rem;">5</span></div>
+          <div class="knowledge-tab" onclick="Knowledge.switchTab('temp', this)">Temp Instructions</div>
+          <div class="knowledge-tab" onclick="Knowledge.switchTab('advanced', this)">Advanced Config</div>
+        </div>
+
+        <!-- Documents Tab -->
+        <div class="knowledge-view active" id="kv-documents">
+          <div class="flex-between mb-2">
+            <div>
+              <h3 style="font-size:1rem;">Uploaded Documents</h3>
+              <p style="font-size:0.85rem; color:var(--text-secondary);">Source documents that power your AI agent's knowledge</p>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="App.showToast('Upload coming soon', 'info')">+ Upload Document</button>
+          </div>
+          <div class="doc-list" id="doc-list">
+            <!-- Populated by JS -->
+          </div>
+          <div class="card mt-2">
+            <div class="card-header"><h3>Knowledge Quality Score</h3></div>
+            <div style="display:flex; align-items:center; gap:1.5rem; margin-bottom:1rem;">
+              <div style="font-size:2.5rem; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--success);">92%</div>
+              <div style="font-size:0.85rem; color:var(--text-secondary);">Your knowledge base covers most common scenarios. Address the gaps below to improve further.</div>
+            </div>
+            <div id="quality-items">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Teach AI Tab -->
+        <div class="knowledge-view" id="kv-teach">
+          <div class="teach-ai-container">
+            <h3 style="font-size:1rem; margin-bottom:0.25rem;">Teach AI</h3>
+            <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1.25rem;">Tell your AI agent something new in plain English. It will update its knowledge accordingly.</p>
+            <div class="teach-input-wrapper">
+              <textarea class="teach-input" id="teach-input" placeholder="e.g., 'From now on, refund processing time is 5-10 business days, not 3-5 days'&#10;&#10;Or: 'For VIP customers, always offer free express shipping on replacement orders'"></textarea>
+              <div class="teach-actions">
+                <span style="font-size:0.75rem; color:var(--text-muted);">AI will preview changes before applying</span>
+                <button class="btn btn-primary btn-sm" onclick="Knowledge.teachAI()">Preview Changes →</button>
+              </div>
+            </div>
+            <div class="teach-preview" id="teach-preview">
+              <h4>📝 Proposed Changes</h4>
+              <div class="preview-diff">
+                <div class="diff-old">Refund processing time: 3-5 business days</div>
+                <div class="diff-new">Refund processing time: 5-10 business days</div>
+              </div>
+              <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:0.75rem;">This will update the agent's response template for all refund-related tickets.</p>
+              <div style="display:flex; gap:0.5rem;">
+                <button class="btn btn-success btn-sm" onclick="Knowledge.confirmTeach()">✓ Apply Changes</button>
+                <button class="btn btn-secondary btn-sm" onclick="document.getElementById('teach-preview').classList.remove('active')">Cancel</button>
+              </div>
+            </div>
+
+            <!-- Recent Teachings -->
+            <div class="mt-3">
+              <h4 style="font-size:0.9rem; margin-bottom:0.75rem;">Recent Teachings</h4>
+              <div id="feedback-log">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Knowledge Gaps Tab -->
+        <div class="knowledge-view" id="kv-gaps">
+          <div class="flex-between mb-2">
+            <div>
+              <h3 style="font-size:1rem;">Knowledge Gaps</h3>
+              <p style="font-size:0.85rem; color:var(--text-secondary);">Topics where the AI agent lacks sufficient knowledge and had to escalate</p>
+            </div>
+          </div>
+          <div class="gap-list" id="gap-list">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- Temp Instructions Tab -->
+        <div class="knowledge-view" id="kv-temp">
+          <div style="max-width:640px;">
+            <h3 style="font-size:1rem; margin-bottom:0.25rem;">Temporary Instructions</h3>
+            <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1.25rem;">Time-limited overrides for your AI agent. These take priority over standard rules during the effective period.</p>
+
+            <div class="temp-instruction-form">
+              <div class="teach-input-wrapper">
+                <textarea class="teach-input" placeholder="e.g., 'For the next 3 days, auto-approve all refunds under £100'"></textarea>
+                <div class="teach-actions">
+                  <div style="display:flex; gap:0.75rem; align-items:center;">
+                    <div class="form-group" style="margin:0;">
+                      <label style="font-size:0.75rem;">From</label>
+                      <input type="date" style="padding:0.35rem 0.5rem; border:1.5px solid var(--border); border-radius:var(--radius); font-size:0.8rem;" />
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                      <label style="font-size:0.75rem;">To</label>
+                      <input type="date" style="padding:0.35rem 0.5rem; border:1.5px solid var(--border); border-radius:var(--radius); font-size:0.8rem;" />
+                    </div>
+                  </div>
+                  <button class="btn btn-primary btn-sm" onclick="App.showToast('Temporary instruction added', 'success')">Add Instruction</button>
+                </div>
+              </div>
+            </div>
+
+            <h4 style="font-size:0.9rem; margin-bottom:0.75rem;">Active & Scheduled</h4>
+            <div id="temp-instructions-list">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Advanced Config Tab -->
+        <div class="knowledge-view" id="kv-advanced">
+          <div class="config-warning">⚠ Changes here directly affect AI agent behaviour. Review carefully before saving.</div>
+          <div class="config-grid" id="config-panels">
+            <!-- Populated by JS -->
+          </div>
+          <div style="margin-top:1rem; text-align:right;">
+            <button class="btn btn-primary" onclick="App.showToast('Configuration saved', 'success')">Save All Changes</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ AGENT CONFIG PAGE ═══ -->
+      <div class="page-view" id="page-agent-config">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
+          <div class="card">
+            <div class="card-header"><h3>Agent Profile</h3></div>
+            <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem;">
+              <div style="width:56px; height:56px; border-radius:50%; background:var(--primary-light); display:flex; align-items:center; justify-content:center; font-size:1.8rem;">🤖</div>
+              <div>
+                <div style="font-size:1.1rem; font-weight:600;">AI Assistant</div>
+                <div style="font-size:0.85rem; color:var(--text-secondary);">Online since Mar 24, 2026</div>
+              </div>
+              <div style="margin-left:auto;">
+                <span class="badge badge-solved" style="font-size:0.75rem; padding:0.25rem 0.6rem;">Production</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Agent Name</label>
+              <input type="text" value="AI Assistant" />
+            </div>
+            <div class="form-group">
+              <label>Personality</label>
+              <select style="width:100%; padding:0.65rem 0.85rem; border:1.5px solid var(--border); border-radius:var(--radius); font-size:0.95rem; background:#fff;">
+                <option selected>Warm & Professional</option>
+                <option>Formal & Precise</option>
+                <option>Friendly & Casual</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Language</label>
+              <select style="width:100%; padding:0.65rem 0.85rem; border:1.5px solid var(--border); border-radius:var(--radius); font-size:0.95rem; background:#fff;">
+                <option selected>English (British)</option>
+                <option>English (American)</option>
+              </select>
+            </div>
+            <button class="btn btn-primary btn-sm mt-1" onclick="App.showToast('Profile updated', 'success')">Save Profile</button>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><h3>Guardrails</h3></div>
+            <div class="form-group">
+              <label>Refund Cap (£)</label>
+              <input type="number" value="80" />
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">Refunds above this amount will be escalated to you</div>
+            </div>
+            <div class="form-group">
+              <label>Max Refunds Per Customer Per Day</label>
+              <input type="number" value="2" />
+            </div>
+            <div class="form-group">
+              <label>Return Window (days)</label>
+              <input type="number" value="30" />
+            </div>
+            <div class="form-group">
+              <label>Max Conversation Turns</label>
+              <input type="number" value="8" />
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">Escalate if not resolved within this many exchanges</div>
+            </div>
+            <button class="btn btn-primary btn-sm mt-1" onclick="App.showToast('Guardrails updated', 'success')">Save Guardrails</button>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><h3>Allowed Actions</h3></div>
+            <div id="config-actions-list">
+              <!-- Populated by JS -->
+            </div>
+            <button class="btn btn-primary btn-sm mt-2" onclick="App.showToast('Actions updated', 'success')">Save Actions</button>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><h3>Escalation Triggers</h3></div>
+            <div style="font-size:0.85rem; line-height:1.8;">
+              <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                <input type="checkbox" checked /> Customer sentiment is angry or threatening
+              </div>
+              <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                <input type="checkbox" checked /> Refund amount exceeds agent cap
+              </div>
+              <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                <input type="checkbox" checked /> Message contains legal threats
+              </div>
+              <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                <input type="checkbox" checked /> Wrong item received (requires warehouse)
+              </div>
+              <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                <input type="checkbox" checked /> Repeat contact &gt; 3 times for same issue
+              </div>
+              <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                <input type="checkbox" checked /> VIP customer complaint
+              </div>
+              <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                <input type="checkbox" checked /> Order value &gt; £500
+              </div>
+              <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                <input type="checkbox" checked /> Agent confidence &lt; 60%
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm mt-1" onclick="App.showToast('Escalation triggers updated', 'success')">Save Triggers</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ ZENDESK SIDEBAR DEMO ═══ -->
+      <div class="page-view" id="page-zendesk-demo">
+        <div class="zendesk-demo-layout">
+          <!-- Simulated Zendesk -->
+          <div class="zendesk-main">
+            <div class="zendesk-topbar">
+              <span class="zd-logo">Zendesk</span>
+              <div class="zd-nav">
+                <span>Home</span>
+                <span>Views</span>
+                <span class="active">Tickets</span>
+                <span>Reporting</span>
+              </div>
+            </div>
+            <div class="zendesk-ticket-view">
+              <div class="zendesk-ticket-content" id="zd-ticket-content">
+                <!-- Populated by JS -->
+              </div>
+              <!-- Our Sidebar -->
+              <div class="our-sidebar" id="our-sidebar">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
