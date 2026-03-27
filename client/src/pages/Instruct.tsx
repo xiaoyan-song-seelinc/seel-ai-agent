@@ -49,18 +49,35 @@ const STATUS_CONFIG: Record<TopicStatus, { label: string; icon: typeof Circle; c
 };
 
 type FilterStatus = "all" | TopicStatus;
+type FilterType = "all" | TopicType;
+
+const PRIORITY_ORDER: Record<TopicType, number> = {
+  knowledge_gap: 0,
+  escalation_review: 1,
+  open_question: 2,
+  rule_update: 3,
+  performance_report: 4,
+};
 
 export default function Instruct() {
   const [topics, setTopics] = useState<Topic[]>(TOPICS);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterStatus>("all");
+  const [typeFilter, setTypeFilter] = useState<FilterType>("all");
   const [search, setSearch] = useState("");
   const [replyText, setReplyText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const filteredTopics = topics
     .filter((t) => filter === "all" || t.status === filter)
-    .filter((t) => !search || t.title.toLowerCase().includes(search.toLowerCase()));
+    .filter((t) => typeFilter === "all" || t.type === typeFilter)
+    .filter((t) => !search || t.title.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      // Unread first, then by priority
+      if (a.status === "unread" && b.status !== "unread") return -1;
+      if (a.status !== "unread" && b.status === "unread") return 1;
+      return PRIORITY_ORDER[a.type] - PRIORITY_ORDER[b.type];
+    });
 
   const selectedTopic = topics.find((t) => t.id === selectedId);
 
@@ -79,6 +96,8 @@ export default function Instruct() {
   }, [selectedId]);
 
   const handleAcceptRule = (topicId: string) => {
+    const topic = topics.find((t) => t.id === topicId);
+    const ruleSummary = topic?.proposedRule?.text || "the proposed rule";
     setTopics((prev) =>
       prev.map((t) => {
         if (t.id !== topicId) return t;
@@ -91,7 +110,7 @@ export default function Instruct() {
         const aiConfirm = {
           id: `m-${Date.now() + 1}`,
           sender: "ai" as MessageSender,
-          content: "Rule updated successfully! I'll apply this going forward. Thanks for confirming.",
+          content: `Got it! I've updated the rule. Here's my understanding to confirm:\n\n> ${ruleSummary}\n\nI'll apply this going forward. If anything needs adjustment, just let me know in this thread.`,
           timestamp: new Date().toISOString(),
         };
         return {
@@ -102,7 +121,7 @@ export default function Instruct() {
         };
       })
     );
-    toast.success("Rule accepted and updated");
+    toast.success("Rule accepted — Alex confirmed understanding");
   };
 
   const handleRejectRule = (topicId: string) => {
@@ -217,7 +236,7 @@ export default function Instruct() {
             />
           </div>
 
-          {/* Filters */}
+          {/* Status Filters */}
           <div className="flex gap-1 mt-3">
             {(["all", "unread", "read", "resolved"] as FilterStatus[]).map((f) => (
               <button
@@ -239,6 +258,39 @@ export default function Instruct() {
                 )}
               </button>
             ))}
+          </div>
+
+          {/* Type Filters */}
+          <div className="flex gap-1 mt-2 flex-wrap">
+            <button
+              onClick={() => setTypeFilter("all")}
+              className={cn(
+                "px-2 py-0.5 rounded text-[11px] font-medium transition-colors",
+                typeFilter === "all"
+                  ? "bg-foreground/10 text-foreground"
+                  : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/40"
+              )}
+            >
+              All Types
+            </button>
+            {(Object.keys(TYPE_CONFIG) as TopicType[]).map((t) => {
+              const conf = TYPE_CONFIG[t];
+              const count = topics.filter((tp) => tp.type === t).length;
+              return (
+                <button
+                  key={t}
+                  onClick={() => setTypeFilter(t)}
+                  className={cn(
+                    "px-2 py-0.5 rounded text-[11px] font-medium transition-colors",
+                    typeFilter === t
+                      ? "bg-foreground/10 text-foreground"
+                      : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/40"
+                  )}
+                >
+                  {conf.label} ({count})
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -318,10 +370,10 @@ export default function Instruct() {
                 className="w-40 h-40 mx-auto mb-6 rounded-2xl object-cover opacity-60"
               />
               <h3 className="text-sm font-heading font-semibold text-foreground/70 mb-1">
-                Select a topic
+                Your conversation hub with Alex
               </h3>
               <p className="text-[13px] text-muted-foreground/60 leading-relaxed">
-                Choose a topic from the left to view the conversation with Alex.
+                Alex posts topics when discovering knowledge gaps, completing performance reports, or needing your input. You can also create new topics to update rules.
               </p>
             </div>
           </div>

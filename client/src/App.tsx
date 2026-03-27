@@ -8,7 +8,7 @@ import DashboardLayout from "./components/DashboardLayout";
 import Instruct from "./pages/Instruct";
 import Performance from "./pages/Performance";
 import SettingsPage from "./pages/SettingsPage";
-import Onboarding from "./pages/Onboarding";
+import OnboardingWrapper from "./pages/OnboardingWrapper";
 import ZendeskApp from "./pages/ZendeskApp";
 
 function Router() {
@@ -21,7 +21,7 @@ function Router() {
       <Route path="/settings" component={SettingsPage} />
 
       {/* Full-width routes (bypass DashboardLayout shell) */}
-      <Route path="/onboarding" component={Onboarding} />
+      <Route path="/onboarding" component={OnboardingWrapper} />
       <Route path="/zendesk" component={ZendeskApp} />
 
       <Route component={NotFound} />

@@ -46,11 +46,14 @@ export default function ZendeskApp() {
   const [selectedTicketId, setSelectedTicketId] = useState<string>(ZENDESK_TICKETS[0]?.id || "");
   const [badCaseNote, setBadCaseNote] = useState("");
   const [showBadCaseInput, setShowBadCaseInput] = useState(false);
+  const [showDenyReason, setShowDenyReason] = useState(false);
+  const [denyReason, setDenyReason] = useState("");
+  const [denyTargetTicketId, setDenyTargetTicketId] = useState<string | null>(null);
   const [, navigate] = useLocation();
 
   const selectedTicket = tickets.find((t) => t.id === selectedTicketId);
 
-  const handleApproval = (ticketId: string, status: "approved" | "denied") => {
+  const handleApproval = (ticketId: string, status: "approved" | "denied", reason?: string) => {
     setTickets((prev) =>
       prev.map((t) =>
         t.id === ticketId
@@ -63,7 +66,28 @@ export default function ZendeskApp() {
           : t
       )
     );
-    toast.success(status === "approved" ? "Action approved — Alex will proceed" : "Action denied — Alex will escalate");
+    if (status === "approved") {
+      toast.success("Action approved — Alex will proceed");
+    } else {
+      toast.success(reason
+        ? "Action denied with feedback — Alex will learn from this"
+        : "Action denied — Alex will escalate"
+      );
+    }
+    setShowDenyReason(false);
+    setDenyReason("");
+    setDenyTargetTicketId(null);
+  };
+
+  const handleDenyClick = (ticketId: string) => {
+    setDenyTargetTicketId(ticketId);
+    setShowDenyReason(true);
+  };
+
+  const handleDenyConfirm = () => {
+    if (denyTargetTicketId) {
+      handleApproval(denyTargetTicketId, "denied", denyReason || undefined);
+    }
   };
 
   const handleTakeover = (ticketId: string) => {
@@ -274,7 +298,7 @@ export default function ZendeskApp() {
                     )}
 
                     {/* Action buttons */}
-                    {selectedTicket.approval.status === "pending" && (
+                    {selectedTicket.approval.status === "pending" && !showDenyReason && (
                       <div className="flex gap-2">
                         <Button
                           size="sm"
@@ -288,11 +312,46 @@ export default function ZendeskApp() {
                           size="sm"
                           variant="outline"
                           className="flex-1 h-8 text-[12px] text-red-600 border-red-200 hover:bg-red-50 gap-1"
-                          onClick={() => handleApproval(selectedTicket.id, "denied")}
+                          onClick={() => handleDenyClick(selectedTicket.id)}
                         >
                           <XCircle className="w-3.5 h-3.5" />
                           Deny
                         </Button>
+                      </div>
+                    )}
+
+                    {/* Deny reason input */}
+                    {showDenyReason && denyTargetTicketId === selectedTicket.id && (
+                      <div className="space-y-2">
+                        <p className="text-[11px] text-[#68737d]">Why are you denying? This helps Alex learn. (Optional)</p>
+                        <Textarea
+                          placeholder="e.g. We don't offer refunds on sale items..."
+                          value={denyReason}
+                          onChange={(e) => setDenyReason(e.target.value)}
+                          className="text-[12px] min-h-[50px] resize-none"
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            className="flex-1 h-7 text-[11px] bg-red-600 hover:bg-red-700"
+                            onClick={handleDenyConfirm}
+                          >
+                            Deny{denyReason.trim() ? " with Feedback" : ""}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-[11px]"
+                            onClick={() => {
+                              setShowDenyReason(false);
+                              setDenyReason("");
+                              setDenyTargetTicketId(null);
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </CardContent>
@@ -312,19 +371,15 @@ export default function ZendeskApp() {
               )}
 
               {selectedTicket.takenOver && (
-                <Button
-                  variant="outline"
-                  className="w-full h-9 text-[12px] gap-2 border-emerald-200 text-emerald-600 hover:bg-emerald-50"
-                  onClick={() => {
-                    setTickets((prev) =>
-                      prev.map((t) => (t.id === selectedTicket.id ? { ...t, takenOver: false } : t))
-                    );
-                    toast.success("AI resumed on this ticket");
-                  }}
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  Resume AI
-                </Button>
+                <div className="w-full px-3 py-2.5 rounded-lg bg-red-50 border border-red-200">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Hand className="w-3.5 h-3.5 text-red-500" />
+                    <span className="text-[12px] font-medium text-red-700">Human Takeover Active</span>
+                  </div>
+                  <p className="text-[11px] text-red-600/70 leading-relaxed">
+                    AI has stopped responding. You own this ticket until it's closed. Alex will learn from how you resolve it.
+                  </p>
+                </div>
               )}
 
               <Separator />
