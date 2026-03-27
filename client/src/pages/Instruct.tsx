@@ -1,7 +1,7 @@
 /* ── Inbox Page ────────────────────────────────────────────────
    Left: Topic list (onboarding pinned at top)
-   Right: Conversation thread with choice bubbles, file upload,
-          scenario cards, "Take me there" links, mode selection
+   Right: Conversation thread with choice bubbles, inline forms,
+          structured conflict resolution, scenario sanity checks
    ──────────────────────────────────────────────────────────── */
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -12,70 +12,37 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Lightbulb,
-  BarChart3,
-  HelpCircle,
-  AlertTriangle,
-  FileEdit,
-  Search,
-  Send,
-  Bot,
-  User,
-  ExternalLink,
-  Check,
-  X,
-  Plus,
-  Inbox as InboxIcon,
-  Sparkles,
-  Upload,
-  FileText,
-  ArrowRight,
-  Zap,
+  Lightbulb, BarChart3, HelpCircle, AlertTriangle, FileEdit,
+  Search, Send, Bot, User, ExternalLink, Check, X, Plus,
+  Inbox as InboxIcon, Sparkles, Upload, FileText, ArrowRight, Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 
 /* ── Config ── */
-
 const TYPE_ICON: Record<TopicType, typeof Lightbulb> = {
-  knowledge_gap: Lightbulb,
-  performance_report: BarChart3,
-  open_question: HelpCircle,
-  escalation_review: AlertTriangle,
-  rule_update: FileEdit,
+  knowledge_gap: Lightbulb, performance_report: BarChart3,
+  open_question: HelpCircle, escalation_review: AlertTriangle, rule_update: FileEdit,
 };
-
-const TYPE_LABEL: Record<TopicType, string> = {
-  knowledge_gap: "Knowledge Gap",
-  performance_report: "Performance",
-  open_question: "Question",
-  escalation_review: "Escalation",
-  rule_update: "Rule Update",
-};
-
 const TYPE_COLOR: Record<TopicType, string> = {
-  knowledge_gap: "text-amber-500",
-  performance_report: "text-blue-500",
-  open_question: "text-slate-500",
-  escalation_review: "text-orange-500",
-  rule_update: "text-violet-500",
+  knowledge_gap: "text-amber-500", performance_report: "text-blue-500",
+  open_question: "text-slate-500", escalation_review: "text-orange-500", rule_update: "text-violet-500",
 };
-
 type FilterTab = "all" | "unread" | "pending" | "resolved";
-
 const PRIORITY: Record<TopicType, number> = {
-  knowledge_gap: 0,
-  escalation_review: 1,
-  open_question: 2,
-  rule_update: 3,
-  performance_report: 4,
+  knowledge_gap: 0, escalation_review: 1, open_question: 2, rule_update: 3, performance_report: 4,
 };
 
 /* ── Onboarding Types ── */
+interface OnboardingChoice { label: string; value: string; description?: string; }
 
-interface OnboardingChoice {
-  label: string;
-  value: string;
-  description?: string;
+interface ConflictItem {
+  id: string;
+  title: string;
+  sourceA: string;
+  sourceALabel: string;
+  sourceB: string;
+  sourceBLabel: string;
+  resolved?: "a" | "b" | "later";
 }
 
 interface OnboardingMessage {
@@ -87,54 +54,99 @@ interface OnboardingMessage {
   isScenario?: boolean;
   isFileUpload?: boolean;
   isTakeMeThere?: { label: string; href: string };
+  isNameInput?: boolean;
+  isActionsForm?: boolean;
+  isEscalationForm?: boolean;
+  isConflictForm?: boolean;
+  conflicts?: ConflictItem[];
+  scenarioFeedback?: boolean;
 }
 
 type OnboardingPhase =
-  | "welcome"
-  | "connect_zendesk"
-  | "connect_shopify"
-  | "upload_doc"
-  | "parsing"
-  | "conflict_1"
-  | "conflict_2"
-  | "actions_intro"
-  | "actions_refund"
-  | "actions_cancel"
-  | "escalation_intro"
-  | "escalation_emotion"
-  | "identity_name"
+  | "welcome" | "name_input"
+  | "connect_zendesk" | "connect_shopify"
+  | "upload_doc" | "parsing" | "parse_done"
+  | "conflicts"
+  | "actions_form"
+  | "escalation_form"
   | "identity_tone"
-  | "scenario_wismo"
-  | "scenario_refund"
-  | "scenario_escalation"
-  | "mode_select"
-  | "complete";
+  | "scenario_wismo" | "scenario_refund" | "scenario_escalation"
+  | "mode_select" | "complete";
+
+/* ── Progress stages ── */
+const STAGES = [
+  { id: "connection", label: "Connection" },
+  { id: "knowledge", label: "Knowledge" },
+  { id: "permissions", label: "Permissions" },
+  { id: "sanity", label: "Sanity Check" },
+  { id: "go_live", label: "Go Live" },
+];
+
+function getStageIndex(phase: OnboardingPhase): number {
+  if (["welcome", "name_input", "connect_zendesk", "connect_shopify"].includes(phase)) return 0;
+  if (["upload_doc", "parsing", "parse_done", "conflicts"].includes(phase)) return 1;
+  if (["actions_form", "escalation_form", "identity_tone"].includes(phase)) return 2;
+  if (["scenario_wismo", "scenario_refund", "scenario_escalation"].includes(phase)) return 3;
+  return 4;
+}
 
 /* ── Onboarding Welcome Topic ── */
-
 const ONBOARDING_TOPIC_ID = "t-onboarding";
-
 function createOnboardingTopic(): Topic {
   return {
-    id: ONBOARDING_TOPIC_ID,
-    type: "rule_update" as TopicType,
-    title: "Welcome — meet your new rep",
-    status: "unread" as TopicStatus,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    preview: "Hi! I'm Alex, your new AI support rep. Let's get me set up.",
-    messages: [],
+    id: ONBOARDING_TOPIC_ID, type: "rule_update" as TopicType,
+    title: "Welcome — meet your new rep", status: "unread" as TopicStatus,
+    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    preview: "Hi! I'm your new AI support rep. Let's get set up.", messages: [],
   };
 }
 
-/* ── Component ── */
+/* ── Default conflicts ── */
+const DEFAULT_CONFLICTS: ConflictItem[] = [
+  {
+    id: "c1", title: "Return window duration",
+    sourceA: "30 days from purchase date", sourceALabel: "SOP Document (Section 2.1)",
+    sourceB: "28 days from delivery date", sourceBLabel: "Observed in 47 past tickets",
+  },
+  {
+    id: "c2", title: "Sale items return policy",
+    sourceA: "No returns on any sale items", sourceALabel: "SOP Document (Section 3.4)",
+    sourceB: "Allow returns if discount was under 30%", sourceBLabel: "Observed in 12 past tickets",
+  },
+  {
+    id: "c3", title: "International return shipping",
+    sourceA: "Customer pays return shipping for international orders", sourceALabel: "SOP Document (Section 5.2)",
+    sourceB: "Provide prepaid label for orders over $100", sourceBLabel: "Observed in 8 past tickets",
+  },
+];
 
+/* ── Default action items ── */
+const DEFAULT_ACTIONS = [
+  { id: "refund", label: "Process refunds", description: "Issue refunds to customers", default: "ask" as const },
+  { id: "cancel", label: "Cancel orders", description: "Cancel unshipped orders", default: "ask" as const },
+  { id: "return_label", label: "Create return labels", description: "Generate prepaid return shipping labels", default: "auto" as const },
+  { id: "reply", label: "Send customer replies", description: "Respond to customer messages", default: "auto" as const },
+  { id: "internal_note", label: "Write internal notes", description: "Add notes to tickets for your team", default: "auto" as const },
+  { id: "lookup_order", label: "Look up orders", description: "Query order status and details in Shopify", default: "auto" as const },
+];
+
+/* ── Default escalation triggers ── */
+const DEFAULT_ESCALATION = [
+  { id: "angry", label: "Customer is angry or upset", default: true },
+  { id: "legal", label: "Legal or compliance keywords detected", default: true },
+  { id: "manager_request", label: "Customer explicitly asks for a manager", default: true },
+  { id: "unresolved_3", label: "Issue unresolved after 3 exchanges", default: true },
+  { id: "high_value", label: "Order value exceeds $500", default: false },
+  { id: "repeat_contact", label: "Customer contacted 3+ times about same issue", default: false },
+  { id: "refund_over_limit", label: "Refund amount exceeds configured limit", default: false },
+];
+
+/* ── Component ── */
 export default function Inbox() {
   const [topics, setTopics] = useState<Topic[]>(() => {
     const onboardingTopic = createOnboardingTopic();
     const regularTopics = TOPICS.map((t) => ({
-      ...t,
-      status: t.status === "read" ? ("pending" as TopicStatus) : t.status,
+      ...t, status: t.status === "read" ? ("pending" as TopicStatus) : t.status,
     }));
     return [onboardingTopic, ...regularTopics];
   });
@@ -151,18 +163,31 @@ export default function Inbox() {
   const [obChoiceMade, setObChoiceMade] = useState<Record<string, string>>({});
   const [fileUploaded, setFileUploaded] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [agentName, setAgentName] = useState("Alex");
+  const [nameInput, setNameInput] = useState("");
+  const [skippedSteps, setSkippedSteps] = useState<string[]>([]);
 
+  // Inline form states
+  const [conflicts, setConflicts] = useState<ConflictItem[]>(DEFAULT_CONFLICTS);
+  const [actionPerms, setActionPerms] = useState<Record<string, "auto" | "ask" | "off">>(
+    Object.fromEntries(DEFAULT_ACTIONS.map((a) => [a.id, a.default]))
+  );
+  const [escalationToggles, setEscalationToggles] = useState<Record<string, boolean>>(
+    Object.fromEntries(DEFAULT_ESCALATION.map((e) => [e.id, e.default]))
+  );
+
+  // Scenario feedback
+  const [scenarioFeedbackText, setScenarioFeedbackText] = useState("");
+  const [awaitingFeedback, setAwaitingFeedback] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const isOnboarding = selectedId === ONBOARDING_TOPIC_ID;
 
   /* ── Onboarding message builder ── */
   const addAIMessage = useCallback((content: string, extras?: Partial<OnboardingMessage>) => {
     const msg: OnboardingMessage = {
       id: `ob-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      sender: "ai",
-      content,
-      timestamp: new Date().toISOString(),
-      ...extras,
+      sender: "ai", content, timestamp: new Date().toISOString(), ...extras,
     };
     setObMessages((prev) => [...prev, msg]);
     return msg;
@@ -171,9 +196,7 @@ export default function Inbox() {
   const addManagerMessage = useCallback((content: string) => {
     const msg: OnboardingMessage = {
       id: `ob-mgr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      sender: "manager",
-      content,
-      timestamp: new Date().toISOString(),
+      sender: "manager", content, timestamp: new Date().toISOString(),
     };
     setObMessages((prev) => [...prev, msg]);
     return msg;
@@ -184,52 +207,52 @@ export default function Inbox() {
     if (obPhase === "welcome" && obMessages.length === 0) {
       const timer = setTimeout(() => {
         addAIMessage(
-          "Hi! I'm **Alex**, your new AI support rep.\n\nI'll be handling customer tickets for your team — things like order inquiries, refunds, returns, and more. But first, I need to learn how your team works.\n\nThis will take about 5 minutes. Ready to get started?",
-          {
-            choices: [
-              { label: "Let's do it", value: "start" },
-            ],
-          }
+          "Hi there! I'm your new AI support rep. I'll be handling customer tickets — things like order inquiries, refunds, returns, and more.\n\nBut first, let me learn how your team works. This will take about 5 minutes.\n\nBefore we start — **what should I call myself** when talking to customers?",
+          { isNameInput: true }
         );
       }, 400);
       return () => clearTimeout(timer);
     }
   }, [obPhase, obMessages.length, addAIMessage]);
 
+  /* ── Submit agent name ── */
+  const handleNameSubmit = useCallback(() => {
+    const name = nameInput.trim() || "Alex";
+    setAgentName(name);
+    addManagerMessage(name);
+    setObPhase("connect_zendesk");
+    setTimeout(() => {
+      addAIMessage(
+        `**${name}** — I like it.\n\nFirst things first — I need access to your helpdesk so I can see and respond to tickets.\n\nDo you use Zendesk?`,
+        {
+          choices: [
+            { label: "Connect Zendesk", value: "connect" },
+            { label: "I'll set this up later", value: "skip" },
+          ],
+        }
+      );
+    }, 500);
+  }, [nameInput, addManagerMessage, addAIMessage]);
+
   /* ── Phase transitions ── */
   const advanceOnboarding = useCallback(
     (choice: string, choiceLabel: string, currentPhase: OnboardingPhase) => {
-      // Record the choice
       setObChoiceMade((prev) => ({ ...prev, [currentPhase]: choice }));
-
-      // Add manager bubble
       addManagerMessage(choiceLabel);
 
-      // Delay AI response for natural feel
       const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
       const advance = async () => {
         await delay(600);
 
         switch (currentPhase) {
-          case "welcome":
-            setObPhase("connect_zendesk");
-            addAIMessage(
-              "Great! First things first — I need access to your helpdesk so I can see and respond to tickets.\n\nDo you use Zendesk?",
-              {
-                choices: [
-                  { label: "Connect Zendesk", value: "connect" },
-                  { label: "I'll set this up later", value: "skip" },
-                ],
-              }
-            );
-            break;
-
           case "connect_zendesk":
             if (choice === "connect") {
               await delay(1200);
-              addAIMessage("Connected to **Zendesk** — coastalliving.zendesk.com. I can see 1,247 tickets from the last 90 days. Nice.");
+              addAIMessage("Connected to **Zendesk** — coastalliving.zendesk.com. I can see 1,247 tickets from the last 90 days.");
               await delay(800);
+            } else {
+              setSkippedSteps((prev) => [...prev, "zendesk"]);
             }
             setObPhase("connect_shopify");
             addAIMessage(
@@ -250,139 +273,28 @@ export default function Inbox() {
               await delay(1200);
               addAIMessage("Connected to **Shopify** — coastalliving.myshopify.com. I can see 3,842 products and recent orders.");
               await delay(800);
+            } else {
+              setSkippedSteps((prev) => [...prev, "shopify"]);
             }
             setObPhase("upload_doc");
             addAIMessage(
-              choice === "connect"
-                ? "Now the important part — **your policies**. I need to learn your rules so I don't go rogue.\n\nDo you have a return policy, SOP doc, or any guidelines you can share? Drop it here and I'll read through it."
-                : "No worries, you can connect anytime in **Playbook → Integrations**.\n\nNow the important part — **your policies**. I need to learn your rules so I don't go rogue.\n\nDo you have a return policy, SOP doc, or any guidelines you can share? Drop it here and I'll read through it.",
+              "Now the important part — **your policies**. I need to learn your rules so I don't go rogue.\n\nDo you have a return policy, SOP doc, or any guidelines you can share?",
               { isFileUpload: true }
             );
             break;
 
-          case "upload_doc":
-            // This is handled by file upload, not choice
-            break;
-
-          case "conflict_1":
-            setObPhase("conflict_2");
-            if (choice === "30_days") {
-              addAIMessage(
-                "Got it — **30 days** is the standard window.\n\nOne more thing I noticed: your SOP says \"no returns on sale items,\" but I found 12 tickets where your team accepted returns on items discounted less than 30%.\n\nWhich should I follow?",
-                {
-                  choices: [
-                    { label: "Follow the SOP — no returns on any sale items", value: "strict" },
-                    { label: "Allow returns if discount was under 30%", value: "flexible" },
-                  ],
-                }
-              );
-            } else {
-              addAIMessage(
-                "Got it — **28 days** is the standard window.\n\nOne more thing I noticed: your SOP says \"no returns on sale items,\" but I found 12 tickets where your team accepted returns on items discounted less than 30%.\n\nWhich should I follow?",
-                {
-                  choices: [
-                    { label: "Follow the SOP — no returns on any sale items", value: "strict" },
-                    { label: "Allow returns if discount was under 30%", value: "flexible" },
-                  ],
-                }
-              );
-            }
-            break;
-
-          case "conflict_2":
-            setObPhase("actions_intro");
+          case "parse_done":
+            setObPhase("conflicts");
             addAIMessage(
-              choice === "strict"
-                ? "Clear — no returns on sale items, period. I've noted that.\n\nOk, rules are set. Now let's talk about **what I'm allowed to do on my own**.\n\nSome actions are low-risk (like looking up an order). Others are bigger deals (like issuing a refund). For the bigger ones, I can either handle them myself or check with you first.\n\nLet's start with refunds:"
-                : "Makes sense — I'll allow returns on items with less than 30% discount.\n\nOk, rules are set. Now let's talk about **what I'm allowed to do on my own**.\n\nSome actions are low-risk (like looking up an order). Others are bigger deals (like issuing a refund). For the bigger ones, I can either handle them myself or check with you first.\n\nLet's start with refunds:"
-            );
-            await delay(600);
-            setObPhase("actions_refund");
-            addAIMessage(
-              "**Refunds** — when a customer qualifies for a refund per your policy, should I:",
-              {
-                choices: [
-                  { label: "Process it myself", value: "autonomous", description: "I'll handle refunds up to a limit you set" },
-                  { label: "Ask me first", value: "ask_permission", description: "I'll draft the refund and wait for your OK" },
-                ],
-              }
+              `I found **3 conflicts** between your document and what I observed in past tickets. For each one, pick the rule I should follow — or choose "Decide later" and resolve it in **Playbook → Knowledge**.`,
+              { isConflictForm: true, conflicts: DEFAULT_CONFLICTS }
             );
             break;
-
-          case "actions_refund":
-            setObPhase("actions_cancel");
-            addAIMessage(
-              choice === "autonomous"
-                ? "I'll handle refunds on my own. You can set a dollar limit anytime in **Playbook → Actions**.\n\n**Order cancellations** — when a customer wants to cancel an unshipped order:"
-                : "I'll always check with you before processing refunds.\n\n**Order cancellations** — when a customer wants to cancel an unshipped order:",
-              {
-                choices: [
-                  { label: "Cancel it myself", value: "autonomous", description: "If the order hasn't shipped, I'll cancel immediately" },
-                  { label: "Ask me first", value: "ask_permission", description: "I'll confirm with you before canceling" },
-                ],
-              }
-            );
-            break;
-
-          case "actions_cancel":
-            setObPhase("escalation_intro");
-            addAIMessage(
-              "Noted. You can fine-tune all action permissions later.",
-              { isTakeMeThere: { label: "See all actions in Playbook", href: "/playbook" } }
-            );
-            await delay(1000);
-            setObPhase("escalation_emotion");
-            addAIMessage(
-              "Next — **when should I hand off to you?**\n\nI'll always escalate if I genuinely don't know the answer. But there are some situations where you might want me to loop you in even if I *could* handle it.\n\nFor example: **angry or upset customers**. Should I try to de-escalate myself, or hand off to you right away?",
-              {
-                choices: [
-                  { label: "Try to de-escalate first", value: "ai_first", description: "I'll attempt to calm things down. If it doesn't work after 2 messages, I'll escalate." },
-                  { label: "Hand off to me immediately", value: "escalate", description: "Any sign of frustration → I loop you in" },
-                ],
-              }
-            );
-            break;
-
-          case "escalation_emotion":
-            setObPhase("identity_name");
-            addAIMessage(
-              choice === "ai_first"
-                ? "I'll try to handle it first, and escalate if it doesn't improve. Smart.\n\nYou can configure more escalation triggers in Playbook."
-                : "Understood — I'll hand off immediately when emotions run high.\n\nYou can configure more escalation triggers in Playbook."
-            );
-            await delay(800);
-            addAIMessage(
-              "Almost there. **How should I introduce myself?**\n\nRight now my name is **Alex**. Want to keep it, or give me a different name?",
-              {
-                choices: [
-                  { label: "Keep Alex", value: "Alex" },
-                  { label: "Call me Ava", value: "Ava" },
-                  { label: "Call me Sam", value: "Sam" },
-                ],
-              }
-            );
-            break;
-
-          case "identity_name": {
-            const agentName = choice === "Alex" ? "Alex" : choice === "Ava" ? "Ava" : "Sam";
-            setObPhase("identity_tone");
-            addAIMessage(
-              `**${agentName}** it is.\n\nAnd what tone should I use with customers?`,
-              {
-                choices: [
-                  { label: "Friendly and warm", value: "friendly", description: "\"Hey Emma! Let me look into that for you 😊\"" },
-                  { label: "Professional", value: "professional", description: "\"Hello Emma, I'd be happy to assist you with this.\"" },
-                  { label: "Casual", value: "casual", description: "\"Hi Emma! Sure thing, let me check that real quick.\"" },
-                ],
-              }
-            );
-            break;
-          }
 
           case "identity_tone":
             setObPhase("scenario_wismo");
             addAIMessage(
-              `Got it — I'll keep it **${choice}**. You can adjust my identity anytime in Playbook.\n\nNow, before I start, let me show you how I'd handle a few common scenarios so you can make sure I'm on the right track.`
+              `Got it — I'll keep it **${choice}**. You can adjust my identity anytime in Playbook.\n\nNow, before I start, let me show you how I'd handle a few common scenarios. If anything looks off, just tell me and I'll adjust on the spot.`
             );
             await delay(1000);
             addAIMessage(
@@ -398,15 +310,16 @@ export default function Inbox() {
             break;
 
           case "scenario_wismo":
+            if (choice === "adjust") {
+              setAwaitingFeedback(true);
+              addAIMessage("Sure — what would you change? Just type it out and I'll update my approach.", { scenarioFeedback: true });
+              return;
+            }
             setObPhase("scenario_refund");
-            addAIMessage(
-              choice === "approve"
-                ? "Great."
-                : "No worries — you can fine-tune my responses in Playbook."
-            );
+            addAIMessage("Great.");
             await delay(800);
             addAIMessage(
-              `**Scenario 2 — "I want a refund"**\n\nCustomer writes: *"I received my ceramic vase yesterday and it's smaller than I expected. I'd like a refund."*\n\nHere's what I'd do:\n1. Check order — delivered 1 day ago, within 30-day return window\n2. Item is $42.99, change-of-mind return\n3. I'd reply and initiate the return:\n\n> *Hi! I'm sorry the vase wasn't what you expected. I've started a return for you — you'll receive a prepaid shipping label via email shortly. Once we receive the item, your refund of $34.04 ($42.99 minus $8.95 return shipping) will be processed to your original payment method within 3-5 business days.*\n\n${obChoiceMade["actions_refund"] === "ask_permission" ? "Since you asked me to check before processing refunds, I'd send you an approval request in Zendesk before actually initiating this." : "Since you gave me permission to process refunds, I'd handle this end-to-end."}\n\nLook good?`,
+              `**Scenario 2 — "I want a refund"**\n\nCustomer writes: *"I received my ceramic vase yesterday and it's smaller than I expected. I'd like a refund."*\n\nHere's what I'd do:\n1. Check order — delivered 1 day ago, within return window\n2. Item is $42.99, change-of-mind return\n3. I'd reply and initiate the return:\n\n> *Hi! I'm sorry the vase wasn't what you expected. I've started a return for you — you'll receive a prepaid shipping label via email shortly. Once we receive the item, your refund of $34.04 ($42.99 minus $8.95 return shipping) will be processed within 3-5 business days.*\n\n${actionPerms["refund"] === "ask" ? "Since refunds need your approval, I'd send you an approval request in Zendesk before initiating." : "Since I have permission to process refunds, I'd handle this end-to-end."}\n\nLook good?`,
               {
                 choices: [
                   { label: "That's right", value: "approve" },
@@ -418,18 +331,16 @@ export default function Inbox() {
             break;
 
           case "scenario_refund":
+            if (choice === "adjust") {
+              setAwaitingFeedback(true);
+              addAIMessage("What should I do differently here? I'll update the rule right away.", { scenarioFeedback: true });
+              return;
+            }
             setObPhase("scenario_escalation");
-            addAIMessage(
-              choice === "approve"
-                ? "Perfect."
-                : "Noted — I'll learn from your corrections over time."
-            );
+            addAIMessage("Perfect.");
             await delay(800);
             addAIMessage(
-              `**Scenario 3 — Escalation**\n\nCustomer writes: *"This is the THIRD time I'm contacting you about this. I want to speak to a manager RIGHT NOW. Your service is absolutely terrible."*\n\nHere's what I'd do:\n${obChoiceMade["escalation_emotion"] === "ai_first"
-                ? "1. Detect strong frustration + explicit request for manager\n2. Even though I'd normally try to de-escalate first, the customer explicitly asked for a manager — so I'd **escalate immediately**\n3. I'd reply:\n\n> *I completely understand your frustration, and I'm sorry for the repeated issues. I'm connecting you with a manager right now who can help resolve this directly. They'll be with you shortly.*\n\nThen I'd assign the ticket to you with an internal note summarizing the situation."
-                : "1. Detect strong frustration + explicit request for manager\n2. Per your preference, I'd **escalate immediately**\n3. I'd reply:\n\n> *I completely understand your frustration, and I'm sorry for the repeated issues. I'm connecting you with a manager right now who can help resolve this directly. They'll be with you shortly.*\n\nThen I'd assign the ticket to you with an internal note summarizing the situation."
-              }\n\nDoes this feel right?`,
+              `**Scenario 3 — Escalation**\n\nCustomer writes: *"This is the THIRD time I'm contacting you about this. I want to speak to a manager RIGHT NOW."*\n\nHere's what I'd do:\n1. Detect strong frustration + explicit request for manager\n2. I'd **escalate immediately**\n3. I'd reply:\n\n> *I completely understand your frustration, and I'm sorry for the repeated issues. I'm connecting you with a manager right now who can help resolve this directly.*\n\nThen I'd assign the ticket to you with an internal note summarizing the situation.\n\nDoes this feel right?`,
               {
                 choices: [
                   { label: "That's right", value: "approve" },
@@ -441,9 +352,14 @@ export default function Inbox() {
             break;
 
           case "scenario_escalation":
+            if (choice === "adjust") {
+              setAwaitingFeedback(true);
+              addAIMessage("What would you change about my escalation approach?", { scenarioFeedback: true });
+              return;
+            }
             setObPhase("mode_select");
             addAIMessage(
-              "Great — I'm confident I understand your policies.\n\nOne last question. How do you want me to work?"
+              "Great — I'm confident I understand your policies.\n\nOne last question. **How do you want me to work?**"
             );
             await delay(800);
             addAIMessage(
@@ -457,14 +373,39 @@ export default function Inbox() {
             );
             break;
 
-          case "mode_select":
+          case "mode_select": {
             setObPhase("complete");
-            addAIMessage(
-              choice === "shadow"
-                ? "Training mode it is. I'll draft everything and wait for your approval before sending.\n\nYou're all set! I'll start picking up tickets now. You'll see my work in Zendesk — check the sidebar for approvals.\n\nIf I run into something I don't know, I'll post it here in Inbox. Talk soon!"
-                : "Production mode — let's go. I'll start handling tickets on my own right away.\n\nYou're all set! You can review my work anytime in Zendesk. If I run into something I don't know, I'll post it here in Inbox. Talk soon!"
-            );
-            // Mark topic as resolved
+            const mode = choice === "shadow" ? "Training" : "Production";
+            const incomplete = skippedSteps.length > 0;
+
+            let completionMsg = `**${mode} mode** it is. ${choice === "shadow" ? "I'll draft everything and wait for your approval before sending." : "I'll start handling tickets on my own right away."}\n\n---\n\n**You're all set!** Here's what happens next:\n\n`;
+            completionMsg += `- **Inbox** — I'll post here whenever I run into something I don't know, need your input on a rule, or have a weekly performance summary.\n`;
+            completionMsg += `- **Zendesk** — ${choice === "shadow" ? "Check the sidebar for my draft responses and approval requests." : "I'm handling tickets. Check the sidebar to review my work, takeover, or flag bad cases."}\n`;
+            completionMsg += `- **Playbook** — Your configuration hub. Adjust my permissions, escalation rules, identity, and knowledge anytime.`;
+
+            if (incomplete) {
+              completionMsg += `\n\n---\n\n**Before I start, you still need to:**`;
+              if (skippedSteps.includes("zendesk")) {
+                completionMsg += `\n- Connect Zendesk`;
+              }
+              if (skippedSteps.includes("shopify")) {
+                completionMsg += `\n- Connect Shopify`;
+              }
+            }
+
+            addAIMessage(completionMsg, incomplete ? undefined : undefined);
+
+            if (incomplete) {
+              setTimeout(() => {
+                addAIMessage(
+                  "Complete the remaining steps so I can start working:",
+                  {
+                    isTakeMeThere: { label: "Go to Playbook → Integrations", href: "/playbook" },
+                  }
+                );
+              }, 800);
+            }
+
             setTopics((prev) =>
               prev.map((t) =>
                 t.id === ONBOARDING_TOPIC_ID
@@ -473,44 +414,168 @@ export default function Inbox() {
               )
             );
             break;
+          }
         }
       };
 
       advance();
     },
-    [addAIMessage, addManagerMessage, obChoiceMade]
+    [addAIMessage, addManagerMessage, obChoiceMade, actionPerms, skippedSteps]
   );
 
+  /* ── Scenario feedback handler ── */
+  const handleScenarioFeedback = useCallback(() => {
+    if (!scenarioFeedbackText.trim() || !awaitingFeedback) return;
+    const feedback = scenarioFeedbackText.trim();
+    addManagerMessage(feedback);
+    setScenarioFeedbackText("");
+    setAwaitingFeedback(false);
+
+    setTimeout(() => {
+      addAIMessage(
+        `Got it — I've updated my approach based on your feedback:\n\n> "${feedback}"\n\nI'll apply this going forward. Let's continue.`
+      );
+
+      setTimeout(() => {
+        // Move to next scenario
+        if (obPhase === "scenario_wismo") {
+          setObPhase("scenario_refund");
+          addAIMessage(
+            `**Scenario 2 — "I want a refund"**\n\nCustomer writes: *"I received my ceramic vase yesterday and it's smaller than I expected. I'd like a refund."*\n\nHere's what I'd do:\n1. Check order — delivered 1 day ago, within return window\n2. Item is $42.99, change-of-mind return\n3. I'd reply and initiate the return:\n\n> *Hi! I'm sorry the vase wasn't what you expected. I've started a return for you — you'll receive a prepaid shipping label via email shortly. Once we receive the item, your refund of $34.04 ($42.99 minus $8.95 return shipping) will be processed within 3-5 business days.*\n\n${actionPerms["refund"] === "ask" ? "Since refunds need your approval, I'd send you an approval request in Zendesk before initiating." : "Since I have permission to process refunds, I'd handle this end-to-end."}\n\nLook good?`,
+            {
+              choices: [
+                { label: "That's right", value: "approve" },
+                { label: "Needs adjustment", value: "adjust" },
+              ],
+              isScenario: true,
+            }
+          );
+        } else if (obPhase === "scenario_refund") {
+          setObPhase("scenario_escalation");
+          addAIMessage(
+            `**Scenario 3 — Escalation**\n\nCustomer writes: *"This is the THIRD time I'm contacting you about this. I want to speak to a manager RIGHT NOW."*\n\nHere's what I'd do:\n1. Detect strong frustration + explicit request for manager\n2. I'd **escalate immediately**\n3. I'd reply:\n\n> *I completely understand your frustration, and I'm sorry for the repeated issues. I'm connecting you with a manager right now who can help resolve this directly.*\n\nThen I'd assign the ticket to you with an internal note summarizing the situation.\n\nDoes this feel right?`,
+            {
+              choices: [
+                { label: "That's right", value: "approve" },
+                { label: "Needs adjustment", value: "adjust" },
+              ],
+              isScenario: true,
+            }
+          );
+        } else if (obPhase === "scenario_escalation") {
+          setObPhase("mode_select");
+          addAIMessage("Great — I'm confident I understand your policies.\n\nOne last question. **How do you want me to work?**");
+          setTimeout(() => {
+            addAIMessage(
+              "**Training mode** — I draft my responses and actions, but I check with you before anything goes out to the customer. Good if you want to review my work for a while.\n\n**Production mode** — I handle tickets on my own. You can review everything after the fact. Good if you trust the sanity check and want me working immediately.",
+              {
+                choices: [
+                  { label: "Training — check with me first", value: "shadow" },
+                  { label: "Production — handle it yourself", value: "production" },
+                ],
+              }
+            );
+          }, 800);
+        }
+      }, 800);
+    }, 600);
+  }, [scenarioFeedbackText, awaitingFeedback, obPhase, addManagerMessage, addAIMessage, actionPerms]);
+
   /* ── File upload handler ── */
-  const handleFileUpload = useCallback(() => {
+  const handleFileUpload = useCallback((useDemoDoc = false) => {
     if (fileUploaded) return;
     setFileUploaded(true);
-    addManagerMessage("📎 Seel_Return_Policy_2026.pdf");
+    addManagerMessage(useDemoDoc ? "📎 Seel_Return_Policy_2026.pdf (demo)" : "📎 Uploaded document");
 
     setIsParsing(true);
     setObPhase("parsing");
 
-    // Simulate parsing
     setTimeout(() => {
       setIsParsing(false);
+      setObPhase("parse_done");
       addAIMessage(
-        "I've read through your return policy. Here's what I found:\n\n**13 rules** across 5 categories:\n- **Return Window**: 30-day standard, 45-day for VIP\n- **Refund Methods**: Original payment, store credit, exchange\n- **Return Shipping**: Free for defective, $8.95 for change-of-mind\n- **Exclusions**: Final sale items, personalized items\n- **Special Cases**: International returns, damaged items\n\nI noticed a couple of things that need your input."
+        "I've read through your return policy and extracted the rules. You can review all extracted rules anytime in **Playbook → Knowledge**.",
+        {
+          choices: [{ label: "Continue", value: "continue" }],
+          isTakeMeThere: { label: "View extracted rules in Playbook", href: "/playbook" },
+        }
       );
+    }, 2500);
+  }, [fileUploaded, addManagerMessage, addAIMessage]);
 
+  /* ── Conflict resolution handler ── */
+  const handleConflictResolve = useCallback((conflictId: string, resolution: "a" | "b" | "later") => {
+    setConflicts((prev) =>
+      prev.map((c) => c.id === conflictId ? { ...c, resolved: resolution } : c)
+    );
+  }, []);
+
+  const handleConflictsSubmit = useCallback(() => {
+    const resolved = conflicts.filter((c) => c.resolved === "a" || c.resolved === "b");
+    const deferred = conflicts.filter((c) => c.resolved === "later" || !c.resolved);
+
+    let msg = `Got it — I've updated ${resolved.length} rule${resolved.length !== 1 ? "s" : ""}.`;
+    if (deferred.length > 0) {
+      msg += ` ${deferred.length} conflict${deferred.length !== 1 ? "s" : ""} deferred — you can resolve ${deferred.length === 1 ? "it" : "them"} in **Playbook → Knowledge**.`;
+    }
+
+    addManagerMessage(`Resolved ${resolved.length} conflicts, deferred ${deferred.length}`);
+    setTimeout(() => {
+      addAIMessage(msg);
       setTimeout(() => {
-        setObPhase("conflict_1");
+        setObPhase("actions_form");
         addAIMessage(
-          "Your document says the return window is **30 days**, but I found tickets where your team accepted returns at **28 days** counting from delivery (not purchase).\n\nWhich should I follow?",
+          "Next — **what can I do on my own, and what needs your OK?**\n\nHere are the actions I can take. For each one, choose whether I should handle it myself, ask you first, or not do it at all.",
+          { isActionsForm: true }
+        );
+      }, 800);
+    }, 600);
+  }, [conflicts, addManagerMessage, addAIMessage]);
+
+  /* ── Actions form submit ── */
+  const handleActionsSubmit = useCallback(() => {
+    const autoCount = Object.values(actionPerms).filter((v) => v === "auto").length;
+    const askCount = Object.values(actionPerms).filter((v) => v === "ask").length;
+    addManagerMessage(`Set ${autoCount} actions to auto, ${askCount} to ask permission`);
+    setTimeout(() => {
+      addAIMessage(
+        `Noted — I'll handle ${autoCount} actions on my own and check with you on ${askCount}. You can fine-tune these anytime.`,
+        { isTakeMeThere: { label: "Adjust in Playbook → Actions", href: "/playbook" } }
+      );
+      setTimeout(() => {
+        setObPhase("escalation_form");
+        addAIMessage(
+          "Now — **when should I hand off to you?**\n\nI'll always escalate if I genuinely don't know the answer. But here are some extra triggers you can turn on:",
+          { isEscalationForm: true }
+        );
+      }, 800);
+    }, 600);
+  }, [actionPerms, addManagerMessage, addAIMessage]);
+
+  /* ── Escalation form submit ── */
+  const handleEscalationSubmit = useCallback(() => {
+    const enabledCount = Object.values(escalationToggles).filter(Boolean).length;
+    addManagerMessage(`Enabled ${enabledCount} escalation triggers`);
+    setTimeout(() => {
+      addAIMessage(
+        `Got it — ${enabledCount} escalation triggers active. You can adjust these anytime.`,
+        { isTakeMeThere: { label: "Change in Playbook → Escalation", href: "/playbook" } }
+      );
+      setTimeout(() => {
+        setObPhase("identity_tone");
+        addAIMessage(
+          `Almost there. I'm **${agentName}**. What tone should I use with customers?`,
           {
             choices: [
-              { label: "30 days from purchase", value: "30_days" },
-              { label: "28 days from delivery", value: "28_days" },
+              { label: "Friendly and warm", value: "friendly", description: `"Hey Emma! Let me look into that for you 😊"` },
+              { label: "Professional", value: "professional", description: `"Hello Emma, I'd be happy to assist you with this."` },
+              { label: "Casual", value: "casual", description: `"Hi Emma! Sure thing, let me check that real quick."` },
             ],
           }
         );
-      }, 1200);
-    }, 2500);
-  }, [fileUploaded, addManagerMessage, addAIMessage]);
+      }, 800);
+    }, 600);
+  }, [escalationToggles, agentName, addManagerMessage, addAIMessage]);
 
   /* ── Regular topic handlers ── */
   const counts = {
@@ -528,7 +593,6 @@ export default function Inbox() {
     })
     .filter((t) => !search || t.title.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
-      // Onboarding always first
       if (a.id === ONBOARDING_TOPIC_ID) return -1;
       if (b.id === ONBOARDING_TOPIC_ID) return 1;
       if (a.status === "unread" && b.status !== "unread") return -1;
@@ -561,12 +625,11 @@ export default function Inbox() {
       prev.map((t) => {
         if (t.id !== id) return t;
         return {
-          ...t,
-          status: "resolved" as TopicStatus,
+          ...t, status: "resolved" as TopicStatus,
           messages: [
             ...t.messages,
             { id: `m-${Date.now()}`, sender: "manager" as MessageSender, content: "Approved. Please update the rule.", timestamp: new Date().toISOString() },
-            { id: `m-${Date.now() + 1}`, sender: "ai" as MessageSender, content: `Got it! I've updated the rule. Here's my understanding:\n\n> ${rule}\n\nI'll apply this going forward. Let me know if anything needs adjustment.`, timestamp: new Date().toISOString() },
+            { id: `m-${Date.now() + 1}`, sender: "ai" as MessageSender, content: `Got it! I've updated the rule:\n\n> ${rule}\n\nI'll apply this going forward.`, timestamp: new Date().toISOString() },
           ],
           proposedRule: t.proposedRule ? { ...t.proposedRule, status: "accepted" as const } : undefined,
         };
@@ -584,7 +647,7 @@ export default function Inbox() {
           messages: [
             ...t.messages,
             { id: `m-${Date.now()}`, sender: "manager" as MessageSender, content: "Rejected. This doesn't match our policy.", timestamp: new Date().toISOString() },
-            { id: `m-${Date.now() + 1}`, sender: "ai" as MessageSender, content: "Understood. I'll keep escalating these cases. Could you tell me the correct approach?", timestamp: new Date().toISOString() },
+            { id: `m-${Date.now() + 1}`, sender: "ai" as MessageSender, content: "Understood. Could you tell me the correct approach?", timestamp: new Date().toISOString() },
           ],
           proposedRule: t.proposedRule ? { ...t.proposedRule, status: "rejected" as const } : undefined,
         };
@@ -603,7 +666,7 @@ export default function Inbox() {
           messages: [
             ...t.messages,
             { id: `m-${Date.now()}`, sender: "manager" as MessageSender, content: replyText.trim(), timestamp: new Date().toISOString() },
-            { id: `m-${Date.now() + 1}`, sender: "ai" as MessageSender, content: "Thanks for the guidance! I'll incorporate this. Let me know if there's anything else.", timestamp: new Date().toISOString() },
+            { id: `m-${Date.now() + 1}`, sender: "ai" as MessageSender, content: "Thanks for the guidance! I'll incorporate this.", timestamp: new Date().toISOString() },
           ],
           updatedAt: new Date().toISOString(),
         };
@@ -614,14 +677,9 @@ export default function Inbox() {
 
   const handleNewTopic = () => {
     const t: Topic = {
-      id: `t-new-${Date.now()}`,
-      type: "rule_update",
-      title: "New Rule Update",
-      status: "pending" as TopicStatus,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      preview: "",
-      messages: [],
+      id: `t-new-${Date.now()}`, type: "rule_update", title: "New Rule Update",
+      status: "pending" as TopicStatus, createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(), preview: "", messages: [],
     };
     setTopics((prev) => [prev[0], t, ...prev.slice(1)]);
     setSelectedId(t.id);
@@ -637,9 +695,13 @@ export default function Inbox() {
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
-  /* ── Find the last message with active choices (for onboarding) ── */
+  /* ── Find the last message with active choices ── */
   const lastChoiceMsg = obMessages.filter((m) => m.choices && m.choices.length > 0).at(-1);
   const isLastChoiceActive = lastChoiceMsg && !obChoiceMade[obPhase] && obPhase !== "parsing" && obPhase !== "complete";
+
+  /* ── Progress bar ── */
+  const currentStageIdx = getStageIndex(obPhase);
+  const progressPct = obPhase === "complete" ? 100 : Math.round((currentStageIdx / (STAGES.length - 1)) * 100);
 
   /* ── Render ── */
   return (
@@ -663,29 +725,19 @@ export default function Inbox() {
         <div className="px-3 pt-3 pb-2 space-y-2 shrink-0">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-            <Input
-              placeholder="Search..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 h-8 text-[13px] bg-background"
-            />
+            <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-8 text-[13px] bg-background" />
           </div>
           <div className="flex gap-0.5 bg-muted/50 rounded-md p-0.5">
             {(["all", "unread", "pending", "resolved"] as FilterTab[]).map((f) => (
               <button
-                key={f}
-                onClick={() => setTab(f)}
+                key={f} onClick={() => setTab(f)}
                 className={cn(
                   "flex-1 px-2 py-1 rounded text-[12px] font-medium transition-all",
-                  tab === f
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
+                  tab === f ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
-                {counts[f] > 0 && f !== "all" && (
-                  <span className="ml-1 opacity-60">{counts[f]}</span>
-                )}
+                {counts[f] > 0 && f !== "all" && <span className="ml-1 opacity-60">{counts[f]}</span>}
               </button>
             ))}
           </div>
@@ -700,31 +752,20 @@ export default function Inbox() {
               const Icon = isOb ? Sparkles : TYPE_ICON[topic.type];
               const isActive = selectedId === topic.id;
               const isUnread = topic.status === "unread";
-
               return (
                 <button
-                  key={topic.id}
-                  onClick={() => setSelectedId(topic.id)}
+                  key={topic.id} onClick={() => setSelectedId(topic.id)}
                   className={cn(
                     "w-full text-left px-4 py-3 border-b border-border/50 transition-colors",
-                    isActive
-                      ? "bg-primary/5 border-l-2 border-l-primary"
-                      : "hover:bg-muted/30 border-l-2 border-l-transparent"
+                    isActive ? "bg-primary/5 border-l-2 border-l-primary" : "hover:bg-muted/30 border-l-2 border-l-transparent"
                   )}
                 >
                   <div className="flex items-center gap-2.5">
                     <Icon className={cn("w-4 h-4 shrink-0", isOb ? "text-primary" : TYPE_COLOR[topic.type])} />
-                    <span
-                      className={cn(
-                        "text-[13px] truncate flex-1",
-                        isUnread || isOb ? "font-semibold text-foreground" : "font-medium text-foreground/80"
-                      )}
-                    >
+                    <span className={cn("text-[13px] truncate flex-1", isUnread || isOb ? "font-semibold text-foreground" : "font-medium text-foreground/80")}>
                       {topic.title}
                     </span>
-                    <span className="text-[11px] text-muted-foreground shrink-0">
-                      {fmtTime(topic.updatedAt)}
-                    </span>
+                    <span className="text-[11px] text-muted-foreground shrink-0">{fmtTime(topic.updatedAt)}</span>
                     {isUnread && !isOb && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
                   </div>
                 </button>
@@ -744,24 +785,55 @@ export default function Inbox() {
               </div>
               <p className="text-sm font-medium text-foreground/70 mb-1">Select a topic</p>
               <p className="text-[13px] text-muted-foreground leading-relaxed">
-                Alex posts topics for knowledge gaps, performance reports, and questions.
+                {agentName} posts topics for knowledge gaps, performance reports, and questions.
               </p>
             </div>
           </div>
         ) : isOnboarding ? (
           /* ── Onboarding Conversation ── */
           <>
-            <div className="h-11 px-5 flex items-center gap-3 border-b border-border shrink-0">
-              <Sparkles className="w-4 h-4 text-primary shrink-0" />
-              <h2 className="text-[13px] font-medium text-foreground truncate flex-1">
-                Welcome — meet your new rep
-              </h2>
-              {obPhase === "complete" ? (
-                <Badge className="bg-emerald-50 text-emerald-600 border-emerald-200 text-[11px]">
-                  Complete
-                </Badge>
-              ) : (
-                <Badge variant="secondary" className="text-[11px]">Setting up</Badge>
+            {/* Header with progress bar */}
+            <div className="shrink-0">
+              <div className="h-11 px-5 flex items-center gap-3 border-b border-border">
+                <Sparkles className="w-4 h-4 text-primary shrink-0" />
+                <h2 className="text-[13px] font-medium text-foreground truncate flex-1">
+                  Welcome — meet your new rep
+                </h2>
+                {obPhase === "complete" ? (
+                  <Badge className="bg-emerald-50 text-emerald-600 border-emerald-200 text-[11px]">Complete</Badge>
+                ) : (
+                  <Badge variant="secondary" className="text-[11px]">Setting up</Badge>
+                )}
+              </div>
+
+              {/* Progress bar */}
+              {obPhase !== "complete" && (
+                <div className="px-5 py-2 border-b border-border/50 bg-muted/20">
+                  <div className="flex items-center gap-3 max-w-[640px] mx-auto">
+                    {STAGES.map((stage, i) => (
+                      <div key={stage.id} className="flex items-center gap-2 flex-1">
+                        <div className="flex items-center gap-1.5 flex-1">
+                          <div className={cn(
+                            "w-1.5 h-1.5 rounded-full shrink-0 transition-colors",
+                            i < currentStageIdx ? "bg-primary" : i === currentStageIdx ? "bg-primary" : "bg-border"
+                          )} />
+                          <span className={cn(
+                            "text-[11px] whitespace-nowrap transition-colors",
+                            i <= currentStageIdx ? "text-foreground/70 font-medium" : "text-muted-foreground/50"
+                          )}>
+                            {stage.label}
+                          </span>
+                        </div>
+                        {i < STAGES.length - 1 && (
+                          <div className={cn(
+                            "h-px flex-1 min-w-[12px] transition-colors",
+                            i < currentStageIdx ? "bg-primary/40" : "bg-border/60"
+                          )} />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
 
@@ -774,41 +846,24 @@ export default function Inbox() {
                   return (
                     <div key={msg.id}>
                       <div className={cn("flex gap-3", !isAI && "flex-row-reverse")}>
-                        <div
-                          className={cn(
-                            "w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5",
-                            isAI ? "bg-primary/10" : "bg-muted"
-                          )}
-                        >
+                        <div className={cn("w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5", isAI ? "bg-primary/10" : "bg-muted")}>
                           {isAI ? <Bot className="w-3.5 h-3.5 text-primary" /> : <User className="w-3.5 h-3.5 text-muted-foreground" />}
                         </div>
                         <div className={cn("flex-1 min-w-0", !isAI && "flex flex-col items-end")}>
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[12px] font-medium text-foreground/60">
-                              {isAI ? "Alex" : "You"}
-                            </span>
+                            <span className="text-[12px] font-medium text-foreground/60">{isAI ? agentName : "You"}</span>
                             <span className="text-[11px] text-muted-foreground/40">just now</span>
                           </div>
 
                           {/* Message content */}
-                          <div
-                            className={cn(
-                              "rounded-lg px-3.5 py-2.5 text-[13px] leading-relaxed max-w-full",
-                              isAI
-                                ? "bg-card border border-border text-foreground/85"
-                                : "bg-primary text-primary-foreground"
-                            )}
-                          >
+                          <div className={cn(
+                            "rounded-lg px-3.5 py-2.5 text-[13px] leading-relaxed max-w-full",
+                            isAI ? "bg-card border border-border text-foreground/85" : "bg-primary text-primary-foreground"
+                          )}>
                             {msg.content.split("\n").map((line, i) => {
                               if (line.startsWith("> ")) {
                                 return (
-                                  <blockquote
-                                    key={i}
-                                    className={cn(
-                                      "border-l-2 pl-3 my-1.5 italic text-[12px]",
-                                      isAI ? "border-primary/30 text-foreground/60" : "border-white/40 text-white/80"
-                                    )}
-                                  >
+                                  <blockquote key={i} className={cn("border-l-2 pl-3 my-1.5 italic text-[12px]", isAI ? "border-primary/30 text-foreground/60" : "border-white/40 text-white/80")}>
                                     {line.slice(2)}
                                   </blockquote>
                                 );
@@ -821,49 +876,213 @@ export default function Inbox() {
                                   </div>
                                 );
                               }
+                              if (line === "---") return <hr key={i} className="my-2 border-border/50" />;
                               if (line === "") return <div key={i} className="h-1.5" />;
                               return <p key={i}>{renderBold(line)}</p>;
                             })}
                           </div>
 
+                          {/* Name input */}
+                          {msg.isNameInput && obPhase === "welcome" && (
+                            <div className="mt-3 flex gap-2 w-full max-w-[320px]">
+                              <Input
+                                placeholder="e.g. Alex, Ava, Sam..."
+                                value={nameInput}
+                                onChange={(e) => setNameInput(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && handleNameSubmit()}
+                                className="flex-1 h-8 text-[13px]"
+                              />
+                              <Button size="sm" className="h-8 px-3" onClick={handleNameSubmit}>
+                                <ArrowRight className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          )}
+
                           {/* File upload zone */}
                           {msg.isFileUpload && !fileUploaded && (
-                            <div className="mt-3 w-full">
-                              <input
-                                ref={fileInputRef}
-                                type="file"
-                                className="hidden"
-                                accept=".pdf,.doc,.docx,.txt"
-                                onChange={() => handleFileUpload()}
-                              />
+                            <div className="mt-3 w-full space-y-2">
+                              <input ref={fileInputRef} type="file" className="hidden" accept=".pdf,.doc,.docx,.txt" onChange={() => handleFileUpload(false)} />
                               <button
-                                onClick={() => handleFileUpload()}
-                                className="w-full border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/40 hover:bg-primary/5 transition-all group cursor-pointer"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="w-full border-2 border-dashed border-border rounded-lg p-5 text-center hover:border-primary/40 hover:bg-primary/5 transition-all group cursor-pointer"
                               >
                                 <Upload className="w-5 h-5 mx-auto mb-2 text-muted-foreground group-hover:text-primary transition-colors" />
-                                <p className="text-[13px] text-muted-foreground group-hover:text-foreground transition-colors">
-                                  Drop a file here or click to upload
-                                </p>
+                                <p className="text-[13px] text-muted-foreground group-hover:text-foreground transition-colors">Drop a file here or click to upload</p>
                                 <p className="text-[11px] text-muted-foreground/60 mt-1">PDF, Word, or text</p>
+                              </button>
+                              <button
+                                onClick={() => handleFileUpload(true)}
+                                className="w-full text-center text-[12px] text-primary hover:text-primary/80 font-medium py-1.5 transition-colors"
+                              >
+                                Use demo doc: Seel_Return_Policy_2026.pdf
                               </button>
                             </div>
                           )}
 
                           {/* Take me there link */}
                           {msg.isTakeMeThere && (
-                            <a
-                              href={msg.isTakeMeThere.href}
-                              className="mt-2 inline-flex items-center gap-1.5 text-[12px] text-primary hover:text-primary/80 font-medium transition-colors"
-                            >
-                              {msg.isTakeMeThere.label}
-                              <ArrowRight className="w-3 h-3" />
+                            <a href={msg.isTakeMeThere.href} className="mt-2 inline-flex items-center gap-1.5 text-[12px] text-primary hover:text-primary/80 font-medium transition-colors">
+                              {msg.isTakeMeThere.label} <ArrowRight className="w-3 h-3" />
                             </a>
+                          )}
+
+                          {/* Conflict resolution form */}
+                          {msg.isConflictForm && obPhase === "conflicts" && (
+                            <div className="mt-3 w-full space-y-3">
+                              {conflicts.map((conflict, ci) => (
+                                <div key={conflict.id} className="border border-border rounded-lg p-3 bg-muted/20">
+                                  <p className="text-[12px] font-semibold text-foreground mb-2">
+                                    Conflict {ci + 1}: {conflict.title}
+                                  </p>
+                                  <div className="space-y-1.5">
+                                    <button
+                                      onClick={() => handleConflictResolve(conflict.id, "a")}
+                                      className={cn(
+                                        "w-full text-left rounded-md px-3 py-2 text-[12px] border transition-all",
+                                        conflict.resolved === "a"
+                                          ? "border-primary bg-primary/5 text-foreground"
+                                          : "border-border hover:border-primary/40 text-foreground/80"
+                                      )}
+                                    >
+                                      <div className="flex items-start gap-2">
+                                        <div className={cn("w-3.5 h-3.5 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center", conflict.resolved === "a" ? "border-primary" : "border-muted-foreground/30")}>
+                                          {conflict.resolved === "a" && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
+                                        </div>
+                                        <div>
+                                          <span className="font-medium">{conflict.sourceA}</span>
+                                          <span className="block text-[11px] text-muted-foreground mt-0.5">Source: {conflict.sourceALabel}</span>
+                                        </div>
+                                      </div>
+                                    </button>
+                                    <button
+                                      onClick={() => handleConflictResolve(conflict.id, "b")}
+                                      className={cn(
+                                        "w-full text-left rounded-md px-3 py-2 text-[12px] border transition-all",
+                                        conflict.resolved === "b"
+                                          ? "border-primary bg-primary/5 text-foreground"
+                                          : "border-border hover:border-primary/40 text-foreground/80"
+                                      )}
+                                    >
+                                      <div className="flex items-start gap-2">
+                                        <div className={cn("w-3.5 h-3.5 rounded-full border-2 mt-0.5 shrink-0 flex items-center justify-center", conflict.resolved === "b" ? "border-primary" : "border-muted-foreground/30")}>
+                                          {conflict.resolved === "b" && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
+                                        </div>
+                                        <div>
+                                          <span className="font-medium">{conflict.sourceB}</span>
+                                          <span className="block text-[11px] text-muted-foreground mt-0.5">Source: {conflict.sourceBLabel}</span>
+                                        </div>
+                                      </div>
+                                    </button>
+                                    <button
+                                      onClick={() => handleConflictResolve(conflict.id, "later")}
+                                      className={cn(
+                                        "w-full text-center py-1.5 text-[11px] transition-colors rounded",
+                                        conflict.resolved === "later"
+                                          ? "text-primary font-medium bg-primary/5"
+                                          : "text-muted-foreground hover:text-foreground"
+                                      )}
+                                    >
+                                      Decide later
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                              <Button
+                                size="sm"
+                                className="w-full h-8 text-[12px]"
+                                disabled={conflicts.every((c) => !c.resolved)}
+                                onClick={handleConflictsSubmit}
+                              >
+                                Continue
+                              </Button>
+                            </div>
+                          )}
+
+                          {/* Actions form */}
+                          {msg.isActionsForm && obPhase === "actions_form" && (
+                            <div className="mt-3 w-full space-y-2">
+                              {DEFAULT_ACTIONS.map((action) => (
+                                <div key={action.id} className="flex items-center justify-between border border-border rounded-lg px-3 py-2.5 bg-muted/20">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[12px] font-medium text-foreground">{action.label}</p>
+                                    <p className="text-[11px] text-muted-foreground">{action.description}</p>
+                                  </div>
+                                  <div className="flex gap-1 shrink-0 ml-3">
+                                    {(["auto", "ask", "off"] as const).map((perm) => (
+                                      <button
+                                        key={perm}
+                                        onClick={() => setActionPerms((prev) => ({ ...prev, [action.id]: perm }))}
+                                        className={cn(
+                                          "px-2 py-1 rounded text-[11px] font-medium transition-all",
+                                          actionPerms[action.id] === perm
+                                            ? perm === "auto" ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                                              : perm === "ask" ? "bg-amber-100 text-amber-700 border border-amber-200"
+                                              : "bg-red-100 text-red-700 border border-red-200"
+                                            : "bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted"
+                                        )}
+                                      >
+                                        {perm === "auto" ? "Auto" : perm === "ask" ? "Ask me" : "Off"}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                              <Button size="sm" className="w-full h-8 text-[12px]" onClick={handleActionsSubmit}>
+                                Continue
+                              </Button>
+                            </div>
+                          )}
+
+                          {/* Escalation form */}
+                          {msg.isEscalationForm && obPhase === "escalation_form" && (
+                            <div className="mt-3 w-full space-y-1.5">
+                              {DEFAULT_ESCALATION.map((trigger) => (
+                                <button
+                                  key={trigger.id}
+                                  onClick={() => setEscalationToggles((prev) => ({ ...prev, [trigger.id]: !prev[trigger.id] }))}
+                                  className={cn(
+                                    "w-full flex items-center gap-3 border rounded-lg px-3 py-2.5 text-left transition-all",
+                                    escalationToggles[trigger.id]
+                                      ? "border-primary/40 bg-primary/5"
+                                      : "border-border bg-muted/20 hover:border-border"
+                                  )}
+                                >
+                                  <div className={cn(
+                                    "w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center transition-colors",
+                                    escalationToggles[trigger.id] ? "border-primary bg-primary" : "border-muted-foreground/30"
+                                  )}>
+                                    {escalationToggles[trigger.id] && <Check className="w-2.5 h-2.5 text-white" />}
+                                  </div>
+                                  <span className="text-[12px] text-foreground/80">{trigger.label}</span>
+                                </button>
+                              ))}
+                              <Button size="sm" className="w-full h-8 text-[12px] mt-2" onClick={handleEscalationSubmit}>
+                                Continue
+                              </Button>
+                            </div>
+                          )}
+
+                          {/* Scenario feedback input */}
+                          {msg.scenarioFeedback && awaitingFeedback && (
+                            <div className="mt-2 flex gap-2 w-full">
+                              <Input
+                                placeholder="Tell me what to change..."
+                                value={scenarioFeedbackText}
+                                onChange={(e) => setScenarioFeedbackText(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && handleScenarioFeedback()}
+                                className="flex-1 h-8 text-[12px]"
+                                autoFocus
+                              />
+                              <Button size="sm" className="h-8 px-3" disabled={!scenarioFeedbackText.trim()} onClick={handleScenarioFeedback}>
+                                <Send className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
                           )}
                         </div>
                       </div>
 
-                      {/* Choice bubbles — right-aligned like manager messages */}
-                      {hasActiveChoices && msg.choices && (
+                      {/* Choice bubbles */}
+                      {hasActiveChoices && msg.choices && !awaitingFeedback && (
                         <div className="flex flex-col items-end gap-2 mt-3 ml-10">
                           {msg.choices.map((choice, ci) => (
                             <button
@@ -895,7 +1114,7 @@ export default function Inbox() {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[12px] font-medium text-foreground/60">Alex</span>
+                        <span className="text-[12px] font-medium text-foreground/60">{agentName}</span>
                       </div>
                       <div className="bg-card border border-border rounded-lg px-3.5 py-3 inline-flex items-center gap-2">
                         <div className="flex gap-1">
@@ -921,21 +1140,16 @@ export default function Inbox() {
                 const Icon = TYPE_ICON[selected.type];
                 return <Icon className={cn("w-4 h-4 shrink-0", TYPE_COLOR[selected.type])} />;
               })()}
-              <h2 className="text-[13px] font-medium text-foreground truncate flex-1">
-                {selected.title}
-              </h2>
+              <h2 className="text-[13px] font-medium text-foreground truncate flex-1">{selected.title}</h2>
               <div className="flex items-center gap-2 shrink-0">
                 {selected.status === "resolved" ? (
-                  <Badge className="bg-emerald-50 text-emerald-600 border-emerald-200 text-[11px]">
-                    Resolved
-                  </Badge>
+                  <Badge className="bg-emerald-50 text-emerald-600 border-emerald-200 text-[11px]">Resolved</Badge>
                 ) : (
                   <Badge variant="secondary" className="text-[11px]">Open</Badge>
                 )}
                 {selected.sourceTicketId && (
                   <button className="text-[12px] text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors">
-                    <ExternalLink className="w-3 h-3" />
-                    #{selected.sourceTicketId}
+                    <ExternalLink className="w-3 h-3" /> #{selected.sourceTicketId}
                   </button>
                 )}
               </div>
@@ -947,41 +1161,22 @@ export default function Inbox() {
                   const isAI = msg.sender === "ai";
                   return (
                     <div key={msg.id} className={cn("flex gap-3", !isAI && "flex-row-reverse")}>
-                      <div
-                        className={cn(
-                          "w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5",
-                          isAI ? "bg-primary/10" : "bg-muted"
-                        )}
-                      >
+                      <div className={cn("w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5", isAI ? "bg-primary/10" : "bg-muted")}>
                         {isAI ? <Bot className="w-3.5 h-3.5 text-primary" /> : <User className="w-3.5 h-3.5 text-muted-foreground" />}
                       </div>
                       <div className={cn("flex-1 min-w-0", !isAI && "flex flex-col items-end")}>
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[12px] font-medium text-foreground/60">
-                            {isAI ? "Alex" : "You"}
-                          </span>
-                          <span className="text-[11px] text-muted-foreground/40">
-                            {fmtTime(msg.timestamp)}
-                          </span>
+                          <span className="text-[12px] font-medium text-foreground/60">{isAI ? agentName : "You"}</span>
+                          <span className="text-[11px] text-muted-foreground/40">{fmtTime(msg.timestamp)}</span>
                         </div>
-                        <div
-                          className={cn(
-                            "rounded-lg px-3.5 py-2.5 text-[13px] leading-relaxed",
-                            isAI
-                              ? "bg-card border border-border text-foreground/85"
-                              : "bg-primary text-primary-foreground"
-                          )}
-                        >
+                        <div className={cn(
+                          "rounded-lg px-3.5 py-2.5 text-[13px] leading-relaxed",
+                          isAI ? "bg-card border border-border text-foreground/85" : "bg-primary text-primary-foreground"
+                        )}>
                           {msg.content.split("\n").map((line, i) => {
                             if (line.startsWith("> ")) {
                               return (
-                                <blockquote
-                                  key={i}
-                                  className={cn(
-                                    "border-l-2 pl-3 my-1.5 italic text-[12px]",
-                                    isAI ? "border-primary/30 text-foreground/60" : "border-white/40 text-white/80"
-                                  )}
-                                >
+                                <blockquote key={i} className={cn("border-l-2 pl-3 my-1.5 italic text-[12px]", isAI ? "border-primary/30 text-foreground/60" : "border-white/40 text-white/80")}>
                                   {line.slice(2)}
                                 </blockquote>
                               );
@@ -1003,13 +1198,9 @@ export default function Inbox() {
                           <div className="flex gap-2 mt-2">
                             {msg.actions.map((action) => (
                               <Button
-                                key={action.label}
-                                size="sm"
+                                key={action.label} size="sm"
                                 variant={action.type === "accept" ? "default" : "outline"}
-                                className={cn(
-                                  "h-7 text-[12px] gap-1",
-                                  action.type === "accept" && "bg-emerald-600 hover:bg-emerald-700"
-                                )}
+                                className={cn("h-7 text-[12px] gap-1", action.type === "accept" && "bg-emerald-600 hover:bg-emerald-700")}
                                 onClick={() => {
                                   if (action.type === "accept") handleAccept(selected.id);
                                   if (action.type === "reject") handleReject(selected.id);
@@ -1033,7 +1224,7 @@ export default function Inbox() {
               <div className="px-5 py-2.5 border-t border-border shrink-0">
                 <div className="max-w-[640px] mx-auto flex gap-2">
                   <Input
-                    placeholder="Reply to Alex..."
+                    placeholder={`Reply to ${agentName}...`}
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
