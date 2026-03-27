@@ -10,6 +10,7 @@ import {
   AGENT_IDENTITY,
   INTEGRATIONS,
   SKILLS,
+  KNOWLEDGE_DOCUMENTS,
   AGENT_MODE,
   type ActionPermission,
   type PermissionLevel,
@@ -43,6 +44,11 @@ import {
   Unlock,
   HelpCircle,
   Save,
+  FileText,
+  Upload,
+  Trash2,
+  ExternalLink,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -61,6 +67,149 @@ const PERMISSION_OPTIONS: { value: PermissionLevel; label: string; description: 
   { value: "ask_permission", label: "Ask Permission", description: "AI requests manager approval", color: "text-amber-600 bg-amber-50" },
   { value: "disabled", label: "Disabled", description: "AI cannot perform this action", color: "text-red-600 bg-red-50" },
 ];
+
+/* ── Knowledge Sub-Tab Component ── */
+function KnowledgeTab() {
+  const [subTab, setSubTab] = useState<"documents" | "skills">("documents");
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-sans font-semibold text-foreground">Knowledge Base</h2>
+        <p className="text-[13px] text-muted-foreground mt-1">
+          Manage source documents and view the rules Alex has learned.
+        </p>
+      </div>
+
+      {/* Sub-tab toggle */}
+      <div className="flex gap-1 p-1 bg-muted/50 rounded-lg w-fit">
+        <button
+          onClick={() => setSubTab("documents")}
+          className={cn(
+            "px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors",
+            subTab === "documents" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <FileText className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
+          Documents ({KNOWLEDGE_DOCUMENTS.length})
+        </button>
+        <button
+          onClick={() => setSubTab("skills")}
+          className={cn(
+            "px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors",
+            subTab === "skills" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <BookOpen className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
+          Learned Rules ({SKILLS.length})
+        </button>
+      </div>
+
+      {/* Documents sub-tab */}
+      {subTab === "documents" && (
+        <div className="space-y-3">
+          {KNOWLEDGE_DOCUMENTS.map((doc) => (
+            <Card key={doc.id}>
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className={cn(
+                      "w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-bold uppercase shrink-0",
+                      doc.type === "pdf" && "bg-red-50 text-red-600",
+                      doc.type === "doc" && "bg-blue-50 text-blue-600",
+                      doc.type === "csv" && "bg-emerald-50 text-emerald-600",
+                      doc.type === "url" && "bg-purple-50 text-purple-600"
+                    )}>
+                      {doc.type}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-medium text-foreground truncate">{doc.name}</p>
+                      <div className="flex items-center gap-3 mt-0.5">
+                        <span className="text-[11px] text-muted-foreground">{doc.size}</span>
+                        <span className="text-[11px] text-muted-foreground">
+                          Uploaded {new Date(doc.uploadedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </span>
+                        <Badge variant="secondary" className="h-[16px] px-1.5 text-[10px]">
+                          {doc.extractedRules} rules extracted
+                        </Badge>
+                        {doc.status === "processed" && (
+                          <span className="flex items-center gap-1 text-[10px] text-emerald-600">
+                            <CheckCircle2 className="w-3 h-3" /> Processed
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+
+          <button
+            onClick={() => toast.info("File upload dialog would open here")}
+            className="w-full border-2 border-dashed border-border/60 rounded-lg p-6 text-center hover:border-primary/40 hover:bg-primary/2 transition-colors"
+          >
+            <Upload className="w-5 h-5 mx-auto text-muted-foreground mb-2" />
+            <p className="text-[13px] font-medium text-foreground">Upload Document</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">PDF, DOC, CSV — Alex will extract rules automatically</p>
+          </button>
+        </div>
+      )}
+
+      {/* Skills sub-tab */}
+      {subTab === "skills" && (
+        <div className="space-y-3">
+          {SKILLS.map((skill) => (
+            <Card key={skill.id} className="overflow-hidden">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[13px] font-medium text-foreground">{skill.name}</span>
+                      <Badge variant="secondary" className="h-[18px] px-1.5 text-[10px]">
+                        {skill.intent}
+                      </Badge>
+                    </div>
+                    <p className="text-[12px] text-muted-foreground leading-relaxed">{skill.ruleText}</p>
+                    <div className="flex items-center gap-3 mt-2">
+                      <span className="text-[11px] text-muted-foreground/60">
+                        Updated {new Date(skill.lastUpdated).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <div className="w-12 h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-primary/60"
+                            style={{ width: `${skill.confidence * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">{Math.round(skill.confidence * 100)}%</span>
+                      </div>
+                      {skill.updatedByTopicId && (
+                        <Badge variant="outline" className="h-[16px] px-1 text-[9px] text-primary/70 border-primary/20">
+                          Updated via Inbox
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+
+          <div className="rounded-lg border border-dashed border-border/60 p-4 text-center">
+            <p className="text-[12px] text-muted-foreground">
+              Rules are updated through conversations in <span className="font-medium text-primary">Inbox</span>.
+              Alex proposes rules, you confirm — and they appear here.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
@@ -340,6 +489,25 @@ export default function SettingsPage() {
                             <span className="text-[13px] font-medium text-foreground">{rule.label}</span>
                           </div>
                           <p className="text-[12px] text-muted-foreground mt-1 ml-11">{rule.description}</p>
+                          {/* Routing target */}
+                          {rule.enabled && rule.routingTarget && (
+                            <div className="ml-11 mt-2 flex items-center gap-2">
+                              <ArrowRight className="w-3 h-3 text-muted-foreground" />
+                              <span className="text-[11px] text-muted-foreground">Route to:</span>
+                              {rule.routingType === "external_link" ? (
+                                <a href={rule.routingTarget} target="_blank" rel="noreferrer" className="text-[11px] text-primary flex items-center gap-1 hover:underline">
+                                  External Zendesk <ExternalLink className="w-3 h-3" />
+                                </a>
+                              ) : (
+                                <Badge variant="secondary" className="h-[18px] px-1.5 text-[10px]">
+                                  {rule.routingTarget}
+                                </Badge>
+                              )}
+                              <Button variant="ghost" size="sm" className="h-5 px-1.5 text-[10px] text-muted-foreground" onClick={() => toast.info("Routing configuration would open here")}>
+                                Edit
+                              </Button>
+                            </div>
+                          )}
                         </div>
                         {rule.configurable && rule.enabled && (
                           <div className="flex items-center gap-2 shrink-0">
@@ -362,6 +530,12 @@ export default function SettingsPage() {
                   ))}
                 </CardContent>
               </Card>
+
+              {/* Add new rule */}
+              <Button variant="outline" className="gap-1.5 text-[12px]" onClick={() => toast.info("Add escalation rule dialog would open here")}>
+                <AlertCircle className="w-3.5 h-3.5" />
+                Add Escalation Rule
+              </Button>
 
               <div className="flex justify-end">
                 <Button className="gap-1.5" onClick={() => toast.success("Escalation rules saved")}>
@@ -464,61 +638,7 @@ export default function SettingsPage() {
 
           {/* ── Knowledge Tab ── */}
           {activeTab === "knowledge" && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-lg font-sans font-semibold text-foreground">Knowledge Base</h2>
-                <p className="text-[13px] text-muted-foreground mt-1">
-                  View the rules and skills Alex has learned. Updates happen through the Instruct module.
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                {SKILLS.map((skill) => (
-                  <Card key={skill.id} className="overflow-hidden">
-                    <CardContent className="pt-4 pb-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[13px] font-medium text-foreground">{skill.name}</span>
-                            <Badge variant="secondary" className="h-[18px] px-1.5 text-[10px]">
-                              {skill.intent}
-                            </Badge>
-                          </div>
-                          <p className="text-[12px] text-muted-foreground leading-relaxed">{skill.ruleText}</p>
-                          <div className="flex items-center gap-3 mt-2">
-                            <span className="text-[11px] text-muted-foreground/60">
-                              Updated {new Date(skill.lastUpdated).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                            </span>
-                            <div className="flex items-center gap-1">
-                              <div className="w-12 h-1.5 rounded-full bg-muted overflow-hidden">
-                                <div
-                                  className="h-full rounded-full bg-primary/60"
-                                  style={{ width: `${skill.confidence * 100}%` }}
-                                />
-                              </div>
-                              <span className="text-[10px] text-muted-foreground">{Math.round(skill.confidence * 100)}%</span>
-                            </div>
-                            {skill.updatedByTopicId && (
-                              <Badge variant="outline" className="h-[16px] px-1 text-[9px] text-primary/70 border-primary/20">
-                                Updated via Instruct
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-              <div className="rounded-lg border border-dashed border-border/60 p-4 text-center">
-                <p className="text-[12px] text-muted-foreground">
-                  Knowledge is updated through conversations in the <span className="font-medium text-primary">Instruct</span> module.
-                  <br />
-                  Alex proposes rules, you confirm — and they appear here.
-                </p>
-              </div>
-            </div>
+            <KnowledgeTab />
           )}
         </div>
       </ScrollArea>

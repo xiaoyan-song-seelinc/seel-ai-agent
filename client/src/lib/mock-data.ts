@@ -12,7 +12,7 @@ export type MessageSender = "ai" | "manager";
 export type ApprovalStatus = "pending" | "approved" | "denied" | "expired";
 export type PermissionLevel = "autonomous" | "ask_permission" | "disabled";
 export type AgentMode = "shadow" | "production" | "off";
-export type OnboardingStep = "connect_zendesk" | "connect_shopify" | "import_rules" | "confirm_rules" | "set_permissions" | "capability_boundary" | "escalation_rules" | "agent_identity" | "go_live";
+export type OnboardingStep = "connect_zendesk" | "connect_shopify" | "import_rules" | "confirm_rules" | "set_permissions" | "capability_boundary" | "escalation_rules" | "agent_identity" | "readiness_audit" | "go_live";
 export type TicketSidebarState = "ai_handling" | "pending_approval" | "escalated" | "taken_over";
 
 export interface Topic {
@@ -68,6 +68,8 @@ export interface EscalationRule {
   enabled: boolean;
   configurable: boolean;
   value?: number;
+  routingTarget?: string;
+  routingType?: "zendesk_group" | "external_link" | "specific_agent";
 }
 
 export interface AgentIdentity {
@@ -84,6 +86,16 @@ export interface Integration {
   connectedAt?: string;
   metadata: Record<string, string | number>;
   webhookStatus?: "active" | "inactive" | "error";
+}
+
+export interface KnowledgeDocument {
+  id: string;
+  name: string;
+  type: "pdf" | "doc" | "csv" | "url";
+  uploadedAt: string;
+  size: string;
+  extractedRules: number;
+  status: "processed" | "processing" | "error";
 }
 
 export interface Skill {
@@ -226,8 +238,18 @@ export const ESCALATION_RULES: EscalationRule[] = [
   { id: "er-2", label: "Legal/safety keywords", description: "Escalate when message contains legal threats, safety concerns, or regulatory keywords", enabled: true, configurable: false },
   { id: "er-3", label: "Unresolved after N turns", description: "Escalate if the issue isn't resolved within a set number of conversation turns", enabled: true, configurable: true, value: 4 },
   { id: "er-4", label: "Customer requests human", description: "Escalate immediately when customer explicitly asks for a human agent", enabled: true, configurable: false },
-  { id: "er-5", label: "High-value order (>$500)", description: "Escalate any issue involving orders above this threshold", enabled: true, configurable: true, value: 500 },
-  { id: "er-6", label: "Repeat contact (3+ times)", description: "Escalate when customer has contacted about the same issue multiple times", enabled: true, configurable: true, value: 3 },
+  { id: "er-5", label: "High-value order (>$500)", description: "Escalate any issue involving orders above this threshold", enabled: true, configurable: true, value: 500, routingTarget: "CX Team A", routingType: "zendesk_group" },
+  { id: "er-6", label: "Repeat contact (3+ times)", description: "Escalate when customer has contacted about the same issue multiple times", enabled: true, configurable: true, value: 3, routingTarget: "CX Team A", routingType: "zendesk_group" },
+  { id: "er-7", label: "Insurance-related inquiry", description: "Route insurance claims and coverage questions to the dedicated insurance support team", enabled: true, configurable: false, routingTarget: "https://insurance-support.seel.com/zendesk", routingType: "external_link" },
+  { id: "er-8", label: "Technical/integration issue", description: "Route technical issues (tracking pixel, API errors) to engineering support", enabled: true, configurable: false, routingTarget: "Engineering Support", routingType: "zendesk_group" },
+];
+
+export const KNOWLEDGE_DOCUMENTS: KnowledgeDocument[] = [
+  { id: "doc-1", name: "Coastal Living Co — Customer Service SOP v3.2.pdf", type: "pdf", uploadedAt: "2026-03-01T09:00:00Z", size: "2.4 MB", extractedRules: 12, status: "processed" },
+  { id: "doc-2", name: "Return & Refund Policy — March 2026.pdf", type: "pdf", uploadedAt: "2026-03-01T09:00:00Z", size: "890 KB", extractedRules: 5, status: "processed" },
+  { id: "doc-3", name: "Shipping Partner SLA & Escalation Guide.doc", type: "doc", uploadedAt: "2026-03-05T14:00:00Z", size: "1.1 MB", extractedRules: 3, status: "processed" },
+  { id: "doc-4", name: "VIP Customer Handling Guidelines.pdf", type: "pdf", uploadedAt: "2026-03-10T11:00:00Z", size: "540 KB", extractedRules: 4, status: "processed" },
+  { id: "doc-5", name: "Product Warranty Terms — All Categories.csv", type: "csv", uploadedAt: "2026-03-15T16:00:00Z", size: "320 KB", extractedRules: 8, status: "processed" },
 ];
 
 export const SKILLS: Skill[] = [

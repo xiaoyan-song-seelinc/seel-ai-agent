@@ -44,6 +44,9 @@ import {
   X,
   HelpCircle,
   Eye,
+  ClipboardCheck,
+  Settings,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -57,6 +60,7 @@ const STEPS: { id: OnboardingStep; label: string; icon: typeof Link2 }[] = [
   { id: "capability_boundary", label: "Capability Review", icon: Eye },
   { id: "escalation_rules", label: "Escalation Rules", icon: Shield },
   { id: "agent_identity", label: "Agent Identity", icon: UserCircle },
+  { id: "readiness_audit", label: "Readiness Audit", icon: ClipboardCheck },
   { id: "go_live", label: "Go Live", icon: Rocket },
 ];
 
@@ -670,6 +674,45 @@ export default function Onboarding() {
               </StepContainer>
             )}
 
+            {/* ── Readiness Audit (Placeholder) ── */}
+            {currentStep.id === "readiness_audit" && (
+              <StepContainer
+                icon={<ClipboardCheck className="w-5 h-5 text-primary" />}
+                title="Readiness Audit"
+                description="Test Alex's readiness before going live."
+              >
+                <Card className="border-2 border-dashed border-border/60">
+                  <CardContent className="pt-8 pb-8 text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                      <ClipboardCheck className="w-7 h-7 text-muted-foreground" />
+                    </div>
+                    <h3 className="text-[15px] font-sans font-semibold text-foreground mb-2">Coming Soon</h3>
+                    <p className="text-[13px] text-muted-foreground max-w-md mx-auto leading-relaxed">
+                      This step will simulate real customer conversations to test Alex's readiness.
+                      A simulated customer agent will ask questions based on your historical tickets,
+                      and an evaluation agent will score Alex's responses across accuracy, tone, and policy compliance.
+                    </p>
+                    <div className="flex items-center justify-center gap-4 mt-5 text-[11px] text-muted-foreground">
+                      <span className="flex items-center gap-1"><Bot className="w-3.5 h-3.5" /> Simulated Customer</span>
+                      <span className="flex items-center gap-1"><Sparkles className="w-3.5 h-3.5" /> AI Evaluator</span>
+                      <span className="flex items-center gap-1"><ClipboardCheck className="w-3.5 h-3.5" /> Readiness Score</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="flex justify-between mt-6">
+                  <Button variant="outline" className="gap-2" onClick={goBack}>
+                    <ArrowLeft className="w-4 h-4" />
+                    Back
+                  </Button>
+                  <Button className="gap-2" onClick={goNext}>
+                    Skip for now
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </StepContainer>
+            )}
+
             {/* ── Go Live ── */}
             {currentStep.id === "go_live" && (
               <StepContainer
@@ -735,6 +778,18 @@ export default function Onboarding() {
                   </CardContent>
                 </Card>
 
+                {/* Settings reminder */}
+                <Card className="bg-muted/30 border-border/40 mt-4">
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-start gap-3">
+                      <Settings className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                      <p className="text-[12px] text-muted-foreground leading-relaxed">
+                        All configurations from this setup can be adjusted anytime in <span className="font-medium text-foreground">Settings</span> — including permissions, escalation rules, identity, and knowledge base.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
                 <div className="flex justify-between mt-6">
                   <Button variant="outline" className="gap-2" onClick={goBack}>
                     <ArrowLeft className="w-4 h-4" />
@@ -743,8 +798,8 @@ export default function Onboarding() {
                   <Button
                     className="gap-2 bg-emerald-600 hover:bg-emerald-700"
                     onClick={() => {
-                      toast.success("Alex is now live! Redirecting to dashboard...");
-                      setTimeout(() => navigate("/instruct"), 1500);
+                      toast.success("Alex is now live! Redirecting to Inbox...");
+                      setTimeout(() => navigate("/inbox"), 1500);
                     }}
                   >
                     <Rocket className="w-4 h-4" />
