@@ -1,25 +1,25 @@
 /* ── Messages Page ────────────────────────────────────────────
-   IM-style DM with Team Lead.
-   Onboarding integrated as the first conversation (3 phases).
-   Rule proposals, inline threads, Topics panel.
+   Topic-card layout inspired by Feishu.
+   Each topic = a card. Rule updates split into context + proposal.
+   Before/After collapsible for long content.
+   Onboarding integrated as first conversation.
    ──────────────────────────────────────────────────────────── */
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import {
-  Send, MessageSquare, Check, X, XCircle, Reply, Bot, List, Plus,
+  Send, Check, X, XCircle, Reply, Bot, List, Plus,
   ArrowRight, ChevronDown, ChevronUp, FileText, BarChart3,
   Link2, Upload, AlertTriangle, CheckCircle2, Sparkles, Eye, Rocket,
-  RotateCcw,
+  RotateCcw, Copy, MessageCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { TOPICS, type Topic, type TopicType } from "@/lib/mock-data";
+import { TOPICS, type Topic } from "@/lib/mock-data";
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -39,23 +39,27 @@ interface RuleChange {
   source?: string;
 }
 
-interface ConvMessage {
+interface TopicMessage {
   id: string;
-  topicId: string;
-  topicTitle: string;
   sender: "ai" | "manager";
   content: string;
   timestamp: string;
   ruleChange?: RuleChange;
-  actions?: ("accept" | "reject" | "reply")[];
-  threadReplies?: ThreadReply[];
-  isScribe?: boolean;
-  status: "waiting" | "done";
-  // Onboarding-specific
-  isOnboarding?: boolean;
   widget?: string;
   widgetData?: Record<string, unknown>;
   choices?: { label: string; value: string; icon?: string; variant?: string }[];
+}
+
+interface TopicCard {
+  id: string;
+  title: string;
+  status: "waiting" | "done";
+  timestamp: string;
+  messages: TopicMessage[];
+  replies: ThreadReply[];
+  hasActions: boolean;
+  isScribe?: boolean;
+  isOnboarding?: boolean;
   isPhaseLabel?: boolean;
 }
 
@@ -92,57 +96,65 @@ function formatRelativeTime(dateStr: string): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-// ── Build messages from TOPICS ────────────────────────────
+function renderMarkdown(text: string) {
+  return text.split("\n").map((line, i) => {
+    if (line.trim() === "") return <div key={i} className="h-1.5" />;
+    if (line.startsWith("- ")) {
+      return (
+        <div key={i} className="flex gap-1.5 ml-1">
+          <span className="text-muted-foreground mt-0.5">·</span>
+          <span dangerouslySetInnerHTML={{ __html: line.slice(2).replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") }} />
+        </div>
+      );
+    }
+    if (line.startsWith("> ")) {
+      return (
+        <div key={i} className="border-l-2 border-primary/20 pl-2 my-0.5 text-muted-foreground italic text-[11px]">
+          {line.slice(2)}
+        </div>
+      );
+    }
+    return <p key={i} dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") }} />;
+  });
+}
 
-function buildMessages(topics: Topic[]): ConvMessage[] {
-  const msgs: ConvMessage[] = [];
+// ── Build topic cards from TOPICS ────────────────────────
+
+function buildTopicCards(topics: Topic[]): TopicCard[] {
+  const cards: TopicCard[] = [];
 
   for (const topic of topics) {
     const isPerf = topic.type === "performance_report";
     const isResolved = topic.status === "resolved";
-    const firstAi = topic.messages.find((m) => m.sender === "ai");
-    const firstManager = topic.messages.find((m) => m.sender === "manager");
-    const anchor = firstAi || firstManager;
+
+    // Build messages for this topic
+    const topicMsgs: TopicMessage[] = [];
+    const replies: ThreadReply[] = [];
+
+    // First message is always the anchor
+    const anchor = topic.messages[0];
     if (!anchor) continue;
 
-    const threadMsgs = topic.messages
-      .filter((m) => m.id !== anchor.id)
-      .map((m) => ({
-        id: m.id,
-        sender: m.sender,
-        content: m.content,
-        timestamp: m.timestamp,
-      }));
-
+    // For escalation_review (t-3) and knowledge_gap with proposed rules,
+    // split into context message + rule proposal message
     let ruleChange: RuleChange | undefined;
+
     if (topic.proposedRule) {
       ruleChange = {
         type: "new",
         ruleName: topic.proposedRule.category + " — " + topic.title,
         after: topic.proposedRule.text,
-        source: topic.proposedRule.evidence.map((e) => e).join(" | "),
+        source: topic.proposedRule.evidence.join(" | "),
       };
     }
 
-    if (topic.type === "escalation_review" && !ruleChange) {
-      const ruleMsg = topic.messages.find((m) => m.sender === "ai" && m.content.includes("Proposed update"));
-      if (ruleMsg) {
-        ruleChange = {
-          type: "update",
-          ruleName: topic.title,
-          before: "Require photo evidence for all damage claims regardless of order value.",
-          after: "For damage claims on items under $80, process replacement or refund without photo. For items $80+, still request photo.",
-          source: `Observed from ticket #${topic.sourceTicketId}`,
-        };
-      }
-    }
-
-    if (topic.type === "rule_update" && anchor.sender === "manager") {
+    if (topic.type === "escalation_review" && topic.id === "t-3") {
       ruleChange = {
-        type: "new",
-        ruleName: topic.title,
-        after: anchor.content,
-        source: "Manager directive",
+        type: "update",
+        ruleName: "Damaged Item Handling",
+        before: "Require photo evidence for all damage claims regardless of order value.",
+        after: "For damage claims on items under $80, process replacement or refund without photo. For items $80+, still request photo.",
+        source: `Observed from ticket #${topic.sourceTicketId}`,
       };
     }
 
@@ -156,126 +168,230 @@ function buildMessages(topics: Topic[]): ConvMessage[] {
       };
     }
 
-    const hasActions = anchor.sender === "ai" && !isPerf && !isResolved;
+    // For rule_update from manager (t-6), the anchor is manager message
+    if (topic.type === "rule_update" && anchor.sender === "manager") {
+      // Manager's directive is first message
+      topicMsgs.push({
+        id: anchor.id,
+        sender: anchor.sender,
+        content: anchor.content,
+        timestamp: anchor.timestamp,
+      });
+      // AI's confirmation with rule is second message
+      if (topic.messages[1]) {
+        topicMsgs.push({
+          id: topic.messages[1].id,
+          sender: topic.messages[1].sender,
+          content: topic.messages[1].content,
+          timestamp: topic.messages[1].timestamp,
+          ruleChange: {
+            type: "new",
+            ruleName: topic.title,
+            after: "Orders placed between March 15-31, 2026 have a 60-day return window (expires May 30, 2026). Applies to all customers.",
+            source: "Manager directive",
+          },
+        });
+      }
+      // Rest are replies
+      for (let i = 2; i < topic.messages.length; i++) {
+        replies.push({
+          id: topic.messages[i].id,
+          sender: topic.messages[i].sender,
+          content: topic.messages[i].content,
+          timestamp: topic.messages[i].timestamp,
+        });
+      }
+    } else if (ruleChange) {
+      // Split: context message + rule proposal card
+      // Context: strip out the rule-related lines from anchor
+      const contextContent = anchor.content.split("\n").filter(line =>
+        !line.startsWith("> ") && !line.includes("Proposed rule:") && !line.includes("Proposed update:")
+      ).join("\n").trim();
 
-    msgs.push({
-      id: anchor.id,
-      topicId: topic.id,
-      topicTitle: topic.title,
-      sender: anchor.sender,
-      content: anchor.content,
-      timestamp: anchor.timestamp,
-      ruleChange,
-      actions: hasActions ? ["accept", "reject", "reply"] : undefined,
-      threadReplies: threadMsgs.length > 0 ? threadMsgs : undefined,
-      isScribe: isPerf,
+      topicMsgs.push({
+        id: anchor.id,
+        sender: anchor.sender,
+        content: contextContent,
+        timestamp: anchor.timestamp,
+      });
+
+      // Rule proposal as separate message (the card)
+      topicMsgs.push({
+        id: `${anchor.id}-rule`,
+        sender: "ai",
+        content: "",
+        timestamp: new Date(new Date(anchor.timestamp).getTime() + 1000).toISOString(),
+        ruleChange,
+      });
+
+      // Rest are replies — but skip messages that are just the proposed rule text
+      // (e.g. t-1's m-1-2 which duplicates the proposedRule content)
+      for (let i = 1; i < topic.messages.length; i++) {
+        const msg = topic.messages[i];
+        const isRuleDuplicate = (msg.sender === "ai" && topic.proposedRule &&
+          msg.content.includes("Proposed rule:")) || (msg.sender === "ai" && msg.content.includes("Should I adopt this rule?"));
+        if (isRuleDuplicate) continue;
+        replies.push({
+          id: msg.id,
+          sender: msg.sender,
+          content: msg.content,
+          timestamp: msg.timestamp,
+        });
+      }
+    } else {
+      // Normal: first message as anchor, rest as replies
+      topicMsgs.push({
+        id: anchor.id,
+        sender: anchor.sender,
+        content: anchor.content,
+        timestamp: anchor.timestamp,
+      });
+
+      for (let i = 1; i < topic.messages.length; i++) {
+        replies.push({
+          id: topic.messages[i].id,
+          sender: topic.messages[i].sender,
+          content: topic.messages[i].content,
+          timestamp: topic.messages[i].timestamp,
+        });
+      }
+    }
+
+    const hasActions = anchor.sender === "ai" && !isPerf && !isResolved && topic.status !== "read";
+
+    cards.push({
+      id: topic.id,
+      title: topic.title,
       status: isResolved ? "done" : "waiting",
+      timestamp: anchor.timestamp,
+      messages: topicMsgs,
+      replies,
+      hasActions,
+      isScribe: isPerf,
     });
   }
 
-  msgs.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-  return msgs;
+  cards.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  return cards;
 }
 
-// ── Rule Change Card ──────────────────────────────────────
+// ── Collapsible Text ─────────────────────────────────────
 
-function RuleChangeCard({ change }: { change: RuleChange }) {
-  return (
-    <div className="mt-2 rounded-lg border border-border overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2 bg-muted/40 border-b border-border">
-        {change.type === "new" ? (
-          <Plus className="w-3 h-3 text-emerald-600" />
-        ) : (
-          <ArrowRight className="w-3 h-3 text-blue-600" />
-        )}
-        <span className="text-[11px] font-semibold text-foreground">
-          {change.type === "new" ? "New Rule" : "Rule Update"}
-        </span>
-        <span className="text-[10px] text-muted-foreground">— {change.ruleName}</span>
-      </div>
-      <div className="px-3 py-2.5 space-y-2">
-        {change.type === "update" && change.before && (
-          <div>
-            <span className="text-[9px] font-medium text-red-500 uppercase tracking-wider">Before</span>
-            <p className="text-[11px] text-muted-foreground leading-relaxed mt-0.5 line-through decoration-red-300">
-              {change.before}
-            </p>
-          </div>
-        )}
-        <div>
-          <span className="text-[9px] font-medium text-emerald-600 uppercase tracking-wider">
-            {change.type === "update" ? "After" : "Proposed Rule"}
-          </span>
-          <p className="text-[11.5px] text-foreground leading-relaxed mt-0.5">
-            {change.after}
-          </p>
-        </div>
-        {change.source && (
-          <p className="text-[9.5px] text-muted-foreground/70 pt-1 border-t border-border/50">
-            Source: {change.source}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Inline Thread ─────────────────────────────────────────
-
-function InlineThread({
-  replies,
-  onReplyInThread,
-}: {
-  replies: ThreadReply[];
-  onReplyInThread: () => void;
-}) {
+function CollapsibleText({ text, maxLines = 3 }: { text: string; maxLines?: number }) {
   const [expanded, setExpanded] = useState(false);
-  const count = replies.length;
-  const showAll = count <= 2 || expanded;
-  const visibleReplies = showAll ? replies : [replies[0], replies[replies.length - 1]];
-  const hiddenCount = count - 2;
+  const lines = text.split("\n");
+  const isLong = lines.length > maxLines;
+
+  if (!isLong || expanded) {
+    return (
+      <div className="text-[12px] leading-relaxed whitespace-pre-wrap">
+        {renderMarkdown(text)}
+        {isLong && (
+          <button onClick={() => setExpanded(false)} className="text-[10px] text-primary hover:underline mt-1 flex items-center gap-0.5">
+            <ChevronUp className="w-3 h-3" /> Show less
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
-    <div className="ml-9 mt-1 border-l-2 border-border/60 pl-3 space-y-1.5">
-      {showAll ? (
-        replies.map((r) => <InlineReplyBubble key={r.id} reply={r} />)
-      ) : (
-        <>
-          <InlineReplyBubble reply={visibleReplies[0]} />
-          <button
-            onClick={() => setExpanded(true)}
-            className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 py-0.5 transition-colors"
-          >
-            <ChevronDown className="w-3 h-3" />
-            {hiddenCount} more {hiddenCount === 1 ? "reply" : "replies"}
-          </button>
-          <InlineReplyBubble reply={visibleReplies[1]} />
-        </>
-      )}
-      {expanded && count > 2 && (
-        <button
-          onClick={() => setExpanded(false)}
-          className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground py-0.5 transition-colors"
-        >
-          <ChevronUp className="w-3 h-3" />
-          Collapse
-        </button>
-      )}
-      <button
-        onClick={onReplyInThread}
-        className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary py-0.5 transition-colors"
-      >
-        <Reply className="w-3 h-3" />
-        Reply
+    <div className="text-[12px] leading-relaxed whitespace-pre-wrap">
+      {renderMarkdown(lines.slice(0, maxLines).join("\n"))}
+      <button onClick={() => setExpanded(true)} className="text-[10px] text-primary hover:underline mt-1 flex items-center gap-0.5">
+        <ChevronDown className="w-3 h-3" /> Show more ({lines.length - maxLines} more lines)
       </button>
     </div>
   );
 }
 
+// ── Rule Change Card (redesigned) ────────────────────────
+
+function RuleChangeCard({ change }: { change: RuleChange }) {
+  const [beforeExpanded, setBeforeExpanded] = useState(false);
+  const [afterExpanded, setAfterExpanded] = useState(false);
+  const MAX_CHARS = 120;
+
+  const renderRuleText = (text: string, expanded: boolean, toggle: () => void, isStrikethrough?: boolean) => {
+    const isLong = text.length > MAX_CHARS;
+    const display = !isLong || expanded ? text : text.slice(0, MAX_CHARS) + "...";
+    return (
+      <div>
+        <p className={cn(
+          "text-[12px] leading-relaxed",
+          isStrikethrough ? "text-muted-foreground line-through decoration-red-300/60" : "text-foreground"
+        )}>
+          {display}
+        </p>
+        {isLong && (
+          <button onClick={toggle} className="text-[10px] text-primary hover:underline mt-0.5">
+            {expanded ? "Show less" : "Show more"}
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="rounded-lg border border-border/80 overflow-hidden bg-muted/20">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border/60">
+        {change.type === "new" ? (
+          <div className="w-5 h-5 rounded-full bg-emerald-50 flex items-center justify-center">
+            <Plus className="w-3 h-3 text-emerald-600" />
+          </div>
+        ) : (
+          <div className="w-5 h-5 rounded-full bg-blue-50 flex items-center justify-center">
+            <ArrowRight className="w-3 h-3 text-blue-600" />
+          </div>
+        )}
+        <span className="text-[11px] font-semibold text-foreground">
+          {change.type === "new" ? "New Rule" : "Rule Update"}
+        </span>
+        <span className="text-[11px] text-muted-foreground">·</span>
+        <span className="text-[11px] text-muted-foreground truncate">{change.ruleName}</span>
+      </div>
+
+      {/* Body */}
+      <div className="px-3 py-2.5 space-y-2.5">
+        {change.type === "update" && change.before && (
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-red-400/60" />
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Current</span>
+            </div>
+            <div className="pl-3.5">
+              {renderRuleText(change.before, beforeExpanded, () => setBeforeExpanded(!beforeExpanded), true)}
+            </div>
+          </div>
+        )}
+        <div className="space-y-1">
+          <div className="flex items-center gap-1.5">
+            <div className={cn("w-2 h-2 rounded-full", change.type === "update" ? "bg-emerald-400" : "bg-emerald-400")} />
+            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+              {change.type === "update" ? "Proposed" : "Proposed Rule"}
+            </span>
+          </div>
+          <div className="pl-3.5">
+            {renderRuleText(change.after, afterExpanded, () => setAfterExpanded(!afterExpanded))}
+          </div>
+        </div>
+        {change.source && (
+          <p className="text-[10px] text-muted-foreground/60 pt-1.5 border-t border-border/40 pl-3.5">
+            {change.source}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Inline Reply ─────────────────────────────────────────
+
 function InlineReplyBubble({ reply }: { reply: ThreadReply }) {
   const isAi = reply.sender === "ai";
   return (
-    <div className="flex items-start gap-2">
+    <div className="flex items-start gap-2 py-1">
       {isAi ? (
         <div className="w-5 h-5 rounded-full bg-primary/8 flex items-center justify-center shrink-0 mt-0.5">
           <Bot className="w-2.5 h-2.5 text-primary" />
@@ -287,24 +403,65 @@ function InlineReplyBubble({ reply }: { reply: ThreadReply }) {
       )}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] font-medium text-foreground">
-            {isAi ? "Team Lead" : "You"}
-          </span>
+          <span className="text-[11px] font-medium text-foreground">{isAi ? "Rep" : "You"}</span>
           <span className="text-[9px] text-muted-foreground">{formatTime(reply.timestamp)}</span>
         </div>
-        <div className="text-[11px] text-foreground/80 leading-relaxed mt-0.5 whitespace-pre-wrap">
-          {reply.content.split("\n").map((line, i) => {
-            if (line.startsWith("> ")) {
-              return (
-                <span key={i} className="block border-l-2 border-primary/20 pl-2 my-0.5 text-muted-foreground italic text-[10.5px]">
-                  {line.slice(2)}
-                </span>
-              );
-            }
-            return <span key={i} className="block" dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") }} />;
-          })}
+        <div className="text-[12px] text-foreground/80 leading-relaxed mt-0.5">
+          {renderMarkdown(reply.content)}
         </div>
       </div>
+    </div>
+  );
+}
+
+function InlineReplies({
+  replies,
+  onOpenThread,
+}: {
+  replies: ThreadReply[];
+  onOpenThread: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const count = replies.length;
+
+  if (count === 0) return null;
+
+  const showAll = count <= 2 || expanded;
+  const hiddenCount = count - 2;
+
+  return (
+    <div className="mt-2 pt-2 border-t border-border/40">
+      <div className="space-y-0.5">
+        {showAll ? (
+          replies.map((r) => <InlineReplyBubble key={r.id} reply={r} />)
+        ) : (
+          <>
+            <InlineReplyBubble reply={replies[0]} />
+            <button
+              onClick={() => setExpanded(true)}
+              className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 py-1 pl-7 transition-colors"
+            >
+              <ChevronDown className="w-3 h-3" />
+              {hiddenCount} more {hiddenCount === 1 ? "reply" : "replies"}
+            </button>
+            <InlineReplyBubble reply={replies[replies.length - 1]} />
+          </>
+        )}
+      </div>
+      {expanded && count > 2 && (
+        <button
+          onClick={() => setExpanded(false)}
+          className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground py-0.5 pl-7 transition-colors"
+        >
+          <ChevronUp className="w-3 h-3" /> Collapse
+        </button>
+      )}
+      <button
+        onClick={onOpenThread}
+        className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary py-1 pl-7 transition-colors"
+      >
+        <Reply className="w-3 h-3" /> Reply
+      </button>
     </div>
   );
 }
@@ -331,8 +488,7 @@ function ConfirmationCard({
             className="h-7 text-[11px] px-4 rounded-full bg-primary text-white hover:bg-primary/90"
             onClick={() => { setDecided("yes"); onConfirm(); }}
           >
-            <Check className="w-3 h-3 mr-1" />
-            Yes, confirm
+            <Check className="w-3 h-3 mr-1" /> Yes, confirm
           </Button>
           <Button
             size="sm"
@@ -340,17 +496,163 @@ function ConfirmationCard({
             className="h-7 text-[11px] px-4 rounded-full text-muted-foreground"
             onClick={() => { setDecided("no"); onReject(); }}
           >
-            <X className="w-3 h-3 mr-1" />
-            No, discard
+            <X className="w-3 h-3 mr-1" /> No, discard
           </Button>
         </div>
       ) : (
-        <div className={cn(
-          "flex items-center gap-1.5 text-[11px]",
-          decided === "yes" ? "text-emerald-600" : "text-muted-foreground"
-        )}>
+        <div className={cn("flex items-center gap-1.5 text-[11px]", decided === "yes" ? "text-emerald-600" : "text-muted-foreground")}>
           {decided === "yes" ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
           {decided === "yes" ? "Confirmed" : "Discarded"}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Topic Card Component ─────────────────────────────────
+
+function TopicCardView({
+  card,
+  onAction,
+  onOpenThread,
+}: {
+  card: TopicCard;
+  onAction: (cardId: string, action: string) => void;
+  onOpenThread: (card: TopicCard) => void;
+}) {
+  const [actioned, setActioned] = useState<string | null>(null);
+
+  return (
+    <div className="rounded-lg border border-border bg-white overflow-hidden hover:shadow-sm transition-shadow">
+      {/* Topic header */}
+      <div className="flex items-center gap-2 px-3.5 py-2 border-b border-border/50 bg-muted/20">
+        <div className="w-5 h-5 rounded-full bg-primary/8 flex items-center justify-center shrink-0">
+          {card.isScribe ? (
+            <BarChart3 className="w-2.5 h-2.5 text-primary" />
+          ) : (
+            <MessageCircle className="w-2.5 h-2.5 text-primary" />
+          )}
+        </div>
+        <span className="text-[12px] font-semibold text-foreground flex-1 truncate">{card.title}</span>
+        <span className="text-[10px] text-muted-foreground shrink-0">{formatRelativeTime(card.timestamp)}</span>
+        {card.status === "waiting" && card.hasActions && (
+          <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+        )}
+      </div>
+
+      {/* Messages within topic */}
+      <div className="px-3.5 py-2.5 space-y-3">
+        {card.messages.map((msg) => (
+          <div key={msg.id}>
+            {/* Sender label */}
+            <div className="flex items-center gap-1.5 mb-1">
+              {msg.sender === "ai" ? (
+                <div className="w-4 h-4 rounded-full bg-primary/8 flex items-center justify-center">
+                  <Bot className="w-2 h-2 text-primary" />
+                </div>
+              ) : (
+                <div className="w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                  <span className="text-[7px] font-medium text-white">JC</span>
+                </div>
+              )}
+              <span className="text-[11px] font-medium text-foreground">{msg.sender === "ai" ? "Rep" : "You"}</span>
+              <span className="text-[9px] text-muted-foreground">{formatTime(msg.timestamp)}</span>
+            </div>
+
+            {/* Content */}
+            {msg.content && (
+              <div className="pl-5.5 ml-[22px]">
+                <CollapsibleText text={msg.content} maxLines={6} />
+              </div>
+            )}
+
+            {/* Rule change card */}
+            {msg.ruleChange && (
+              <div className="ml-[22px] mt-2">
+                <RuleChangeCard change={msg.ruleChange} />
+              </div>
+            )}
+
+            {/* Onboarding widgets */}
+            {msg.widget && (
+              <div className="ml-[22px] mt-2">
+                <OnboardingWidget
+                  widget={msg.widget}
+                  widgetData={msg.widgetData}
+                  importProgress={0}
+                  onAction={() => {}}
+                />
+              </div>
+            )}
+
+            {/* Choices */}
+            {msg.choices && msg.choices.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2 ml-[22px]">
+                {msg.choices.map((c) => (
+                  <button
+                    key={c.value}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all",
+                      c.variant === "primary"
+                        ? "bg-primary text-white hover:bg-primary/90"
+                        : "border border-border text-foreground hover:bg-accent"
+                    )}
+                  >
+                    {c.label}
+                    {c.icon === "arrow" && <ArrowRight className="w-3 h-3" />}
+                    {c.icon === "eye" && <Eye className="w-3 h-3" />}
+                    {c.icon === "rocket" && <Rocket className="w-3 h-3" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Action buttons */}
+      {card.hasActions && !actioned && (
+        <div className="flex items-center gap-1.5 px-3.5 py-2 border-t border-border/40">
+          <Button
+            size="sm"
+            className="h-7 text-[11px] px-3 rounded-full bg-primary text-white hover:bg-primary/90"
+            onClick={() => { setActioned("Accepted"); onAction(card.id, "accept"); }}
+          >
+            <Check className="w-3 h-3 mr-1" /> Accept
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-[11px] px-3 rounded-full text-muted-foreground hover:text-foreground"
+            onClick={() => { setActioned("Rejected"); onAction(card.id, "reject"); }}
+          >
+            <XCircle className="w-3 h-3 mr-1" /> Reject
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-[11px] px-3 rounded-full text-muted-foreground hover:text-foreground"
+            onClick={() => onOpenThread(card)}
+          >
+            <Reply className="w-3 h-3 mr-1" /> Reply
+          </Button>
+        </div>
+      )}
+
+      {actioned && (
+        <div className={cn(
+          "flex items-center gap-1.5 px-3.5 py-2 border-t border-border/40 text-[11px]",
+          actioned === "Accepted" ? "text-emerald-600" : "text-red-500"
+        )}>
+          {actioned === "Accepted" ? <Check className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+          {actioned}
+        </div>
+      )}
+
+      {/* Inline replies */}
+      {card.replies.length > 0 && (
+        <div className="px-3.5 pb-2.5">
+          <InlineReplies replies={card.replies} onOpenThread={() => onOpenThread(card)} />
         </div>
       )}
     </div>
@@ -373,7 +675,7 @@ function OnboardingWidget({
   switch (widget) {
     case "connect_zendesk":
       return (
-        <div className="mt-2 p-3.5 rounded-lg border border-border bg-white">
+        <div className="p-3 rounded-lg border border-border bg-white">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-7 h-7 rounded-lg bg-[#03363D]/10 flex items-center justify-center">
               <span className="text-[12px] font-bold text-[#03363D]">Z</span>
@@ -383,18 +685,14 @@ function OnboardingWidget({
               <p className="text-[10px] text-muted-foreground">Connect via OAuth</p>
             </div>
           </div>
-          <button
-            onClick={() => onAction("zendesk_connected")}
-            className="w-full py-2 rounded-lg bg-[#03363D] text-white text-[12px] font-medium hover:bg-[#03363D]/90 transition-colors flex items-center justify-center gap-2"
-          >
-            <Link2 className="w-3.5 h-3.5" />
-            Connect Zendesk Account
+          <button onClick={() => onAction("zendesk_connected")} className="w-full py-2 rounded-lg bg-[#03363D] text-white text-[12px] font-medium hover:bg-[#03363D]/90 transition-colors flex items-center justify-center gap-2">
+            <Link2 className="w-3.5 h-3.5" /> Connect Zendesk Account
           </button>
         </div>
       );
     case "connect_shopify":
       return (
-        <div className="mt-2 p-3.5 rounded-lg border border-border bg-white">
+        <div className="p-3 rounded-lg border border-border bg-white">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-7 h-7 rounded-lg bg-[#96BF48]/10 flex items-center justify-center">
               <span className="text-[12px] font-bold text-[#96BF48]">S</span>
@@ -404,35 +702,27 @@ function OnboardingWidget({
               <p className="text-[10px] text-muted-foreground">Connect via OAuth</p>
             </div>
           </div>
-          <button
-            onClick={() => onAction("shopify_connected")}
-            className="w-full py-2 rounded-lg bg-[#96BF48] text-white text-[12px] font-medium hover:bg-[#96BF48]/90 transition-colors flex items-center justify-center gap-2"
-          >
-            <Link2 className="w-3.5 h-3.5" />
-            Connect Shopify Store
+          <button onClick={() => onAction("shopify_connected")} className="w-full py-2 rounded-lg bg-[#96BF48] text-white text-[12px] font-medium hover:bg-[#96BF48]/90 transition-colors flex items-center justify-center gap-2">
+            <Link2 className="w-3.5 h-3.5" /> Connect Shopify Store
           </button>
         </div>
       );
     case "upload_doc":
       return (
-        <div className="mt-2 p-3.5 rounded-lg border border-dashed border-border bg-white hover:border-primary/40 transition-colors">
+        <div className="p-3 rounded-lg border border-dashed border-border bg-white hover:border-primary/40 transition-colors">
           <div className="text-center py-3">
             <Upload className="w-5 h-5 text-muted-foreground/50 mx-auto mb-2" />
             <p className="text-[12px] font-medium text-foreground">Drop your document here</p>
             <p className="text-[10px] text-muted-foreground mt-1">PDF, DOCX, or TXT</p>
           </div>
-          <button
-            onClick={() => onAction("uploaded")}
-            className="w-full mt-2 py-2 rounded-lg bg-primary text-white text-[12px] font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            Upload Seel_Return_Policy_v2.pdf
+          <button onClick={() => onAction("uploaded")} className="w-full mt-2 py-2 rounded-lg bg-primary text-white text-[12px] font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
+            <FileText className="w-3.5 h-3.5" /> Upload Seel_Return_Policy_v2.pdf
           </button>
         </div>
       );
     case "import_progress":
       return (
-        <div className="mt-2 p-3.5 rounded-lg border border-border bg-white">
+        <div className="p-3 rounded-lg border border-border bg-white">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
               <Bot className="w-3 h-3 text-primary animate-pulse" />
@@ -451,7 +741,7 @@ function OnboardingWidget({
       const rules = (widgetData?.rules as { category: string; count: number; example: string }[]) || [];
       const totalRules = rules.reduce((sum, r) => sum + r.count, 0);
       return (
-        <div className="mt-2 p-3.5 rounded-lg border border-border bg-white">
+        <div className="p-3 rounded-lg border border-border bg-white">
           <div className="flex items-center gap-2 mb-2.5">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
             <span className="text-[12px] font-medium">{totalRules} rules extracted</span>
@@ -470,7 +760,7 @@ function OnboardingWidget({
     }
     case "conflict":
       return (
-        <div className="mt-2 p-3.5 rounded-lg border border-amber-200 bg-amber-50/50">
+        <div className="p-3 rounded-lg border border-amber-200 bg-amber-50/50">
           <div className="flex items-start gap-2 mb-2.5">
             <AlertTriangle className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
             <div>
@@ -481,16 +771,10 @@ function OnboardingWidget({
             </div>
           </div>
           <div className="flex gap-2 mt-1">
-            <button
-              onClick={() => onAction("30_days")}
-              className="px-3.5 py-1.5 rounded-full text-[11px] font-medium border border-amber-300 text-amber-800 hover:bg-amber-100 transition-colors"
-            >
+            <button onClick={() => onAction("30_days")} className="px-3.5 py-1.5 rounded-full text-[11px] font-medium border border-amber-300 text-amber-800 hover:bg-amber-100 transition-colors">
               30 days from delivery
             </button>
-            <button
-              onClick={() => onAction("28_days")}
-              className="px-3.5 py-1.5 rounded-full text-[11px] font-medium border border-amber-300 text-amber-800 hover:bg-amber-100 transition-colors"
-            >
+            <button onClick={() => onAction("28_days")} className="px-3.5 py-1.5 rounded-full text-[11px] font-medium border border-amber-300 text-amber-800 hover:bg-amber-100 transition-colors">
               28 calendar days
             </button>
           </div>
@@ -503,7 +787,7 @@ function OnboardingWidget({
     case "scenario": {
       const scenario = widgetData as { title: string; description: string; response: string };
       return (
-        <div className="mt-2 rounded-lg border border-border bg-white overflow-hidden">
+        <div className="rounded-lg border border-border bg-white overflow-hidden">
           <div className="px-3 py-2 bg-violet-50/50 border-b border-border">
             <span className="text-[10px] font-semibold text-violet-600 uppercase tracking-wider">{scenario.title}</span>
           </div>
@@ -539,22 +823,18 @@ function ActionsFormWidget({ onDone }: { onDone: () => void }) {
     Object.fromEntries(DEFAULT_ACTIONS.map((a) => [a.id, a.default]))
   );
   return (
-    <div className="mt-2 rounded-lg border border-border bg-white p-3.5">
+    <div className="rounded-lg border border-border bg-white p-3">
       <p className="text-[11px] font-medium text-foreground mb-2.5">Action Permissions</p>
       <div className="space-y-2">
         {DEFAULT_ACTIONS.map((a) => (
           <div key={a.id} className="flex items-center justify-between">
             <span className="text-[11px] text-foreground">{a.label}</span>
-            <Switch
-              checked={perms[a.id]}
-              onCheckedChange={(v) => setPerms((p) => ({ ...p, [a.id]: v }))}
-            />
+            <Switch checked={perms[a.id]} onCheckedChange={(v) => setPerms((p) => ({ ...p, [a.id]: v }))} />
           </div>
         ))}
       </div>
       <Button size="sm" className="mt-3 h-7 text-[11px] rounded-full px-4" onClick={onDone}>
-        <Check className="w-3 h-3 mr-1" />
-        Confirm Permissions
+        <Check className="w-3 h-3 mr-1" /> Confirm Permissions
       </Button>
     </div>
   );
@@ -575,229 +855,41 @@ function EscalationFormWidget({ onDone }: { onDone: () => void }) {
     Object.fromEntries(DEFAULT_ESCALATION.map((e) => [e.id, e.default]))
   );
   return (
-    <div className="mt-2 rounded-lg border border-border bg-white p-3.5">
+    <div className="rounded-lg border border-border bg-white p-3">
       <p className="text-[11px] font-medium text-foreground mb-2.5">Escalation Triggers</p>
       <div className="space-y-2">
         {DEFAULT_ESCALATION.map((e) => (
           <div key={e.id} className="flex items-center justify-between">
             <span className="text-[11px] text-foreground">{e.label}</span>
-            <Switch
-              checked={toggles[e.id]}
-              onCheckedChange={(v) => setToggles((p) => ({ ...p, [e.id]: v }))}
-            />
+            <Switch checked={toggles[e.id]} onCheckedChange={(v) => setToggles((p) => ({ ...p, [e.id]: v }))} />
           </div>
         ))}
       </div>
       <Button size="sm" className="mt-3 h-7 text-[11px] rounded-full px-4" onClick={onDone}>
-        <Check className="w-3 h-3 mr-1" />
-        Confirm Triggers
+        <Check className="w-3 h-3 mr-1" /> Confirm Triggers
       </Button>
     </div>
   );
 }
 
-// ── Message Card ──────────────────────────────────────────
-
-function MessageCard({
-  msg,
-  onReplyInThread,
-  onAction,
-  importProgress,
-  onOnboardingAction,
-}: {
-  msg: ConvMessage;
-  onReplyInThread: (msg: ConvMessage) => void;
-  onAction: (msgId: string, action: string) => void;
-  importProgress: number;
-  onOnboardingAction: (value: string) => void;
-}) {
-  const isAi = msg.sender === "ai";
-  const [actioned, setActioned] = useState<string | null>(null);
-
-  // Phase label (section divider)
-  if (msg.isPhaseLabel) {
-    return (
-      <div className="flex items-center gap-3 my-3">
-        <div className="flex-1 h-px bg-primary/15" />
-        <span className="text-[10px] font-semibold text-primary/60 uppercase tracking-wider px-2 flex items-center gap-1.5">
-          <Sparkles className="w-3 h-3" />
-          {msg.content}
-        </span>
-        <div className="flex-1 h-px bg-primary/15" />
-      </div>
-    );
-  }
-
-  const displayContent = msg.ruleChange && msg.sender === "ai"
-    ? msg.content.split("\n").filter(line =>
-        !line.startsWith("> ") && !line.includes("Proposed rule:") && !line.includes("Proposed update:")
-      ).join("\n").trim()
-    : msg.content;
-
-  return (
-    <div className="group">
-      {isAi ? (
-        <div className="flex gap-2.5 max-w-[88%]">
-          <div className="w-7 h-7 rounded-full bg-primary/8 flex items-center justify-center shrink-0 mt-0.5">
-            <Bot className="w-3.5 h-3.5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[12px] font-semibold text-foreground">Team Lead</span>
-              <span className="text-[10px] text-muted-foreground">{formatTime(msg.timestamp)}</span>
-            </div>
-
-            <div className="rounded-lg border border-border bg-white p-3 text-[12px] leading-relaxed text-foreground">
-              {msg.isScribe ? (
-                <div className="flex items-center gap-2">
-                  {msg.topicTitle.includes("Performance") ? (
-                    <BarChart3 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                  ) : (
-                    <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                  )}
-                  <span className="font-medium">{msg.topicTitle}</span>
-                </div>
-              ) : (
-                <>
-                  {displayContent && (
-                    <div className="whitespace-pre-wrap">
-                      {displayContent.split("\n").map((line, i) => {
-                        if (line.trim() === "") return <div key={i} className="h-1.5" />;
-                        if (line.startsWith("- ")) {
-                          return (
-                            <div key={i} className="flex gap-1.5 ml-1">
-                              <span className="text-muted-foreground mt-0.5">·</span>
-                              <span dangerouslySetInnerHTML={{ __html: line.slice(2).replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") }} />
-                            </div>
-                          );
-                        }
-                        return (
-                          <p key={i} dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") }} />
-                        );
-                      })}
-                    </div>
-                  )}
-                </>
-              )}
-
-              {msg.ruleChange && <RuleChangeCard change={msg.ruleChange} />}
-              {msg.widget && (
-                <OnboardingWidget
-                  widget={msg.widget}
-                  widgetData={msg.widgetData}
-                  importProgress={importProgress}
-                  onAction={onOnboardingAction}
-                />
-              )}
-              {msg.choices && msg.choices.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {msg.choices.map((c) => (
-                    <button
-                      key={c.value}
-                      className={cn(
-                        "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-medium transition-all",
-                        c.variant === "primary"
-                          ? "bg-primary text-white hover:bg-primary/90"
-                          : "border border-border text-foreground hover:bg-accent"
-                      )}
-                      onClick={() => onOnboardingAction(c.value)}
-                    >
-                      {c.label}
-                      {c.icon === "arrow" && <ArrowRight className="w-3 h-3" />}
-                      {c.icon === "eye" && <Eye className="w-3 h-3" />}
-                      {c.icon === "rocket" && <Rocket className="w-3 h-3" />}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {msg.actions && !actioned && (
-              <div className="flex gap-1.5 mt-1.5">
-                <Button
-                  size="sm"
-                  className="h-7 text-[11px] px-3 rounded-full bg-primary text-white hover:bg-primary/90"
-                  onClick={() => { setActioned("Accepted"); onAction(msg.id, "accept"); }}
-                >
-                  <Check className="w-3 h-3 mr-1" />
-                  Accept
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-[11px] px-3 rounded-full text-muted-foreground hover:text-foreground"
-                  onClick={() => { setActioned("Rejected"); onAction(msg.id, "reject"); }}
-                >
-                  <XCircle className="w-3 h-3 mr-1" />
-                  Reject
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-[11px] px-3 rounded-full text-muted-foreground hover:text-foreground"
-                  onClick={() => onReplyInThread(msg)}
-                >
-                  <Reply className="w-3 h-3 mr-1" />
-                  Reply
-                </Button>
-              </div>
-            )}
-
-            {actioned && (
-              <div className={cn(
-                "flex items-center gap-1.5 mt-1.5 text-[11px]",
-                actioned === "Accepted" ? "text-emerald-600" : "text-red-500"
-              )}>
-                {actioned === "Accepted" ? <Check className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                {actioned}
-              </div>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col items-end">
-          <div className="max-w-[75%]">
-            <div className="flex items-center justify-end gap-2 mb-1">
-              <span className="text-[10px] text-muted-foreground">{formatTime(msg.timestamp)}</span>
-              <span className="text-[12px] font-semibold text-foreground">You</span>
-            </div>
-            <div className="rounded-lg bg-primary/6 border border-primary/10 p-3 text-[12px] leading-relaxed text-foreground">
-              <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{
-                __html: msg.content.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-              }} />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {msg.threadReplies && msg.threadReplies.length > 0 && (
-        <InlineThread
-          replies={msg.threadReplies}
-          onReplyInThread={() => onReplyInThread(msg)}
-        />
-      )}
-    </div>
-  );
-}
-
-// ── Topics Panel ──────────────────────────────────────────
+// ── Topics Panel ─────────────────────────────────────────
 
 function TopicsPanel({
-  messages,
+  cards,
   onSelectTopic,
   onClose,
 }: {
-  messages: ConvMessage[];
-  onSelectTopic: (msg: ConvMessage) => void;
+  cards: TopicCard[];
+  onSelectTopic: (card: TopicCard) => void;
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<"waiting" | "done">("waiting");
-  const waiting = messages.filter((m) => m.status === "waiting" && m.sender === "ai" && !m.isOnboarding && !m.isPhaseLabel);
-  const done = messages.filter((m) => m.status === "done" && m.sender === "ai" && !m.isOnboarding && !m.isPhaseLabel);
+  const waiting = cards.filter((c) => c.status === "waiting" && !c.isOnboarding && !c.isPhaseLabel);
+  const done = cards.filter((c) => c.status === "done" && !c.isOnboarding && !c.isPhaseLabel);
   const list = tab === "waiting" ? waiting : done;
 
   return (
-    <div className="w-[280px] border-l border-border bg-white flex flex-col h-full shrink-0">
+    <div className="w-[260px] border-l border-border bg-white flex flex-col h-full shrink-0">
       <div className="flex items-center justify-between px-3 h-11 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
           <List className="w-3.5 h-3.5 text-muted-foreground" />
@@ -829,20 +921,20 @@ function TopicsPanel({
                   {tab === "waiting" ? "All caught up!" : "No resolved topics yet."}
                 </p>
               )}
-              {list.map((msg) => (
+              {list.map((card) => (
                 <button
-                  key={msg.id}
-                  onClick={() => onSelectTopic(msg)}
+                  key={card.id}
+                  onClick={() => onSelectTopic(card)}
                   className="w-full flex items-start gap-2.5 px-3 py-2.5 hover:bg-accent/50 transition-colors text-left border-b border-border/30"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-medium text-foreground truncate">{msg.topicTitle}</p>
+                    <p className="text-[11px] font-medium text-foreground truncate">{card.title}</p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {formatRelativeTime(msg.threadReplies?.[msg.threadReplies.length - 1]?.timestamp || msg.timestamp)}
-                      {msg.threadReplies && ` · ${msg.threadReplies.length} replies`}
+                      {formatRelativeTime(card.replies.length > 0 ? card.replies[card.replies.length - 1].timestamp : card.timestamp)}
+                      {card.replies.length > 0 && ` · ${card.replies.length} replies`}
                     </p>
                   </div>
-                  {msg.status === "waiting" && msg.actions && (
+                  {card.status === "waiting" && card.hasActions && (
                     <span className="w-2 h-2 rounded-full bg-red-400 shrink-0 mt-1.5" />
                   )}
                 </button>
@@ -858,16 +950,16 @@ function TopicsPanel({
 // ── Thread Side Panel ────────────────────────────────────
 
 function ThreadSidePanel({
-  msg,
+  card,
   onClose,
 }: {
-  msg: ConvMessage;
+  card: TopicCard;
   onClose: () => void;
 }) {
   const [input, setInput] = useState("");
   const [localReplies, setLocalReplies] = useState<ThreadReply[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
-  const allReplies = [...(msg.threadReplies || []), ...localReplies];
+  const allReplies = [...card.replies, ...localReplies];
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -898,28 +990,31 @@ function ThreadSidePanel({
   };
 
   return (
-    <div className="w-[360px] border-l border-border bg-white flex flex-col h-full shrink-0">
+    <div className="w-[340px] border-l border-border bg-white flex flex-col h-full shrink-0">
       <div className="flex items-center justify-between px-4 h-11 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
-          <MessageSquare className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className="text-[12px] font-semibold text-foreground truncate max-w-[240px]">{msg.topicTitle}</span>
+          <MessageCircle className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-[12px] font-semibold text-foreground truncate max-w-[220px]">{card.title}</span>
         </div>
         <button onClick={onClose} className="p-1 rounded hover:bg-accent transition-colors">
           <X className="w-3.5 h-3.5 text-muted-foreground" />
         </button>
       </div>
+
+      {/* Original context */}
       <div className="px-4 py-2.5 border-b border-border bg-muted/20">
         <div className="flex items-center gap-2 mb-1">
-          <div className="w-5 h-5 rounded-full bg-primary/8 flex items-center justify-center">
-            <Bot className="w-2.5 h-2.5 text-primary" />
+          <div className="w-4 h-4 rounded-full bg-primary/8 flex items-center justify-center">
+            <Bot className="w-2 h-2 text-primary" />
           </div>
-          <span className="text-[10px] font-semibold text-foreground">Team Lead</span>
-          <span className="text-[9px] text-muted-foreground">{formatTime(msg.timestamp)}</span>
+          <span className="text-[10px] font-medium text-foreground">Rep</span>
+          <span className="text-[9px] text-muted-foreground">{formatTime(card.timestamp)}</span>
         </div>
-        <p className="text-[10.5px] text-muted-foreground leading-relaxed line-clamp-2 ml-7">
-          {msg.content.replace(/\*\*/g, "").slice(0, 150)}...
+        <p className="text-[10.5px] text-muted-foreground leading-relaxed line-clamp-2 ml-6">
+          {card.messages[0]?.content.replace(/\*\*/g, "").slice(0, 150)}...
         </p>
       </div>
+
       <ScrollArea className="flex-1 px-4">
         <div className="py-3 space-y-3">
           {allReplies.map((reply) => (
@@ -936,9 +1031,7 @@ function ThreadSidePanel({
                 )}
                 <div className={cn("max-w-[85%]", reply.sender === "manager" && "text-right")}>
                   <div className={cn("flex items-center gap-1.5 mb-0.5", reply.sender === "manager" && "justify-end")}>
-                    <span className="text-[10px] font-medium text-foreground">
-                      {reply.sender === "ai" ? "Team Lead" : "You"}
-                    </span>
+                    <span className="text-[10px] font-medium text-foreground">{reply.sender === "ai" ? "Rep" : "You"}</span>
                     <span className="text-[9px] text-muted-foreground">{formatTime(reply.timestamp)}</span>
                   </div>
                   <div className={cn(
@@ -953,11 +1046,7 @@ function ThreadSidePanel({
               </div>
               {reply.isConfirmation && reply.sender === "ai" && (
                 <div className="ml-7 mt-1.5">
-                  <ConfirmationCard
-                    content="Apply this rule update?"
-                    onConfirm={() => {}}
-                    onReject={() => {}}
-                  />
+                  <ConfirmationCard content="Apply this rule update?" onConfirm={() => {}} onReject={() => {}} />
                 </div>
               )}
             </div>
@@ -965,6 +1054,7 @@ function ThreadSidePanel({
           <div ref={endRef} />
         </div>
       </ScrollArea>
+
       <div className="px-3 py-2.5 border-t border-border">
         <div className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-1.5 focus-within:ring-1 focus-within:ring-primary/30 focus-within:border-primary/40">
           <input
@@ -974,11 +1064,7 @@ function ThreadSidePanel({
             placeholder="Reply..."
             className="flex-1 text-[11.5px] bg-transparent outline-none placeholder:text-muted-foreground/50"
           />
-          <button
-            onClick={handleSend}
-            disabled={!input.trim()}
-            className="p-1 rounded text-primary hover:bg-primary/8 transition-colors disabled:opacity-30"
-          >
+          <button onClick={handleSend} disabled={!input.trim()} className="p-1 rounded text-primary hover:bg-primary/8 transition-colors disabled:opacity-30">
             <Send className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -992,47 +1078,41 @@ function ThreadSidePanel({
 // ══════════════════════════════════════════════════════════
 
 type OBPhase =
-  | "idle" // not started / completed
-  | "welcome"
+  | "idle" | "welcome"
   | "connect_zendesk" | "connect_shopify"
   | "upload_doc" | "importing" | "parse_result" | "conflict"
   | "actions_form" | "escalation_form"
   | "rep_name" | "rep_tone"
   | "scenario_1" | "scenario_2" | "scenario_3"
-  | "mode_select"
-  | "complete";
+  | "mode_select" | "complete";
+
+interface OBMessage {
+  id: string;
+  sender: "ai" | "manager";
+  content: string;
+  timestamp: string;
+  widget?: string;
+  widgetData?: Record<string, unknown>;
+  choices?: { label: string; value: string; icon?: string; variant?: string }[];
+  isPhaseLabel?: boolean;
+}
 
 const OB_BASE_TIME = "2026-03-20T09:00:00Z";
 let obMsgId = 0;
-function obMsg(
-  sender: "ai" | "manager",
-  content: string,
-  extras?: Partial<ConvMessage>,
-  offsetMin = 0
-): ConvMessage {
+function obMsg(sender: "ai" | "manager", content: string, extras?: Partial<OBMessage>, offsetMin = 0): OBMessage {
   obMsgId++;
   const ts = new Date(new Date(OB_BASE_TIME).getTime() + offsetMin * 60000).toISOString();
-  return {
-    id: `ob-${obMsgId}`,
-    topicId: "onboarding",
-    topicTitle: "Setup",
-    sender,
-    content,
-    timestamp: ts,
-    status: "done",
-    isOnboarding: true,
-    ...extras,
-  };
+  return { id: `ob-${obMsgId}`, sender, content, timestamp: ts, ...extras };
 }
 
-function phaseLabel(label: string, offsetMin: number): ConvMessage {
+function obPhaseLabel(label: string, offsetMin: number): OBMessage {
   return obMsg("ai", label, { isPhaseLabel: true }, offsetMin);
 }
 
-function buildOnboardingMessages(): ConvMessage[] {
+function buildInitialOBMessages(): OBMessage[] {
   obMsgId = 0;
   return [
-    phaseLabel("Connect to your system", 0),
+    obPhaseLabel("Connect to your system", 0),
     obMsg("ai", "Hey! I'm your **Team Lead**. Let's get your AI support team set up — it takes about 3 minutes.\n\nFirst, let's connect your helpdesk and store.", {
       choices: [
         { label: "Connect Zendesk", value: "start_zendesk", icon: "arrow", variant: "primary" },
@@ -1047,22 +1127,20 @@ function buildOnboardingMessages(): ConvMessage[] {
 // ══════════════════════════════════════════════════════════
 
 export default function MessagesPage() {
-  const [threadPanel, setThreadPanel] = useState<ConvMessage | null>(null);
+  const [threadPanel, setThreadPanel] = useState<TopicCard | null>(null);
   const [showTopics, setShowTopics] = useState(false);
   const [inputValue, setInputValue] = useState("");
-  const [extraMessages, setExtraMessages] = useState<ConvMessage[]>([]);
-  const [confirmations, setConfirmations] = useState<Map<string, ConvMessage>>(new Map());
+  const [extraCards, setExtraCards] = useState<TopicCard[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // ── Onboarding state ──
   const [obPhase, setObPhase] = useState<OBPhase>("welcome");
-  const [obMessages, setObMessages] = useState<ConvMessage[]>(() => buildOnboardingMessages());
+  const [obMessages, setObMessages] = useState<OBMessage[]>(() => buildInitialOBMessages());
   const [importProgress, setImportProgress] = useState(0);
   const [repName, setRepName] = useState("Alex");
-  const [nameInput, setNameInput] = useState("");
   const obOffsetRef = useRef(2);
 
-  const addObMsg = useCallback((sender: "ai" | "manager", content: string, extras?: Partial<ConvMessage>) => {
+  const addObMsg = useCallback((sender: "ai" | "manager", content: string, extras?: Partial<OBMessage>) => {
     obOffsetRef.current += 1;
     const msg = obMsg(sender, content, extras, obOffsetRef.current);
     setObMessages((prev) => [...prev, msg]);
@@ -1071,7 +1149,7 @@ export default function MessagesPage() {
 
   const addPhaseLabel = useCallback((label: string) => {
     obOffsetRef.current += 1;
-    setObMessages((prev) => [...prev, phaseLabel(label, obOffsetRef.current)]);
+    setObMessages((prev) => [...prev, obPhaseLabel(label, obOffsetRef.current)]);
   }, []);
 
   // Onboarding choice handler
@@ -1085,7 +1163,7 @@ export default function MessagesPage() {
             setObPhase("connect_shopify");
             addObMsg("manager", "I'll set this up later");
             await delay(500);
-            addObMsg("ai", "No problem — you can connect Zendesk later in **Playbook → Integrations**.\n\nHow about Shopify? Connecting it lets me look up orders and process refunds.", {
+            addObMsg("ai", "No problem — you can connect Zendesk later in **Playbook → Integrations**.\n\nHow about Shopify?", {
               choices: [
                 { label: "Connect Shopify", value: "start_shopify", icon: "arrow", variant: "primary" },
                 { label: "Skip for now", value: "skip_shopify", variant: "outline" },
@@ -1099,7 +1177,7 @@ export default function MessagesPage() {
 
         case "connect_zendesk":
           setObPhase("connect_shopify");
-          addObMsg("ai", "Connected to **Zendesk** — coastalliving.zendesk.com. I can see 1,247 tickets.\n\nNow let's connect Shopify so I can look up orders.", {
+          addObMsg("ai", "Connected to **Zendesk** — coastalliving.zendesk.com. I can see 1,247 tickets.\n\nNow let's connect Shopify.", {
             choices: [
               { label: "Connect Shopify", value: "start_shopify", icon: "arrow", variant: "primary" },
               { label: "Skip for now", value: "skip_shopify", variant: "outline" },
@@ -1118,9 +1196,7 @@ export default function MessagesPage() {
           addPhaseLabel("Set up a playbook");
           setObPhase("upload_doc");
           await delay(300);
-          addObMsg("ai", "Now I need to learn your business rules. Upload a document — your SOP, return policy, or playbook — and I'll extract the rules.", {
-            widget: "upload_doc",
-          });
+          addObMsg("ai", "Now I need to learn your business rules. Upload a document — your SOP, return policy, or playbook — and I'll extract the rules.", { widget: "upload_doc" });
           break;
 
         case "upload_doc":
@@ -1129,7 +1205,6 @@ export default function MessagesPage() {
           addObMsg("manager", "📄 Seel_Return_Policy_v2.pdf");
           await delay(300);
           addObMsg("ai", "Got it! Reading through your return policy now...", { widget: "import_progress" });
-          // Simulate progress
           {
             const interval = setInterval(() => {
               setImportProgress((prev) => {
@@ -1165,9 +1240,7 @@ export default function MessagesPage() {
           const choiceLabel = value === "30_days" ? "30 days from delivery" : "28 calendar days";
           addObMsg("manager", choiceLabel);
           await delay(400);
-          addObMsg("ai", `Got it — I'll use "${choiceLabel}" as the rule.\n\nNow let's configure what your agent can do autonomously:`, {
-            widget: "actions_form",
-          });
+          addObMsg("ai", `Got it — I'll use "${choiceLabel}" as the rule.\n\nNow let's configure what your agent can do autonomously:`, { widget: "actions_form" });
           setObPhase("actions_form");
           break;
         }
@@ -1175,9 +1248,7 @@ export default function MessagesPage() {
         case "actions_form":
           addObMsg("manager", "Confirmed permissions");
           await delay(400);
-          addObMsg("ai", "Great. Now — when should the agent escalate to you?", {
-            widget: "escalation_form",
-          });
+          addObMsg("ai", "Great. Now — when should the agent escalate to you?", { widget: "escalation_form" });
           setObPhase("escalation_form");
           break;
 
@@ -1186,14 +1257,14 @@ export default function MessagesPage() {
           await delay(400);
           addPhaseLabel("Hire a rep");
           await delay(300);
-          addObMsg("ai", "Setup complete! Now let's **hire your first rep**. They'll handle customer tickets day-to-day.\n\nWhat should your rep be called? This is the name customers will see.");
+          addObMsg("ai", "Setup complete! Now let's **hire your first rep**. What should your rep be called? This is the name customers will see.");
           setObPhase("rep_name");
           break;
 
         case "rep_tone":
           addObMsg("manager", value === "friendly" ? "Friendly and warm" : value === "professional" ? "Professional" : "Casual");
           await delay(500);
-          addObMsg("ai", `Got it — ${repName} will keep it **${value}**.\n\nLet me run a quick sanity check. Here's how ${repName} would handle a common scenario:`, {
+          addObMsg("ai", `Got it — ${repName} will keep it **${value}**.\n\nLet me run a quick sanity check:`, {
             widget: "scenario",
             widgetData: {
               title: `Scenario 1 — "Where is my order?"`,
@@ -1260,7 +1331,7 @@ export default function MessagesPage() {
           const modeName = value === "shadow" ? "Shadow" : "Production";
           addObMsg("manager", `${modeName} Mode`);
           await delay(500);
-          addObMsg("ai", `**${repName} is now in ${modeName} Mode.** ${value === "shadow" ? "They'll draft everything and wait for your approval." : "They'll handle tickets independently."}\n\nHere's how things work from here:\n- **Messages** — I'll message you here whenever ${repName} needs input or has updates\n- **Zendesk** — Check the sidebar to review ${repName}'s work\n- **Playbook** — Adjust knowledge, escalation rules, and integrations\n- **Agent** — Configure ${repName}'s identity, permissions, and mode`);
+          addObMsg("ai", `**${repName} is now in ${modeName} Mode.** ${value === "shadow" ? "They'll draft everything and wait for your approval." : "They'll handle tickets independently."}\n\nHere's how things work from here:\n- **Messages** — I'll message you here whenever ${repName} needs input\n- **Zendesk** — Check the sidebar to review ${repName}'s work\n- **Playbook** — Adjust knowledge, escalation rules, and integrations\n- **Agent** — Configure ${repName}'s identity, permissions, and mode`);
           setObPhase("complete");
           break;
         }
@@ -1271,8 +1342,7 @@ export default function MessagesPage() {
   }, [obPhase, addObMsg, addPhaseLabel, repName]);
 
   // Handle rep name submit
-  const handleNameSubmit = useCallback(() => {
-    const name = nameInput.trim() || "Alex";
+  const handleNameSubmit = useCallback((name: string) => {
     setRepName(name);
     addObMsg("manager", name);
     setObPhase("rep_tone");
@@ -1285,124 +1355,118 @@ export default function MessagesPage() {
         ],
       });
     }, 500);
-  }, [nameInput, addObMsg]);
+  }, [addObMsg]);
 
   // Reset onboarding
   const resetOnboarding = useCallback(() => {
     obMsgId = 0;
     obOffsetRef.current = 2;
     setObPhase("welcome");
-    setObMessages(buildOnboardingMessages());
+    setObMessages(buildInitialOBMessages());
     setImportProgress(0);
     setRepName("Alex");
-    setNameInput("");
     toast.success("Onboarding restarted");
   }, []);
 
-  // ── Regular messages ──
-  const baseMessages = useMemo(() => buildMessages(TOPICS), []);
-  const allRegularMessages = [...baseMessages, ...extraMessages];
+  // ── Regular topic cards ──
+  const baseCards = useMemo(() => buildTopicCards(TOPICS), []);
+  const allRegularCards = [...baseCards, ...extraCards];
 
-  // Combine onboarding + regular messages
-  const allMessages = [...obMessages, ...allRegularMessages];
+  // Combine: onboarding messages rendered as a special section, then topic cards
+  const waitingCount = allRegularCards.filter((c) => c.status === "waiting" && c.hasActions).length;
 
-  const waitingCount = allRegularMessages.filter((m) => m.status === "waiting" && m.sender === "ai").length;
-
-  // Group by date
-  const groupedMessages = useMemo(() => {
-    const groups: { date: string; messages: ConvMessage[] }[] = [];
+  // Group regular cards by date
+  const groupedCards = useMemo(() => {
+    const groups: { date: string; cards: TopicCard[] }[] = [];
     let currentDate = "";
-    for (const msg of allMessages) {
-      const dateKey = new Date(msg.timestamp).toISOString().split("T")[0];
+    for (const card of allRegularCards) {
+      const dateKey = new Date(card.timestamp).toISOString().split("T")[0];
       if (dateKey !== currentDate) {
         currentDate = dateKey;
-        groups.push({ date: msg.timestamp, messages: [msg] });
+        groups.push({ date: card.timestamp, cards: [card] });
       } else {
-        groups[groups.length - 1].messages.push(msg);
+        groups[groups.length - 1].cards.push(card);
       }
     }
     return groups;
-  }, [allMessages]);
+  }, [allRegularCards]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [allMessages.length]);
+  }, [obMessages.length, allRegularCards.length]);
 
   const handleSendMessage = () => {
     if (!inputValue.trim()) return;
 
-    // If in rep_name phase, treat as name input
     if (obPhase === "rep_name") {
-      setNameInput(inputValue.trim());
       const name = inputValue.trim() || "Alex";
-      setRepName(name);
-      addObMsg("manager", name);
+      handleNameSubmit(name);
       setInputValue("");
-      setObPhase("rep_tone");
-      setTimeout(() => {
-        addObMsg("ai", `**${name}** — great name. What tone should ${name} use with customers?`, {
-          choices: [
-            { label: "Friendly and warm", value: "friendly", variant: "primary" },
-            { label: "Professional", value: "professional", variant: "outline" },
-            { label: "Casual", value: "casual", variant: "outline" },
-          ],
-        });
-      }, 500);
       return;
     }
 
-    const newMsg: ConvMessage = {
-      id: `cm-${Date.now()}`,
-      topicId: `new-${Date.now()}`,
-      topicTitle: inputValue.trim().slice(0, 60),
-      sender: "manager",
-      content: inputValue.trim(),
-      timestamp: new Date().toISOString(),
+    // Create a new topic card from the user's message
+    const newCard: TopicCard = {
+      id: `new-${Date.now()}`,
+      title: inputValue.trim().slice(0, 60),
       status: "waiting",
+      timestamp: new Date().toISOString(),
+      messages: [{
+        id: `cm-${Date.now()}`,
+        sender: "manager",
+        content: inputValue.trim(),
+        timestamp: new Date().toISOString(),
+      }],
+      replies: [],
+      hasActions: false,
     };
-    setExtraMessages((prev) => [...prev, newMsg]);
+    setExtraCards((prev) => [...prev, newCard]);
     setInputValue("");
 
+    // AI responds after a delay
     setTimeout(() => {
-      const confirmMsg: ConvMessage = {
-        id: `cm-ai-${Date.now()}`,
-        topicId: newMsg.topicId,
-        topicTitle: newMsg.topicTitle,
-        sender: "ai",
-        content: `I understand. Let me update the rules to reflect this change.`,
-        timestamp: new Date().toISOString(),
-        ruleChange: {
-          type: "new",
-          ruleName: newMsg.topicTitle,
-          after: newMsg.content,
-          source: "Manager directive",
-        },
-        status: "waiting",
-      };
-      setExtraMessages((prev) => [...prev, confirmMsg]);
-      setConfirmations((prev) => new Map(prev).set(confirmMsg.id, confirmMsg));
+      setExtraCards((prev) => prev.map((c) =>
+        c.id === newCard.id
+          ? {
+              ...c,
+              messages: [
+                ...c.messages,
+                {
+                  id: `cm-ai-${Date.now()}`,
+                  sender: "ai" as const,
+                  content: "I understand. Let me update the rules to reflect this change.",
+                  timestamp: new Date().toISOString(),
+                  ruleChange: {
+                    type: "new" as const,
+                    ruleName: newCard.title,
+                    after: inputValue.trim(),
+                    source: "Manager directive",
+                  },
+                },
+              ],
+            }
+          : c
+      ));
     }, 1500);
   };
 
-  const handleAction = (msgId: string, action: string) => {
-    console.log(`Action: ${action} on message ${msgId}`);
+  const handleAction = (cardId: string, action: string) => {
+    console.log(`Action: ${action} on card ${cardId}`);
   };
 
-  const handleReplyInThread = (msg: ConvMessage) => {
-    setThreadPanel(msg);
+  const handleOpenThread = (card: TopicCard) => {
+    setThreadPanel(card);
     setShowTopics(false);
   };
 
-  const handleSelectTopic = (msg: ConvMessage) => {
-    const el = document.getElementById(`msg-${msg.id}`);
+  const handleSelectTopic = (card: TopicCard) => {
+    const el = document.getElementById(`card-${card.id}`);
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
-      el.classList.add("ring-2", "ring-primary/30", "rounded-lg");
-      setTimeout(() => el.classList.remove("ring-2", "ring-primary/30", "rounded-lg"), 2000);
+      el.classList.add("ring-2", "ring-primary/30");
+      setTimeout(() => el.classList.remove("ring-2", "ring-primary/30"), 2000);
     }
   };
-
-  const isOnboardingActive = obPhase !== "complete" && obPhase !== "idle";
 
   return (
     <div className="flex h-full">
@@ -1418,26 +1482,21 @@ export default function MessagesPage() {
             <span className="text-[10px] text-muted-foreground">Your AI team's updates & decisions</span>
           </div>
           <div className="flex items-center gap-1.5">
-            {/* Restart onboarding button */}
             <button
               onClick={resetOnboarding}
               className="flex items-center gap-1.5 px-2.5 h-7 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               title="Restart onboarding (for testing)"
             >
-              <RotateCcw className="w-3 h-3" />
-              Restart Setup
+              <RotateCcw className="w-3 h-3" /> Restart Setup
             </button>
             <button
               onClick={() => { setShowTopics(!showTopics); setThreadPanel(null); }}
               className={cn(
                 "flex items-center gap-1.5 px-2.5 h-7 rounded-md text-[11px] transition-colors relative",
-                showTopics
-                  ? "bg-primary/8 text-primary"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                showTopics ? "bg-primary/8 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-accent"
               )}
             >
-              <List className="w-3.5 h-3.5" />
-              Topics
+              <List className="w-3.5 h-3.5" /> Topics
               {waitingCount > 0 && !showTopics && (
                 <span className="w-4 h-4 rounded-full bg-red-500 text-white text-[9px] flex items-center justify-center font-medium ml-0.5">
                   {waitingCount}
@@ -1449,57 +1508,125 @@ export default function MessagesPage() {
 
         {/* Messages */}
         <ScrollArea className="flex-1">
-          <div className="max-w-[780px] mx-auto px-5 py-4">
-            {groupedMessages.map((group, gi) => (
+          <div className="max-w-[720px] mx-auto px-5 py-4 space-y-3">
+
+            {/* ── Onboarding Section ── */}
+            {obMessages.length > 0 && (
+              <div className="space-y-2.5">
+                {obMessages.map((msg) => {
+                  if (msg.isPhaseLabel) {
+                    return (
+                      <div key={msg.id} className="flex items-center gap-3 my-2">
+                        <div className="flex-1 h-px bg-primary/15" />
+                        <span className="text-[10px] font-semibold text-primary/60 uppercase tracking-wider px-2 flex items-center gap-1.5">
+                          <Sparkles className="w-3 h-3" /> {msg.content}
+                        </span>
+                        <div className="flex-1 h-px bg-primary/15" />
+                      </div>
+                    );
+                  }
+
+                  const isAi = msg.sender === "ai";
+
+                  if (!isAi) {
+                    return (
+                      <div key={msg.id} className="flex justify-end">
+                        <div className="max-w-[70%]">
+                          <div className="rounded-lg bg-primary/6 border border-primary/10 px-3 py-2 text-[12px] leading-relaxed text-foreground">
+                            {msg.content}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={msg.id} className="flex gap-2.5 max-w-[85%]">
+                      <div className="w-6 h-6 rounded-full bg-primary/8 flex items-center justify-center shrink-0 mt-0.5">
+                        <Bot className="w-3 h-3 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        {msg.content && (
+                          <div className="text-[12px] leading-relaxed text-foreground">
+                            {renderMarkdown(msg.content)}
+                          </div>
+                        )}
+                        {msg.widget && (
+                          <div className="mt-2">
+                            <OnboardingWidget
+                              widget={msg.widget}
+                              widgetData={msg.widgetData}
+                              importProgress={importProgress}
+                              onAction={handleOnboardingAction}
+                            />
+                          </div>
+                        )}
+                        {msg.choices && msg.choices.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {msg.choices.map((c) => (
+                              <button
+                                key={c.value}
+                                className={cn(
+                                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all",
+                                  c.variant === "primary"
+                                    ? "bg-primary text-white hover:bg-primary/90"
+                                    : "border border-border text-foreground hover:bg-accent"
+                                )}
+                                onClick={() => handleOnboardingAction(c.value)}
+                              >
+                                {c.label}
+                                {c.icon === "arrow" && <ArrowRight className="w-3 h-3" />}
+                                {c.icon === "eye" && <Eye className="w-3 h-3" />}
+                                {c.icon === "rocket" && <Rocket className="w-3 h-3" />}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* ── Divider between onboarding and topics ── */}
+            {obMessages.length > 0 && groupedCards.length > 0 && (
+              <div className="flex items-center gap-3 my-4 pt-2">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-[10px] font-medium text-muted-foreground px-2">Topics</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+            )}
+
+            {/* ── Topic Cards ── */}
+            {groupedCards.map((group, gi) => (
               <div key={gi}>
-                <div className="flex items-center gap-3 my-4">
+                <div className="flex items-center gap-3 my-3">
                   <div className="flex-1 h-px bg-border" />
                   <span className="text-[10px] font-medium text-muted-foreground px-2">{formatDateGroup(group.date)}</span>
                   <div className="flex-1 h-px bg-border" />
                 </div>
-                <div className="space-y-4">
-                  {group.messages.map((msg) => (
-                    <div key={msg.id} id={`msg-${msg.id}`} className="transition-all duration-300">
-                      <MessageCard
-                        msg={msg}
-                        onReplyInThread={handleReplyInThread}
+                <div className="space-y-3">
+                  {group.cards.map((card) => (
+                    <div key={card.id} id={`card-${card.id}`} className="transition-all duration-300">
+                      <TopicCardView
+                        card={card}
                         onAction={handleAction}
-                        importProgress={importProgress}
-                        onOnboardingAction={handleOnboardingAction}
+                        onOpenThread={handleOpenThread}
                       />
-                      {confirmations.has(msg.id) && (
-                        <div className="ml-9 mt-2">
-                          <ConfirmationCard
-                            content="Apply this rule update?"
-                            onConfirm={() => {
-                              setConfirmations((prev) => {
-                                const next = new Map(prev);
-                                next.delete(msg.id);
-                                return next;
-                              });
-                            }}
-                            onReject={() => {
-                              setConfirmations((prev) => {
-                                const next = new Map(prev);
-                                next.delete(msg.id);
-                                return next;
-                              });
-                            }}
-                          />
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
               </div>
             ))}
+
             <div ref={messagesEndRef} />
           </div>
         </ScrollArea>
 
         {/* Input */}
         <div className="px-5 py-3 border-t border-border bg-white">
-          <div className="max-w-[780px] mx-auto">
+          <div className="max-w-[720px] mx-auto">
             <div className="flex items-center gap-2 rounded-lg border border-border bg-white px-4 py-2 focus-within:ring-1 focus-within:ring-primary/30 focus-within:border-primary/40 transition-all">
               <input
                 value={inputValue}
@@ -1522,13 +1649,13 @@ export default function MessagesPage() {
 
       {/* Thread side panel */}
       {threadPanel && (
-        <ThreadSidePanel msg={threadPanel} onClose={() => setThreadPanel(null)} />
+        <ThreadSidePanel card={threadPanel} onClose={() => setThreadPanel(null)} />
       )}
 
       {/* Topics panel */}
       {showTopics && !threadPanel && (
         <TopicsPanel
-          messages={allRegularMessages}
+          cards={allRegularCards}
           onSelectTopic={handleSelectTopic}
           onClose={() => setShowTopics(false)}
         />
