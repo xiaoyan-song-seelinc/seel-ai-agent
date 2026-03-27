@@ -15,6 +15,7 @@ import {
   ExternalLink,
   Sparkles,
   BookOpen,
+  MessageCircle,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { TOPICS, AGENT_MODE } from "@/lib/mock-data";
@@ -33,7 +34,13 @@ const NAV_ITEMS: NavItem[] = [
     href: "/inbox",
     icon: Inbox,
     badge: TOPICS.filter((t) => t.status === "unread").length,
-    matchPaths: ["/inbox", "/"],
+    matchPaths: ["/inbox"],
+  },
+  {
+    label: "Conversation",
+    href: "/conversation",
+    icon: MessageCircle,
+    matchPaths: ["/conversation", "/"],
   },
   {
     label: "Performance",

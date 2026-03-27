@@ -10,15 +10,17 @@ import Performance from "./pages/Performance";
 import PlaybookPage from "./pages/PlaybookPage";
 import OnboardingWrapper from "./pages/OnboardingWrapper";
 import ZendeskApp from "./pages/ZendeskApp";
+import ConversationPage from "./pages/ConversationPage";
 
 function Router() {
   return (
     <Switch>
       {/* Main app routes */}
-      <Route path="/" component={Inbox} />
+      <Route path="/" component={ConversationPage} />
       <Route path="/inbox" component={Inbox} />
       <Route path="/performance" component={Performance} />
       <Route path="/playbook" component={PlaybookPage} />
+      <Route path="/conversation" component={ConversationPage} />
 
       {/* Legacy route redirect */}
       <Route path="/settings">
