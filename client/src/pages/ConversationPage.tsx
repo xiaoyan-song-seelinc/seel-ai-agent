@@ -1,8 +1,8 @@
 /* ── Messages Page ────────────────────────────────────────────
-   Topic-card layout inspired by Feishu.
-   Each topic = a card. Rule updates split into context + proposal.
-   Before/After collapsible for long content.
-   Onboarding integrated as first conversation.
+   DM-style conversation flow. Each message is a chat bubble.
+   Topics are marked with lightweight inline labels.
+   Rule proposals are embedded cards within AI messages.
+   No onboarding — that lives at /onboarding.
    ──────────────────────────────────────────────────────────── */
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
@@ -10,26 +10,14 @@ import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
-import { Switch } from "@/components/ui/switch";
 import {
   Send, Check, X, XCircle, Reply, Bot, List, Plus,
-  ArrowRight, ChevronDown, ChevronUp, FileText, BarChart3,
-  Link2, Upload, AlertTriangle, CheckCircle2, Sparkles, Eye, Rocket,
-  RotateCcw, Copy, MessageCircle,
+  ArrowRight, ChevronDown, ChevronUp, MessageCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { TOPICS, type Topic } from "@/lib/mock-data";
 
 // ── Types ──────────────────────────────────────────────────
-
-interface ThreadReply {
-  id: string;
-  sender: "ai" | "manager";
-  content: string;
-  timestamp: string;
-  isConfirmation?: boolean;
-}
 
 interface RuleChange {
   type: "new" | "update";
@@ -39,28 +27,17 @@ interface RuleChange {
   source?: string;
 }
 
-interface TopicMessage {
+interface ChatMessage {
   id: string;
   sender: "ai" | "manager";
   content: string;
   timestamp: string;
+  topicId: string;
+  topicTitle: string;
+  topicStatus: "waiting" | "done";
   ruleChange?: RuleChange;
-  widget?: string;
-  widgetData?: Record<string, unknown>;
-  choices?: { label: string; value: string; icon?: string; variant?: string }[];
-}
-
-interface TopicCard {
-  id: string;
-  title: string;
-  status: "waiting" | "done";
-  timestamp: string;
-  messages: TopicMessage[];
-  replies: ThreadReply[];
-  hasActions: boolean;
-  isScribe?: boolean;
-  isOnboarding?: boolean;
-  isPhaseLabel?: boolean;
+  hasActions?: boolean;
+  isTopicStart?: boolean;
 }
 
 // ── Helpers ────────────────────────────────────────────────
@@ -118,25 +95,16 @@ function renderMarkdown(text: string) {
   });
 }
 
-// ── Build topic cards from TOPICS ────────────────────────
+// ── Build flat chat messages from TOPICS ────────────────────
 
-function buildTopicCards(topics: Topic[]): TopicCard[] {
-  const cards: TopicCard[] = [];
+function buildChatMessages(topics: Topic[]): ChatMessage[] {
+  const messages: ChatMessage[] = [];
 
   for (const topic of topics) {
-    const isPerf = topic.type === "performance_report";
     const isResolved = topic.status === "resolved";
+    const status: "waiting" | "done" = isResolved ? "done" : "waiting";
 
-    // Build messages for this topic
-    const topicMsgs: TopicMessage[] = [];
-    const replies: ThreadReply[] = [];
-
-    // First message is always the anchor
-    const anchor = topic.messages[0];
-    if (!anchor) continue;
-
-    // For escalation_review (t-3) and knowledge_gap with proposed rules,
-    // split into context message + rule proposal message
+    // Determine rule change for this topic
     let ruleChange: RuleChange | undefined;
 
     if (topic.proposedRule) {
@@ -168,123 +136,88 @@ function buildTopicCards(topics: Topic[]): TopicCard[] {
       };
     }
 
-    // For rule_update from manager (t-6), the anchor is manager message
-    if (topic.type === "rule_update" && anchor.sender === "manager") {
-      // Manager's directive is first message
-      topicMsgs.push({
-        id: anchor.id,
-        sender: anchor.sender,
-        content: anchor.content,
-        timestamp: anchor.timestamp,
-      });
-      // AI's confirmation with rule is second message
-      if (topic.messages[1]) {
-        topicMsgs.push({
-          id: topic.messages[1].id,
-          sender: topic.messages[1].sender,
-          content: topic.messages[1].content,
-          timestamp: topic.messages[1].timestamp,
-          ruleChange: {
-            type: "new",
-            ruleName: topic.title,
-            after: "Orders placed between March 15-31, 2026 have a 60-day return window (expires May 30, 2026). Applies to all customers.",
-            source: "Manager directive",
-          },
-        });
-      }
-      // Rest are replies
-      for (let i = 2; i < topic.messages.length; i++) {
-        replies.push({
-          id: topic.messages[i].id,
-          sender: topic.messages[i].sender,
-          content: topic.messages[i].content,
-          timestamp: topic.messages[i].timestamp,
-        });
-      }
-    } else if (ruleChange) {
-      // Split: context message + rule proposal card
-      // Context: strip out the rule-related lines from anchor
-      const contextContent = anchor.content.split("\n").filter(line =>
-        !line.startsWith("> ") && !line.includes("Proposed rule:") && !line.includes("Proposed update:")
-      ).join("\n").trim();
+    // Process messages
+    for (let i = 0; i < topic.messages.length; i++) {
+      const msg = topic.messages[i];
+      const isFirst = i === 0;
 
-      topicMsgs.push({
-        id: anchor.id,
-        sender: anchor.sender,
-        content: contextContent,
-        timestamp: anchor.timestamp,
-      });
-
-      // Rule proposal as separate message (the card)
-      topicMsgs.push({
-        id: `${anchor.id}-rule`,
-        sender: "ai",
-        content: "",
-        timestamp: new Date(new Date(anchor.timestamp).getTime() + 1000).toISOString(),
-        ruleChange,
-      });
-
-      // Rest are replies — but skip messages that are just the proposed rule text
-      // (e.g. t-1's m-1-2 which duplicates the proposedRule content)
-      for (let i = 1; i < topic.messages.length; i++) {
-        const msg = topic.messages[i];
-        const isRuleDuplicate = (msg.sender === "ai" && topic.proposedRule &&
-          msg.content.includes("Proposed rule:")) || (msg.sender === "ai" && msg.content.includes("Should I adopt this rule?"));
-        if (isRuleDuplicate) continue;
-        replies.push({
-          id: msg.id,
-          sender: msg.sender,
-          content: msg.content,
-          timestamp: msg.timestamp,
-        });
+      // Skip duplicate rule text messages (e.g. t-1's m-1-2)
+      if (msg.sender === "ai" && topic.proposedRule &&
+        (msg.content.includes("Proposed rule:") || msg.content.includes("Should I adopt this rule?"))) {
+        if (!isFirst) continue;
       }
-    } else {
-      // Normal: first message as anchor, rest as replies
-      topicMsgs.push({
-        id: anchor.id,
-        sender: anchor.sender,
-        content: anchor.content,
-        timestamp: anchor.timestamp,
-      });
 
-      for (let i = 1; i < topic.messages.length; i++) {
-        replies.push({
-          id: topic.messages[i].id,
-          sender: topic.messages[i].sender,
-          content: topic.messages[i].content,
-          timestamp: topic.messages[i].timestamp,
-        });
+      // Clean content: strip rule-related lines from anchor if we have a ruleChange
+      let content = msg.content;
+      if (isFirst && ruleChange && topic.type !== "rule_update") {
+        content = content.split("\n").filter(line =>
+          !line.startsWith("> ") && !line.includes("Proposed rule:") && !line.includes("Proposed update:")
+        ).join("\n").trim();
       }
+
+      // Determine if this message should carry the rule card
+      // For rule_update (t-6): AI's second message carries the rule
+      // For others: first AI message carries it
+      let msgRuleChange: RuleChange | undefined;
+      if (topic.type === "rule_update" && msg.sender === "ai" && i === 1) {
+        msgRuleChange = {
+          type: "new",
+          ruleName: topic.title,
+          after: "Orders placed between March 15-31, 2026 have a 60-day return window (expires May 30, 2026). Applies to all customers.",
+          source: "Manager directive",
+        };
+      } else if (isFirst && ruleChange && topic.type !== "rule_update") {
+        msgRuleChange = ruleChange;
+      }
+
+      // Determine if this message should show actions
+      const hasActions = isFirst && msg.sender === "ai" && !isResolved &&
+        topic.status !== "read" && topic.type !== "performance_report" &&
+        ruleChange !== undefined;
+
+      messages.push({
+        id: msg.id,
+        sender: msg.sender,
+        content,
+        timestamp: msg.timestamp,
+        topicId: topic.id,
+        topicTitle: topic.title,
+        topicStatus: status,
+        ruleChange: msgRuleChange,
+        hasActions,
+        isTopicStart: isFirst,
+      });
     }
-
-    const hasActions = anchor.sender === "ai" && !isPerf && !isResolved && topic.status !== "read";
-
-    cards.push({
-      id: topic.id,
-      title: topic.title,
-      status: isResolved ? "done" : "waiting",
-      timestamp: anchor.timestamp,
-      messages: topicMsgs,
-      replies,
-      hasActions,
-      isScribe: isPerf,
-    });
   }
 
-  cards.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-  return cards;
+  // Group by topic, sort topics by their first message, keep messages within topic in order
+  const topicGroups = new Map<string, ChatMessage[]>();
+  for (const msg of messages) {
+    if (!topicGroups.has(msg.topicId)) topicGroups.set(msg.topicId, []);
+    topicGroups.get(msg.topicId)!.push(msg);
+  }
+  // Sort each topic's messages internally
+  for (const group of Array.from(topicGroups.values())) {
+    group.sort((a: ChatMessage, b: ChatMessage) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  }
+  // Sort topics by their first message timestamp
+  const sortedTopics = Array.from(topicGroups.entries()).sort(
+    ([, a], [, b]) => new Date(a[0].timestamp).getTime() - new Date(b[0].timestamp).getTime()
+  );
+  // Flatten: all messages of topic A, then all of topic B, etc.
+  return sortedTopics.flatMap(([, msgs]) => msgs);
 }
 
 // ── Collapsible Text ─────────────────────────────────────
 
-function CollapsibleText({ text, maxLines = 3 }: { text: string; maxLines?: number }) {
+function CollapsibleText({ text, maxLines = 4 }: { text: string; maxLines?: number }) {
   const [expanded, setExpanded] = useState(false);
   const lines = text.split("\n");
   const isLong = lines.length > maxLines;
 
   if (!isLong || expanded) {
     return (
-      <div className="text-[12px] leading-relaxed whitespace-pre-wrap">
+      <div className="text-[12.5px] leading-relaxed whitespace-pre-wrap">
         {renderMarkdown(text)}
         {isLong && (
           <button onClick={() => setExpanded(false)} className="text-[10px] text-primary hover:underline mt-1 flex items-center gap-0.5">
@@ -296,21 +229,21 @@ function CollapsibleText({ text, maxLines = 3 }: { text: string; maxLines?: numb
   }
 
   return (
-    <div className="text-[12px] leading-relaxed whitespace-pre-wrap">
+    <div className="text-[12.5px] leading-relaxed whitespace-pre-wrap">
       {renderMarkdown(lines.slice(0, maxLines).join("\n"))}
       <button onClick={() => setExpanded(true)} className="text-[10px] text-primary hover:underline mt-1 flex items-center gap-0.5">
-        <ChevronDown className="w-3 h-3" /> Show more ({lines.length - maxLines} more lines)
+        <ChevronDown className="w-3 h-3" /> Show more
       </button>
     </div>
   );
 }
 
-// ── Rule Change Card (redesigned) ────────────────────────
+// ── Rule Change Card ────────────────────────────────────
 
 function RuleChangeCard({ change }: { change: RuleChange }) {
   const [beforeExpanded, setBeforeExpanded] = useState(false);
   const [afterExpanded, setAfterExpanded] = useState(false);
-  const MAX_CHARS = 120;
+  const MAX_CHARS = 140;
 
   const renderRuleText = (text: string, expanded: boolean, toggle: () => void, isStrikethrough?: boolean) => {
     const isLong = text.length > MAX_CHARS;
@@ -333,51 +266,44 @@ function RuleChangeCard({ change }: { change: RuleChange }) {
   };
 
   return (
-    <div className="rounded-lg border border-border/80 overflow-hidden bg-muted/20">
-      {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border/60">
+    <div className="mt-2 rounded-lg border border-border/80 overflow-hidden bg-muted/20">
+      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/60 bg-muted/30">
         {change.type === "new" ? (
-          <div className="w-5 h-5 rounded-full bg-emerald-50 flex items-center justify-center">
-            <Plus className="w-3 h-3 text-emerald-600" />
-          </div>
+          <Plus className="w-3 h-3 text-emerald-600" />
         ) : (
-          <div className="w-5 h-5 rounded-full bg-blue-50 flex items-center justify-center">
-            <ArrowRight className="w-3 h-3 text-blue-600" />
-          </div>
+          <ArrowRight className="w-3 h-3 text-blue-600" />
         )}
         <span className="text-[11px] font-semibold text-foreground">
           {change.type === "new" ? "New Rule" : "Rule Update"}
         </span>
-        <span className="text-[11px] text-muted-foreground">·</span>
-        <span className="text-[11px] text-muted-foreground truncate">{change.ruleName}</span>
+        <span className="text-[10px] text-muted-foreground truncate">{change.ruleName}</span>
       </div>
 
-      {/* Body */}
-      <div className="px-3 py-2.5 space-y-2.5">
+      <div className="px-3 py-2 space-y-2">
         {change.type === "update" && change.before && (
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-red-400/60" />
+              <div className="w-1.5 h-1.5 rounded-full bg-red-400/60" />
               <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Current</span>
             </div>
-            <div className="pl-3.5">
+            <div className="pl-3">
               {renderRuleText(change.before, beforeExpanded, () => setBeforeExpanded(!beforeExpanded), true)}
             </div>
           </div>
         )}
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <div className="flex items-center gap-1.5">
-            <div className={cn("w-2 h-2 rounded-full", change.type === "update" ? "bg-emerald-400" : "bg-emerald-400")} />
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
             <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
               {change.type === "update" ? "Proposed" : "Proposed Rule"}
             </span>
           </div>
-          <div className="pl-3.5">
+          <div className="pl-3">
             {renderRuleText(change.after, afterExpanded, () => setAfterExpanded(!afterExpanded))}
           </div>
         </div>
         {change.source && (
-          <p className="text-[10px] text-muted-foreground/60 pt-1.5 border-t border-border/40 pl-3.5">
+          <p className="text-[10px] text-muted-foreground/60 pt-1 border-t border-border/40 pl-3">
             {change.source}
           </p>
         )}
@@ -386,488 +312,117 @@ function RuleChangeCard({ change }: { change: RuleChange }) {
   );
 }
 
-// ── Inline Reply ─────────────────────────────────────────
+// ── Topic Label (lightweight inline divider) ────────────
 
-function InlineReplyBubble({ reply }: { reply: ThreadReply }) {
-  const isAi = reply.sender === "ai";
+function TopicLabel({ title, status }: { title: string; status: "waiting" | "done" }) {
   return (
-    <div className="flex items-start gap-2 py-1">
-      {isAi ? (
-        <div className="w-5 h-5 rounded-full bg-primary/8 flex items-center justify-center shrink-0 mt-0.5">
-          <Bot className="w-2.5 h-2.5 text-primary" />
-        </div>
-      ) : (
-        <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center shrink-0 mt-0.5">
-          <span className="text-[8px] font-medium text-white">JC</span>
-        </div>
-      )}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-medium text-foreground">{isAi ? "Rep" : "You"}</span>
-          <span className="text-[9px] text-muted-foreground">{formatTime(reply.timestamp)}</span>
-        </div>
-        <div className="text-[12px] text-foreground/80 leading-relaxed mt-0.5">
-          {renderMarkdown(reply.content)}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function InlineReplies({
-  replies,
-  onOpenThread,
-}: {
-  replies: ThreadReply[];
-  onOpenThread: () => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const count = replies.length;
-
-  if (count === 0) return null;
-
-  const showAll = count <= 2 || expanded;
-  const hiddenCount = count - 2;
-
-  return (
-    <div className="mt-2 pt-2 border-t border-border/40">
-      <div className="space-y-0.5">
-        {showAll ? (
-          replies.map((r) => <InlineReplyBubble key={r.id} reply={r} />)
-        ) : (
-          <>
-            <InlineReplyBubble reply={replies[0]} />
-            <button
-              onClick={() => setExpanded(true)}
-              className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 py-1 pl-7 transition-colors"
-            >
-              <ChevronDown className="w-3 h-3" />
-              {hiddenCount} more {hiddenCount === 1 ? "reply" : "replies"}
-            </button>
-            <InlineReplyBubble reply={replies[replies.length - 1]} />
-          </>
+    <div className="flex items-center gap-2 py-1">
+      <div className="flex-1 h-px bg-border/60" />
+      <div className="flex items-center gap-1.5 px-2">
+        <MessageCircle className="w-3 h-3 text-muted-foreground/50" />
+        <span className="text-[10px] font-medium text-muted-foreground">{title}</span>
+        {status === "done" && (
+          <span className="text-[9px] text-emerald-500 font-medium">Done</span>
         )}
       </div>
-      {expanded && count > 2 && (
-        <button
-          onClick={() => setExpanded(false)}
-          className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground py-0.5 pl-7 transition-colors"
-        >
-          <ChevronUp className="w-3 h-3" /> Collapse
-        </button>
-      )}
-      <button
-        onClick={onOpenThread}
-        className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary py-1 pl-7 transition-colors"
-      >
-        <Reply className="w-3 h-3" /> Reply
-      </button>
+      <div className="flex-1 h-px bg-border/60" />
     </div>
   );
 }
 
-// ── Confirmation Card ────────────────────────────────────
+// ── Message Bubble ──────────────────────────────────────
 
-function ConfirmationCard({
-  content,
-  onConfirm,
-  onReject,
-}: {
-  content: string;
-  onConfirm: () => void;
-  onReject: () => void;
-}) {
-  const [decided, setDecided] = useState<"yes" | "no" | null>(null);
-  return (
-    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
-      <p className="text-[11px] text-foreground leading-relaxed mb-2.5">{content}</p>
-      {decided === null ? (
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            className="h-7 text-[11px] px-4 rounded-full bg-primary text-white hover:bg-primary/90"
-            onClick={() => { setDecided("yes"); onConfirm(); }}
-          >
-            <Check className="w-3 h-3 mr-1" /> Yes, confirm
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-[11px] px-4 rounded-full text-muted-foreground"
-            onClick={() => { setDecided("no"); onReject(); }}
-          >
-            <X className="w-3 h-3 mr-1" /> No, discard
-          </Button>
-        </div>
-      ) : (
-        <div className={cn("flex items-center gap-1.5 text-[11px]", decided === "yes" ? "text-emerald-600" : "text-muted-foreground")}>
-          {decided === "yes" ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-          {decided === "yes" ? "Confirmed" : "Discarded"}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Topic Card Component ─────────────────────────────────
-
-function TopicCardView({
-  card,
+function MessageBubble({
+  msg,
   onAction,
-  onOpenThread,
+  onReply,
 }: {
-  card: TopicCard;
-  onAction: (cardId: string, action: string) => void;
-  onOpenThread: (card: TopicCard) => void;
+  msg: ChatMessage;
+  onAction: (topicId: string, action: string) => void;
+  onReply: (topicId: string) => void;
 }) {
   const [actioned, setActioned] = useState<string | null>(null);
+  const isAi = msg.sender === "ai";
 
-  return (
-    <div className="rounded-lg border border-border bg-white overflow-hidden hover:shadow-sm transition-shadow">
-      {/* Topic header */}
-      <div className="flex items-center gap-2 px-3.5 py-2 border-b border-border/50 bg-muted/20">
-        <div className="w-5 h-5 rounded-full bg-primary/8 flex items-center justify-center shrink-0">
-          {card.isScribe ? (
-            <BarChart3 className="w-2.5 h-2.5 text-primary" />
-          ) : (
-            <MessageCircle className="w-2.5 h-2.5 text-primary" />
-          )}
-        </div>
-        <span className="text-[12px] font-semibold text-foreground flex-1 truncate">{card.title}</span>
-        <span className="text-[10px] text-muted-foreground shrink-0">{formatRelativeTime(card.timestamp)}</span>
-        {card.status === "waiting" && card.hasActions && (
-          <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-        )}
-      </div>
-
-      {/* Messages within topic */}
-      <div className="px-3.5 py-2.5 space-y-3">
-        {card.messages.map((msg) => (
-          <div key={msg.id}>
-            {/* Sender label */}
-            <div className="flex items-center gap-1.5 mb-1">
-              {msg.sender === "ai" ? (
-                <div className="w-4 h-4 rounded-full bg-primary/8 flex items-center justify-center">
-                  <Bot className="w-2 h-2 text-primary" />
-                </div>
-              ) : (
-                <div className="w-4 h-4 rounded-full bg-primary flex items-center justify-center">
-                  <span className="text-[7px] font-medium text-white">JC</span>
-                </div>
-              )}
-              <span className="text-[11px] font-medium text-foreground">{msg.sender === "ai" ? "Rep" : "You"}</span>
-              <span className="text-[9px] text-muted-foreground">{formatTime(msg.timestamp)}</span>
-            </div>
-
-            {/* Content */}
-            {msg.content && (
-              <div className="pl-5.5 ml-[22px]">
-                <CollapsibleText text={msg.content} maxLines={6} />
-              </div>
-            )}
-
-            {/* Rule change card */}
-            {msg.ruleChange && (
-              <div className="ml-[22px] mt-2">
-                <RuleChangeCard change={msg.ruleChange} />
-              </div>
-            )}
-
-            {/* Onboarding widgets */}
-            {msg.widget && (
-              <div className="ml-[22px] mt-2">
-                <OnboardingWidget
-                  widget={msg.widget}
-                  widgetData={msg.widgetData}
-                  importProgress={0}
-                  onAction={() => {}}
-                />
-              </div>
-            )}
-
-            {/* Choices */}
-            {msg.choices && msg.choices.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2 ml-[22px]">
-                {msg.choices.map((c) => (
-                  <button
-                    key={c.value}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all",
-                      c.variant === "primary"
-                        ? "bg-primary text-white hover:bg-primary/90"
-                        : "border border-border text-foreground hover:bg-accent"
-                    )}
-                  >
-                    {c.label}
-                    {c.icon === "arrow" && <ArrowRight className="w-3 h-3" />}
-                    {c.icon === "eye" && <Eye className="w-3 h-3" />}
-                    {c.icon === "rocket" && <Rocket className="w-3 h-3" />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Action buttons */}
-      {card.hasActions && !actioned && (
-        <div className="flex items-center gap-1.5 px-3.5 py-2 border-t border-border/40">
-          <Button
-            size="sm"
-            className="h-7 text-[11px] px-3 rounded-full bg-primary text-white hover:bg-primary/90"
-            onClick={() => { setActioned("Accepted"); onAction(card.id, "accept"); }}
-          >
-            <Check className="w-3 h-3 mr-1" /> Accept
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-[11px] px-3 rounded-full text-muted-foreground hover:text-foreground"
-            onClick={() => { setActioned("Rejected"); onAction(card.id, "reject"); }}
-          >
-            <XCircle className="w-3 h-3 mr-1" /> Reject
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-[11px] px-3 rounded-full text-muted-foreground hover:text-foreground"
-            onClick={() => onOpenThread(card)}
-          >
-            <Reply className="w-3 h-3 mr-1" /> Reply
-          </Button>
-        </div>
-      )}
-
-      {actioned && (
-        <div className={cn(
-          "flex items-center gap-1.5 px-3.5 py-2 border-t border-border/40 text-[11px]",
-          actioned === "Accepted" ? "text-emerald-600" : "text-red-500"
-        )}>
-          {actioned === "Accepted" ? <Check className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-          {actioned}
-        </div>
-      )}
-
-      {/* Inline replies */}
-      {card.replies.length > 0 && (
-        <div className="px-3.5 pb-2.5">
-          <InlineReplies replies={card.replies} onOpenThread={() => onOpenThread(card)} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Onboarding Widget Renderer ───────────────────────────
-
-function OnboardingWidget({
-  widget,
-  widgetData,
-  importProgress,
-  onAction,
-}: {
-  widget: string;
-  widgetData?: Record<string, unknown>;
-  importProgress: number;
-  onAction: (value: string) => void;
-}) {
-  switch (widget) {
-    case "connect_zendesk":
-      return (
-        <div className="p-3 rounded-lg border border-border bg-white">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-[#03363D]/10 flex items-center justify-center">
-              <span className="text-[12px] font-bold text-[#03363D]">Z</span>
-            </div>
-            <div>
-              <p className="text-[12px] font-medium">Zendesk</p>
-              <p className="text-[10px] text-muted-foreground">Connect via OAuth</p>
-            </div>
-          </div>
-          <button onClick={() => onAction("zendesk_connected")} className="w-full py-2 rounded-lg bg-[#03363D] text-white text-[12px] font-medium hover:bg-[#03363D]/90 transition-colors flex items-center justify-center gap-2">
-            <Link2 className="w-3.5 h-3.5" /> Connect Zendesk Account
-          </button>
-        </div>
-      );
-    case "connect_shopify":
-      return (
-        <div className="p-3 rounded-lg border border-border bg-white">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-[#96BF48]/10 flex items-center justify-center">
-              <span className="text-[12px] font-bold text-[#96BF48]">S</span>
-            </div>
-            <div>
-              <p className="text-[12px] font-medium">Shopify</p>
-              <p className="text-[10px] text-muted-foreground">Connect via OAuth</p>
-            </div>
-          </div>
-          <button onClick={() => onAction("shopify_connected")} className="w-full py-2 rounded-lg bg-[#96BF48] text-white text-[12px] font-medium hover:bg-[#96BF48]/90 transition-colors flex items-center justify-center gap-2">
-            <Link2 className="w-3.5 h-3.5" /> Connect Shopify Store
-          </button>
-        </div>
-      );
-    case "upload_doc":
-      return (
-        <div className="p-3 rounded-lg border border-dashed border-border bg-white hover:border-primary/40 transition-colors">
-          <div className="text-center py-3">
-            <Upload className="w-5 h-5 text-muted-foreground/50 mx-auto mb-2" />
-            <p className="text-[12px] font-medium text-foreground">Drop your document here</p>
-            <p className="text-[10px] text-muted-foreground mt-1">PDF, DOCX, or TXT</p>
-          </div>
-          <button onClick={() => onAction("uploaded")} className="w-full mt-2 py-2 rounded-lg bg-primary text-white text-[12px] font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
-            <FileText className="w-3.5 h-3.5" /> Upload Seel_Return_Policy_v2.pdf
-          </button>
-        </div>
-      );
-    case "import_progress":
-      return (
-        <div className="p-3 rounded-lg border border-border bg-white">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
-              <Bot className="w-3 h-3 text-primary animate-pulse" />
-            </div>
-            <span className="text-[11px] text-muted-foreground">
-              {importProgress < 30 && "Reading document..."}
-              {importProgress >= 30 && importProgress < 60 && "Extracting business rules..."}
-              {importProgress >= 60 && importProgress < 90 && "Cross-referencing with FAQ..."}
-              {importProgress >= 90 && "Finalizing..."}
+  if (!isAi) {
+    // Manager message — right-aligned bubble
+    return (
+      <div className="flex justify-end group">
+        <div className="max-w-[75%]">
+          <div className="flex items-center gap-1.5 justify-end mb-0.5">
+            <span className="text-[9px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+              {formatTime(msg.timestamp)}
             </span>
           </div>
-          <Progress value={Math.min(importProgress, 100)} className="h-1" />
-        </div>
-      );
-    case "parse_result": {
-      const rules = (widgetData?.rules as { category: string; count: number; example: string }[]) || [];
-      const totalRules = rules.reduce((sum, r) => sum + r.count, 0);
-      return (
-        <div className="p-3 rounded-lg border border-border bg-white">
-          <div className="flex items-center gap-2 mb-2.5">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-            <span className="text-[12px] font-medium">{totalRules} rules extracted</span>
-          </div>
-          <div className="space-y-1">
-            {rules.map((r) => (
-              <div key={r.category} className="flex items-start gap-2 py-1.5 px-2.5 rounded-md bg-muted/40">
-                <span className="text-[11px] font-medium text-foreground w-24 shrink-0">{r.category}</span>
-                <span className="text-[11px] text-muted-foreground flex-1">{r.example}</span>
-                <span className="text-[10px] text-muted-foreground shrink-0">{r.count}</span>
-              </div>
-            ))}
+          <div className="rounded-2xl rounded-tr-sm bg-primary/8 border border-primary/10 px-3.5 py-2 text-[12.5px] leading-relaxed text-foreground">
+            {renderMarkdown(msg.content)}
           </div>
         </div>
-      );
-    }
-    case "conflict":
-      return (
-        <div className="p-3 rounded-lg border border-amber-200 bg-amber-50/50">
-          <div className="flex items-start gap-2 mb-2.5">
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-[12px] font-medium text-amber-900">Conflict: Return Window</p>
-              <p className="text-[11px] text-amber-800/80 mt-1 leading-relaxed">
-                Your return policy says "30-day return window" but the FAQ page says "28 calendar days from delivery." Which one should I follow?
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2 mt-1">
-            <button onClick={() => onAction("30_days")} className="px-3.5 py-1.5 rounded-full text-[11px] font-medium border border-amber-300 text-amber-800 hover:bg-amber-100 transition-colors">
-              30 days from delivery
-            </button>
-            <button onClick={() => onAction("28_days")} className="px-3.5 py-1.5 rounded-full text-[11px] font-medium border border-amber-300 text-amber-800 hover:bg-amber-100 transition-colors">
-              28 calendar days
-            </button>
-          </div>
-        </div>
-      );
-    case "actions_form":
-      return <ActionsFormWidget onDone={() => onAction("actions_done")} />;
-    case "escalation_form":
-      return <EscalationFormWidget onDone={() => onAction("escalation_done")} />;
-    case "scenario": {
-      const scenario = widgetData as { title: string; description: string; response: string };
-      return (
-        <div className="rounded-lg border border-border bg-white overflow-hidden">
-          <div className="px-3 py-2 bg-violet-50/50 border-b border-border">
-            <span className="text-[10px] font-semibold text-violet-600 uppercase tracking-wider">{scenario.title}</span>
-          </div>
-          <div className="px-3 py-2.5 space-y-2">
-            <p className="text-[11px] text-muted-foreground leading-relaxed italic">{scenario.description}</p>
-            <div className="p-2.5 rounded-md bg-muted/30 border border-border/40">
-              <p className="text-[11px] text-foreground leading-relaxed whitespace-pre-wrap"
-                dangerouslySetInnerHTML={{ __html: (scenario.response || "").replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") }}
-              />
-            </div>
-          </div>
-        </div>
-      );
-    }
-    default:
-      return null;
+      </div>
+    );
   }
-}
 
-// ── Actions Form Widget ──────────────────────────────────
-
-const DEFAULT_ACTIONS = [
-  { id: "return_label", label: "Create return labels", default: true },
-  { id: "reply", label: "Send customer replies", default: true },
-  { id: "internal_note", label: "Write internal notes", default: true },
-  { id: "lookup_order", label: "Look up orders", default: true },
-  { id: "cancel", label: "Cancel orders", default: false },
-  { id: "seel_ticket", label: "Create Seel ticket", default: true },
-];
-
-function ActionsFormWidget({ onDone }: { onDone: () => void }) {
-  const [perms, setPerms] = useState<Record<string, boolean>>(
-    Object.fromEntries(DEFAULT_ACTIONS.map((a) => [a.id, a.default]))
-  );
+  // AI message — left-aligned with avatar
   return (
-    <div className="rounded-lg border border-border bg-white p-3">
-      <p className="text-[11px] font-medium text-foreground mb-2.5">Action Permissions</p>
-      <div className="space-y-2">
-        {DEFAULT_ACTIONS.map((a) => (
-          <div key={a.id} className="flex items-center justify-between">
-            <span className="text-[11px] text-foreground">{a.label}</span>
-            <Switch checked={perms[a.id]} onCheckedChange={(v) => setPerms((p) => ({ ...p, [a.id]: v }))} />
-          </div>
-        ))}
+    <div className="flex gap-2.5 group max-w-[85%]">
+      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center shrink-0 mt-0.5">
+        <Bot className="w-3.5 h-3.5 text-primary" />
       </div>
-      <Button size="sm" className="mt-3 h-7 text-[11px] rounded-full px-4" onClick={onDone}>
-        <Check className="w-3 h-3 mr-1" /> Confirm Permissions
-      </Button>
-    </div>
-  );
-}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <span className="text-[11px] font-medium text-foreground">Rep</span>
+          <span className="text-[9px] text-muted-foreground">{formatTime(msg.timestamp)}</span>
+        </div>
 
-// ── Escalation Form Widget ───────────────────────────────
-
-const DEFAULT_ESCALATION = [
-  { id: "angry", label: "Customer is angry or upset", default: true },
-  { id: "legal", label: "Legal or compliance keywords", default: true },
-  { id: "manager_request", label: "Customer asks for a manager", default: true },
-  { id: "unresolved_3", label: "Unresolved after 3 exchanges", default: true },
-  { id: "high_value", label: "Order value exceeds $500", default: false },
-];
-
-function EscalationFormWidget({ onDone }: { onDone: () => void }) {
-  const [toggles, setToggles] = useState<Record<string, boolean>>(
-    Object.fromEntries(DEFAULT_ESCALATION.map((e) => [e.id, e.default]))
-  );
-  return (
-    <div className="rounded-lg border border-border bg-white p-3">
-      <p className="text-[11px] font-medium text-foreground mb-2.5">Escalation Triggers</p>
-      <div className="space-y-2">
-        {DEFAULT_ESCALATION.map((e) => (
-          <div key={e.id} className="flex items-center justify-between">
-            <span className="text-[11px] text-foreground">{e.label}</span>
-            <Switch checked={toggles[e.id]} onCheckedChange={(v) => setToggles((p) => ({ ...p, [e.id]: v }))} />
+        {/* Message content */}
+        {msg.content && (
+          <div className="text-[12.5px] leading-relaxed text-foreground/90">
+            <CollapsibleText text={msg.content} />
           </div>
-        ))}
+        )}
+
+        {/* Rule change card */}
+        {msg.ruleChange && <RuleChangeCard change={msg.ruleChange} />}
+
+        {/* Action buttons */}
+        {msg.hasActions && !actioned && (
+          <div className="flex items-center gap-1.5 mt-2.5">
+            <Button
+              size="sm"
+              className="h-7 text-[11px] px-3.5 rounded-full bg-primary text-white hover:bg-primary/90"
+              onClick={() => { setActioned("Accepted"); onAction(msg.topicId, "accept"); }}
+            >
+              <Check className="w-3 h-3 mr-1" /> Accept
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-[11px] px-3.5 rounded-full text-muted-foreground hover:text-foreground"
+              onClick={() => { setActioned("Rejected"); onAction(msg.topicId, "reject"); }}
+            >
+              <XCircle className="w-3 h-3 mr-1" /> Reject
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-[11px] px-3.5 rounded-full text-muted-foreground hover:text-foreground"
+              onClick={() => onReply(msg.topicId)}
+            >
+              <Reply className="w-3 h-3 mr-1" /> Reply
+            </Button>
+          </div>
+        )}
+
+        {actioned && (
+          <div className={cn(
+            "flex items-center gap-1.5 mt-2 text-[11px]",
+            actioned === "Accepted" ? "text-emerald-600" : "text-red-500"
+          )}>
+            {actioned === "Accepted" ? <Check className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+            {actioned}
+          </div>
+        )}
       </div>
-      <Button size="sm" className="mt-3 h-7 text-[11px] rounded-full px-4" onClick={onDone}>
-        <Check className="w-3 h-3 mr-1" /> Confirm Triggers
-      </Button>
     </div>
   );
 }
@@ -875,17 +430,17 @@ function EscalationFormWidget({ onDone }: { onDone: () => void }) {
 // ── Topics Panel ─────────────────────────────────────────
 
 function TopicsPanel({
-  cards,
+  topics,
   onSelectTopic,
   onClose,
 }: {
-  cards: TopicCard[];
-  onSelectTopic: (card: TopicCard) => void;
+  topics: { id: string; title: string; status: "waiting" | "done"; timestamp: string; hasActions: boolean; replyCount: number }[];
+  onSelectTopic: (topicId: string) => void;
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<"waiting" | "done">("waiting");
-  const waiting = cards.filter((c) => c.status === "waiting" && !c.isOnboarding && !c.isPhaseLabel);
-  const done = cards.filter((c) => c.status === "done" && !c.isOnboarding && !c.isPhaseLabel);
+  const waiting = topics.filter((t) => t.status === "waiting");
+  const done = topics.filter((t) => t.status === "done");
   const list = tab === "waiting" ? waiting : done;
 
   return (
@@ -921,20 +476,20 @@ function TopicsPanel({
                   {tab === "waiting" ? "All caught up!" : "No resolved topics yet."}
                 </p>
               )}
-              {list.map((card) => (
+              {list.map((t) => (
                 <button
-                  key={card.id}
-                  onClick={() => onSelectTopic(card)}
+                  key={t.id}
+                  onClick={() => onSelectTopic(t.id)}
                   className="w-full flex items-start gap-2.5 px-3 py-2.5 hover:bg-accent/50 transition-colors text-left border-b border-border/30"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-medium text-foreground truncate">{card.title}</p>
+                    <p className="text-[11px] font-medium text-foreground truncate">{t.title}</p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {formatRelativeTime(card.replies.length > 0 ? card.replies[card.replies.length - 1].timestamp : card.timestamp)}
-                      {card.replies.length > 0 && ` · ${card.replies.length} replies`}
+                      {formatRelativeTime(t.timestamp)}
+                      {t.replyCount > 0 && ` · ${t.replyCount} messages`}
                     </p>
                   </div>
-                  {card.status === "waiting" && card.hasActions && (
+                  {t.status === "waiting" && t.hasActions && (
                     <span className="w-2 h-2 rounded-full bg-red-400 shrink-0 mt-1.5" />
                   )}
                 </button>
@@ -949,21 +504,31 @@ function TopicsPanel({
 
 // ── Thread Side Panel ────────────────────────────────────
 
+interface ThreadReply {
+  id: string;
+  sender: "ai" | "manager";
+  content: string;
+  timestamp: string;
+}
+
 function ThreadSidePanel({
-  card,
+  topicId,
+  topicTitle,
+  contextMsg,
   onClose,
 }: {
-  card: TopicCard;
+  topicId: string;
+  topicTitle: string;
+  contextMsg: string;
   onClose: () => void;
 }) {
   const [input, setInput] = useState("");
-  const [localReplies, setLocalReplies] = useState<ThreadReply[]>([]);
+  const [replies, setReplies] = useState<ThreadReply[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
-  const allReplies = [...card.replies, ...localReplies];
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [allReplies.length]);
+  }, [replies.length]);
 
   const handleSend = () => {
     if (!input.trim()) return;
@@ -973,17 +538,16 @@ function ThreadSidePanel({
       content: input.trim(),
       timestamp: new Date().toISOString(),
     };
-    setLocalReplies((prev) => [...prev, newReply]);
+    setReplies((prev) => [...prev, newReply]);
     setInput("");
     setTimeout(() => {
-      setLocalReplies((prev) => [
+      setReplies((prev) => [
         ...prev,
         {
           id: `tr-ai-${Date.now()}`,
           sender: "ai",
-          content: `Got it. I'll update the rule to reflect this. Here's what I'll change:\n\n**Updated rule:** ${input.trim()}\n\nPlease confirm this is correct.`,
+          content: `Got it. I'll update the rule accordingly.\n\n**Updated rule:** ${input.trim()}\n\nPlease confirm this is correct.`,
           timestamp: new Date().toISOString(),
-          isConfirmation: true,
         },
       ]);
     }, 1500);
@@ -994,7 +558,7 @@ function ThreadSidePanel({
       <div className="flex items-center justify-between px-4 h-11 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
           <MessageCircle className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className="text-[12px] font-semibold text-foreground truncate max-w-[220px]">{card.title}</span>
+          <span className="text-[12px] font-semibold text-foreground truncate max-w-[220px]">{topicTitle}</span>
         </div>
         <button onClick={onClose} className="p-1 rounded hover:bg-accent transition-colors">
           <X className="w-3.5 h-3.5 text-muted-foreground" />
@@ -1008,47 +572,37 @@ function ThreadSidePanel({
             <Bot className="w-2 h-2 text-primary" />
           </div>
           <span className="text-[10px] font-medium text-foreground">Rep</span>
-          <span className="text-[9px] text-muted-foreground">{formatTime(card.timestamp)}</span>
         </div>
         <p className="text-[10.5px] text-muted-foreground leading-relaxed line-clamp-2 ml-6">
-          {card.messages[0]?.content.replace(/\*\*/g, "").slice(0, 150)}...
+          {contextMsg.replace(/\*\*/g, "").slice(0, 150)}...
         </p>
       </div>
 
       <ScrollArea className="flex-1 px-4">
         <div className="py-3 space-y-3">
-          {allReplies.map((reply) => (
-            <div key={reply.id}>
-              <div className={cn("flex gap-2", reply.sender === "manager" && "flex-row-reverse")}>
-                {reply.sender === "ai" ? (
-                  <div className="w-5 h-5 rounded-full bg-primary/8 flex items-center justify-center shrink-0 mt-0.5">
-                    <Bot className="w-2.5 h-2.5 text-primary" />
-                  </div>
-                ) : (
-                  <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center shrink-0 mt-0.5">
-                    <span className="text-[8px] font-medium text-white">JC</span>
-                  </div>
-                )}
-                <div className={cn("max-w-[85%]", reply.sender === "manager" && "text-right")}>
-                  <div className={cn("flex items-center gap-1.5 mb-0.5", reply.sender === "manager" && "justify-end")}>
-                    <span className="text-[10px] font-medium text-foreground">{reply.sender === "ai" ? "Rep" : "You"}</span>
-                    <span className="text-[9px] text-muted-foreground">{formatTime(reply.timestamp)}</span>
-                  </div>
-                  <div className={cn(
-                    "rounded-lg px-2.5 py-1.5 text-[11px] leading-relaxed",
-                    reply.sender === "ai" ? "bg-muted/50 text-foreground" : "bg-primary/6 text-foreground"
-                  )}>
-                    <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{
-                      __html: reply.content.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-                    }} />
-                  </div>
+          {replies.map((reply) => (
+            <div key={reply.id} className={cn("flex gap-2", reply.sender === "manager" && "flex-row-reverse")}>
+              {reply.sender === "ai" ? (
+                <div className="w-5 h-5 rounded-full bg-primary/8 flex items-center justify-center shrink-0 mt-0.5">
+                  <Bot className="w-2.5 h-2.5 text-primary" />
                 </div>
-              </div>
-              {reply.isConfirmation && reply.sender === "ai" && (
-                <div className="ml-7 mt-1.5">
-                  <ConfirmationCard content="Apply this rule update?" onConfirm={() => {}} onReject={() => {}} />
+              ) : (
+                <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-[8px] font-medium text-white">JC</span>
                 </div>
               )}
+              <div className={cn("max-w-[85%]", reply.sender === "manager" && "text-right")}>
+                <div className={cn("flex items-center gap-1.5 mb-0.5", reply.sender === "manager" && "justify-end")}>
+                  <span className="text-[10px] font-medium text-foreground">{reply.sender === "ai" ? "Rep" : "You"}</span>
+                  <span className="text-[9px] text-muted-foreground">{formatTime(reply.timestamp)}</span>
+                </div>
+                <div className={cn(
+                  "rounded-lg px-2.5 py-1.5 text-[11px] leading-relaxed inline-block text-left",
+                  reply.sender === "ai" ? "bg-muted/50 text-foreground" : "bg-primary/6 text-foreground"
+                )} dangerouslySetInnerHTML={{
+                  __html: reply.content.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br/>")
+                }} />
+              </div>
             </div>
           ))}
           <div ref={endRef} />
@@ -1074,399 +628,136 @@ function ThreadSidePanel({
 }
 
 // ══════════════════════════════════════════════════════════
-// ── ONBOARDING STATE MACHINE ─────────────────────────────
-// ══════════════════════════════════════════════════════════
-
-type OBPhase =
-  | "idle" | "welcome"
-  | "connect_zendesk" | "connect_shopify"
-  | "upload_doc" | "importing" | "parse_result" | "conflict"
-  | "actions_form" | "escalation_form"
-  | "rep_name" | "rep_tone"
-  | "scenario_1" | "scenario_2" | "scenario_3"
-  | "mode_select" | "complete";
-
-interface OBMessage {
-  id: string;
-  sender: "ai" | "manager";
-  content: string;
-  timestamp: string;
-  widget?: string;
-  widgetData?: Record<string, unknown>;
-  choices?: { label: string; value: string; icon?: string; variant?: string }[];
-  isPhaseLabel?: boolean;
-}
-
-const OB_BASE_TIME = "2026-03-20T09:00:00Z";
-let obMsgId = 0;
-function obMsg(sender: "ai" | "manager", content: string, extras?: Partial<OBMessage>, offsetMin = 0): OBMessage {
-  obMsgId++;
-  const ts = new Date(new Date(OB_BASE_TIME).getTime() + offsetMin * 60000).toISOString();
-  return { id: `ob-${obMsgId}`, sender, content, timestamp: ts, ...extras };
-}
-
-function obPhaseLabel(label: string, offsetMin: number): OBMessage {
-  return obMsg("ai", label, { isPhaseLabel: true }, offsetMin);
-}
-
-function buildInitialOBMessages(): OBMessage[] {
-  obMsgId = 0;
-  return [
-    obPhaseLabel("Connect to your system", 0),
-    obMsg("ai", "Hey! I'm your **Team Lead**. Let's get your AI support team set up — it takes about 3 minutes.\n\nFirst, let's connect your helpdesk and store.", {
-      choices: [
-        { label: "Connect Zendesk", value: "start_zendesk", icon: "arrow", variant: "primary" },
-        { label: "Skip for now", value: "skip_zendesk", variant: "outline" },
-      ],
-    }, 1),
-  ];
-}
-
-// ══════════════════════════════════════════════════════════
 // ── MAIN PAGE ────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════
 
 export default function MessagesPage() {
-  const [threadPanel, setThreadPanel] = useState<TopicCard | null>(null);
+  const [threadPanel, setThreadPanel] = useState<{ topicId: string; topicTitle: string; contextMsg: string } | null>(null);
   const [showTopics, setShowTopics] = useState(false);
   const [inputValue, setInputValue] = useState("");
-  const [extraCards, setExtraCards] = useState<TopicCard[]>([]);
+  const [extraMessages, setExtraMessages] = useState<ChatMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // ── Onboarding state ──
-  const [obPhase, setObPhase] = useState<OBPhase>("welcome");
-  const [obMessages, setObMessages] = useState<OBMessage[]>(() => buildInitialOBMessages());
-  const [importProgress, setImportProgress] = useState(0);
-  const [repName, setRepName] = useState("Alex");
-  const obOffsetRef = useRef(2);
+  // Build all messages
+  const baseMessages = useMemo(() => buildChatMessages(TOPICS), []);
+  const allMessages = useMemo(() => {
+    const combined = [...baseMessages, ...extraMessages];
+    combined.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    return combined;
+  }, [baseMessages, extraMessages]);
 
-  const addObMsg = useCallback((sender: "ai" | "manager", content: string, extras?: Partial<OBMessage>) => {
-    obOffsetRef.current += 1;
-    const msg = obMsg(sender, content, extras, obOffsetRef.current);
-    setObMessages((prev) => [...prev, msg]);
-    return msg;
-  }, []);
-
-  const addPhaseLabel = useCallback((label: string) => {
-    obOffsetRef.current += 1;
-    setObMessages((prev) => [...prev, obPhaseLabel(label, obOffsetRef.current)]);
-  }, []);
-
-  // Onboarding choice handler
-  const handleOnboardingAction = useCallback((value: string) => {
-    const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-    const advance = async () => {
-      switch (obPhase) {
-        case "welcome":
-          if (value === "skip_zendesk") {
-            setObPhase("connect_shopify");
-            addObMsg("manager", "I'll set this up later");
-            await delay(500);
-            addObMsg("ai", "No problem — you can connect Zendesk later in **Playbook → Integrations**.\n\nHow about Shopify?", {
-              choices: [
-                { label: "Connect Shopify", value: "start_shopify", icon: "arrow", variant: "primary" },
-                { label: "Skip for now", value: "skip_shopify", variant: "outline" },
-              ],
-            });
-          } else {
-            setObPhase("connect_zendesk");
-            addObMsg("ai", "", { widget: "connect_zendesk" });
-          }
-          break;
-
-        case "connect_zendesk":
-          setObPhase("connect_shopify");
-          addObMsg("ai", "Connected to **Zendesk** — coastalliving.zendesk.com. I can see 1,247 tickets.\n\nNow let's connect Shopify.", {
-            choices: [
-              { label: "Connect Shopify", value: "start_shopify", icon: "arrow", variant: "primary" },
-              { label: "Skip for now", value: "skip_shopify", variant: "outline" },
-            ],
-          });
-          break;
-
-        case "connect_shopify":
-          if (value === "skip_shopify") {
-            addObMsg("manager", "I'll set this up later");
-            await delay(400);
-          } else if (value === "shopify_connected") {
-            addObMsg("ai", "Connected to **Shopify** — coastalliving.myshopify.com.");
-            await delay(400);
-          }
-          addPhaseLabel("Set up a playbook");
-          setObPhase("upload_doc");
-          await delay(300);
-          addObMsg("ai", "Now I need to learn your business rules. Upload a document — your SOP, return policy, or playbook — and I'll extract the rules.", { widget: "upload_doc" });
-          break;
-
-        case "upload_doc":
-          setObPhase("importing");
-          setImportProgress(0);
-          addObMsg("manager", "📄 Seel_Return_Policy_v2.pdf");
-          await delay(300);
-          addObMsg("ai", "Got it! Reading through your return policy now...", { widget: "import_progress" });
-          {
-            const interval = setInterval(() => {
-              setImportProgress((prev) => {
-                if (prev >= 100) {
-                  clearInterval(interval);
-                  setTimeout(() => {
-                    setObPhase("conflict");
-                    addObMsg("ai", "I've extracted the rules. Here's what I found:", {
-                      widget: "parse_result",
-                      widgetData: {
-                        rules: [
-                          { category: "Return Window", count: 3, example: "30-day return window from delivery date" },
-                          { category: "Refund Method", count: 2, example: "Refund to original payment method only" },
-                          { category: "Condition Rules", count: 4, example: "Items must be unused with tags attached" },
-                          { category: "Exceptions", count: 2, example: "Final sale items are non-returnable" },
-                          { category: "Shipping", count: 2, example: "Customer pays return shipping unless defective" },
-                        ],
-                      },
-                    });
-                    setTimeout(() => {
-                      addObMsg("ai", "One conflict I need you to resolve:", { widget: "conflict" });
-                    }, 600);
-                  }, 400);
-                  return 100;
-                }
-                return prev + Math.random() * 15;
-              });
-            }, 180);
-          }
-          break;
-
-        case "conflict": {
-          const choiceLabel = value === "30_days" ? "30 days from delivery" : "28 calendar days";
-          addObMsg("manager", choiceLabel);
-          await delay(400);
-          addObMsg("ai", `Got it — I'll use "${choiceLabel}" as the rule.\n\nNow let's configure what your agent can do autonomously:`, { widget: "actions_form" });
-          setObPhase("actions_form");
-          break;
-        }
-
-        case "actions_form":
-          addObMsg("manager", "Confirmed permissions");
-          await delay(400);
-          addObMsg("ai", "Great. Now — when should the agent escalate to you?", { widget: "escalation_form" });
-          setObPhase("escalation_form");
-          break;
-
-        case "escalation_form":
-          addObMsg("manager", "Confirmed escalation triggers");
-          await delay(400);
-          addPhaseLabel("Hire a rep");
-          await delay(300);
-          addObMsg("ai", "Setup complete! Now let's **hire your first rep**. What should your rep be called? This is the name customers will see.");
-          setObPhase("rep_name");
-          break;
-
-        case "rep_tone":
-          addObMsg("manager", value === "friendly" ? "Friendly and warm" : value === "professional" ? "Professional" : "Casual");
-          await delay(500);
-          addObMsg("ai", `Got it — ${repName} will keep it **${value}**.\n\nLet me run a quick sanity check:`, {
-            widget: "scenario",
-            widgetData: {
-              title: `Scenario 1 — "Where is my order?"`,
-              description: `Customer writes: "Where is my order #DBH-29174? It's been a week."`,
-              response: `I'd look up **#DBH-29174** in Shopify, find it shipped via Royal Mail (tracking: RM29174UK, ETA Mar 25), and reply:\n\n"Hi Emma! Your order shipped via Royal Mail and is expected by March 25th. Here's your tracking link. Let me know if you need anything else!"`,
-            },
-            choices: [
-              { label: "Looks good", value: "approve", variant: "primary" },
-              { label: "Needs adjustment", value: "adjust", variant: "outline" },
-            ],
-          });
-          setObPhase("scenario_1");
-          break;
-
-        case "scenario_1":
-          addObMsg("manager", value === "approve" ? "Looks good" : "Needs adjustment");
-          await delay(500);
-          addObMsg("ai", `${value === "approve" ? "Great!" : "Noted, I'll adjust."} Next scenario:`, {
-            widget: "scenario",
-            widgetData: {
-              title: `Scenario 2 — "I want a refund"`,
-              description: `Customer writes: "I received my ceramic vase yesterday and it's smaller than I expected. I'd like a refund."`,
-              response: `I'd check the order — delivered 1 day ago, within return window. Item is $42.99, change-of-mind return.\n\nI'd reply: "Hi! I'm sorry the vase wasn't what you expected. I've started a return for you — you'll receive a prepaid shipping label shortly. Your refund of $34.04 ($42.99 minus $8.95 return shipping) will be processed within 3-5 business days."`,
-            },
-            choices: [
-              { label: "Looks good", value: "approve", variant: "primary" },
-              { label: "Needs adjustment", value: "adjust", variant: "outline" },
-            ],
-          });
-          setObPhase("scenario_2");
-          break;
-
-        case "scenario_2":
-          addObMsg("manager", value === "approve" ? "Looks good" : "Needs adjustment");
-          await delay(500);
-          addObMsg("ai", `${value === "approve" ? "Nice." : "Got it."} One more:`, {
-            widget: "scenario",
-            widgetData: {
-              title: `Scenario 3 — Escalation`,
-              description: `Customer writes: "This is the THIRD time I'm contacting you. I want to speak to a manager RIGHT NOW."`,
-              response: `I'd detect strong frustration + explicit manager request, and **escalate immediately**.\n\nI'd reply: "I completely understand your frustration, and I'm sorry for the repeated issues. I'm connecting you with a manager right now who can help resolve this directly."\n\nThen assign the ticket to you with a context summary.`,
-            },
-            choices: [
-              { label: "Looks good", value: "approve", variant: "primary" },
-              { label: "Needs adjustment", value: "adjust", variant: "outline" },
-            ],
-          });
-          setObPhase("scenario_3");
-          break;
-
-        case "scenario_3":
-          addObMsg("manager", value === "approve" ? "Looks good" : "Needs adjustment");
-          await delay(500);
-          addObMsg("ai", `**${repName} passed the sanity check.** One last question — how should ${repName} work?`, {
-            choices: [
-              { label: "Shadow Mode — check with me first", value: "shadow", icon: "eye", variant: "primary" },
-              { label: "Production — handle it yourself", value: "production", icon: "rocket", variant: "outline" },
-            ],
-          });
-          setObPhase("mode_select");
-          break;
-
-        case "mode_select": {
-          const modeName = value === "shadow" ? "Shadow" : "Production";
-          addObMsg("manager", `${modeName} Mode`);
-          await delay(500);
-          addObMsg("ai", `**${repName} is now in ${modeName} Mode.** ${value === "shadow" ? "They'll draft everything and wait for your approval." : "They'll handle tickets independently."}\n\nHere's how things work from here:\n- **Messages** — I'll message you here whenever ${repName} needs input\n- **Zendesk** — Check the sidebar to review ${repName}'s work\n- **Playbook** — Adjust knowledge, escalation rules, and integrations\n- **Agent** — Configure ${repName}'s identity, permissions, and mode`);
-          setObPhase("complete");
-          break;
-        }
+  // Build topics list for panel
+  const topicsList = useMemo(() => {
+    const topicMap = new Map<string, { id: string; title: string; status: "waiting" | "done"; timestamp: string; hasActions: boolean; replyCount: number }>();
+    for (const msg of allMessages) {
+      if (!topicMap.has(msg.topicId)) {
+        topicMap.set(msg.topicId, {
+          id: msg.topicId,
+          title: msg.topicTitle,
+          status: msg.topicStatus,
+          timestamp: msg.timestamp,
+          hasActions: !!msg.hasActions,
+          replyCount: 0,
+        });
       }
-    };
+      topicMap.get(msg.topicId)!.replyCount++;
+      topicMap.get(msg.topicId)!.timestamp = msg.timestamp;
+    }
+    return Array.from(topicMap.values());
+  }, [allMessages]);
 
-    advance();
-  }, [obPhase, addObMsg, addPhaseLabel, repName]);
+  const waitingCount = topicsList.filter((t) => t.status === "waiting" && t.hasActions).length;
 
-  // Handle rep name submit
-  const handleNameSubmit = useCallback((name: string) => {
-    setRepName(name);
-    addObMsg("manager", name);
-    setObPhase("rep_tone");
-    setTimeout(() => {
-      addObMsg("ai", `**${name}** — great name. What tone should ${name} use with customers?`, {
-        choices: [
-          { label: "Friendly and warm", value: "friendly", variant: "primary" },
-          { label: "Professional", value: "professional", variant: "outline" },
-          { label: "Casual", value: "casual", variant: "outline" },
-        ],
-      });
-    }, 500);
-  }, [addObMsg]);
-
-  // Reset onboarding
-  const resetOnboarding = useCallback(() => {
-    obMsgId = 0;
-    obOffsetRef.current = 2;
-    setObPhase("welcome");
-    setObMessages(buildInitialOBMessages());
-    setImportProgress(0);
-    setRepName("Alex");
-    toast.success("Onboarding restarted");
-  }, []);
-
-  // ── Regular topic cards ──
-  const baseCards = useMemo(() => buildTopicCards(TOPICS), []);
-  const allRegularCards = [...baseCards, ...extraCards];
-
-  // Combine: onboarding messages rendered as a special section, then topic cards
-  const waitingCount = allRegularCards.filter((c) => c.status === "waiting" && c.hasActions).length;
-
-  // Group regular cards by date
-  const groupedCards = useMemo(() => {
-    const groups: { date: string; cards: TopicCard[] }[] = [];
+  // Group messages by date for date dividers
+  const groupedMessages = useMemo(() => {
+    const groups: { date: string; messages: ChatMessage[] }[] = [];
     let currentDate = "";
-    for (const card of allRegularCards) {
-      const dateKey = new Date(card.timestamp).toISOString().split("T")[0];
+    for (const msg of allMessages) {
+      const dateKey = new Date(msg.timestamp).toISOString().split("T")[0];
       if (dateKey !== currentDate) {
         currentDate = dateKey;
-        groups.push({ date: card.timestamp, cards: [card] });
+        groups.push({ date: msg.timestamp, messages: [msg] });
       } else {
-        groups[groups.length - 1].cards.push(card);
+        groups[groups.length - 1].messages.push(msg);
       }
     }
     return groups;
-  }, [allRegularCards]);
+  }, [allMessages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [obMessages.length, allRegularCards.length]);
+  }, [allMessages.length]);
 
   const handleSendMessage = () => {
     if (!inputValue.trim()) return;
+    const topicId = `new-${Date.now()}`;
+    const now = new Date().toISOString();
 
-    if (obPhase === "rep_name") {
-      const name = inputValue.trim() || "Alex";
-      handleNameSubmit(name);
-      setInputValue("");
-      return;
-    }
-
-    // Create a new topic card from the user's message
-    const newCard: TopicCard = {
-      id: `new-${Date.now()}`,
-      title: inputValue.trim().slice(0, 60),
-      status: "waiting",
-      timestamp: new Date().toISOString(),
-      messages: [{
-        id: `cm-${Date.now()}`,
-        sender: "manager",
-        content: inputValue.trim(),
-        timestamp: new Date().toISOString(),
-      }],
-      replies: [],
-      hasActions: false,
+    const managerMsg: ChatMessage = {
+      id: `cm-${Date.now()}`,
+      sender: "manager",
+      content: inputValue.trim(),
+      timestamp: now,
+      topicId,
+      topicTitle: inputValue.trim().slice(0, 60),
+      topicStatus: "waiting",
+      isTopicStart: true,
     };
-    setExtraCards((prev) => [...prev, newCard]);
+
+    setExtraMessages((prev) => [...prev, managerMsg]);
     setInputValue("");
 
-    // AI responds after a delay
+    // AI responds
     setTimeout(() => {
-      setExtraCards((prev) => prev.map((c) =>
-        c.id === newCard.id
-          ? {
-              ...c,
-              messages: [
-                ...c.messages,
-                {
-                  id: `cm-ai-${Date.now()}`,
-                  sender: "ai" as const,
-                  content: "I understand. Let me update the rules to reflect this change.",
-                  timestamp: new Date().toISOString(),
-                  ruleChange: {
-                    type: "new" as const,
-                    ruleName: newCard.title,
-                    after: inputValue.trim(),
-                    source: "Manager directive",
-                  },
-                },
-              ],
-            }
-          : c
-      ));
+      const aiMsg: ChatMessage = {
+        id: `cm-ai-${Date.now()}`,
+        sender: "ai",
+        content: "I understand. Let me update the rules to reflect this change.",
+        timestamp: new Date().toISOString(),
+        topicId,
+        topicTitle: managerMsg.topicTitle,
+        topicStatus: "waiting",
+        ruleChange: {
+          type: "new",
+          ruleName: managerMsg.topicTitle,
+          after: inputValue.trim(),
+          source: "Manager directive",
+        },
+        hasActions: false,
+      };
+      setExtraMessages((prev) => [...prev, aiMsg]);
     }, 1500);
   };
 
-  const handleAction = (cardId: string, action: string) => {
-    console.log(`Action: ${action} on card ${cardId}`);
+  const handleAction = (topicId: string, action: string) => {
+    toast.success(action === "accept" ? "Rule accepted" : "Rule rejected");
   };
 
-  const handleOpenThread = (card: TopicCard) => {
-    setThreadPanel(card);
-    setShowTopics(false);
-  };
-
-  const handleSelectTopic = (card: TopicCard) => {
-    const el = document.getElementById(`card-${card.id}`);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      el.classList.add("ring-2", "ring-primary/30");
-      setTimeout(() => el.classList.remove("ring-2", "ring-primary/30"), 2000);
+  const handleReply = (topicId: string) => {
+    const msgs = allMessages.filter((m) => m.topicId === topicId);
+    const first = msgs[0];
+    if (first) {
+      setThreadPanel({
+        topicId,
+        topicTitle: first.topicTitle,
+        contextMsg: first.content,
+      });
+      setShowTopics(false);
     }
   };
+
+  const handleSelectTopic = (topicId: string) => {
+    // Find the first message of this topic and scroll to it
+    const el = document.getElementById(`msg-${topicId}-start`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("bg-primary/5");
+      setTimeout(() => el.classList.remove("bg-primary/5"), 2000);
+    }
+  };
+
+  // Track which topic labels have been shown
+  const shownTopics = new Set<string>();
 
   return (
     <div className="flex h-full">
@@ -1475,20 +766,13 @@ export default function MessagesPage() {
         {/* Header */}
         <div className="flex items-center justify-between px-5 h-11 border-b border-border shrink-0 bg-white">
           <div className="flex items-center gap-2.5">
-            <div className="w-6 h-6 rounded-full bg-primary/8 flex items-center justify-center">
+            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary/15 to-primary/5 flex items-center justify-center">
               <Bot className="w-3 h-3 text-primary" />
             </div>
-            <span className="text-[13px] font-semibold text-foreground">Team Lead</span>
-            <span className="text-[10px] text-muted-foreground">Your AI team's updates & decisions</span>
+            <span className="text-[13px] font-semibold text-foreground">Rep</span>
+            <span className="text-[10px] text-muted-foreground">AI support agent</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <button
-              onClick={resetOnboarding}
-              className="flex items-center gap-1.5 px-2.5 h-7 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              title="Restart onboarding (for testing)"
-            >
-              <RotateCcw className="w-3 h-3" /> Restart Setup
-            </button>
             <button
               onClick={() => { setShowTopics(!showTopics); setThreadPanel(null); }}
               className={cn(
@@ -1508,114 +792,35 @@ export default function MessagesPage() {
 
         {/* Messages */}
         <ScrollArea className="flex-1">
-          <div className="max-w-[720px] mx-auto px-5 py-4 space-y-3">
-
-            {/* ── Onboarding Section ── */}
-            {obMessages.length > 0 && (
-              <div className="space-y-2.5">
-                {obMessages.map((msg) => {
-                  if (msg.isPhaseLabel) {
-                    return (
-                      <div key={msg.id} className="flex items-center gap-3 my-2">
-                        <div className="flex-1 h-px bg-primary/15" />
-                        <span className="text-[10px] font-semibold text-primary/60 uppercase tracking-wider px-2 flex items-center gap-1.5">
-                          <Sparkles className="w-3 h-3" /> {msg.content}
-                        </span>
-                        <div className="flex-1 h-px bg-primary/15" />
-                      </div>
-                    );
-                  }
-
-                  const isAi = msg.sender === "ai";
-
-                  if (!isAi) {
-                    return (
-                      <div key={msg.id} className="flex justify-end">
-                        <div className="max-w-[70%]">
-                          <div className="rounded-lg bg-primary/6 border border-primary/10 px-3 py-2 text-[12px] leading-relaxed text-foreground">
-                            {msg.content}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div key={msg.id} className="flex gap-2.5 max-w-[85%]">
-                      <div className="w-6 h-6 rounded-full bg-primary/8 flex items-center justify-center shrink-0 mt-0.5">
-                        <Bot className="w-3 h-3 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        {msg.content && (
-                          <div className="text-[12px] leading-relaxed text-foreground">
-                            {renderMarkdown(msg.content)}
-                          </div>
-                        )}
-                        {msg.widget && (
-                          <div className="mt-2">
-                            <OnboardingWidget
-                              widget={msg.widget}
-                              widgetData={msg.widgetData}
-                              importProgress={importProgress}
-                              onAction={handleOnboardingAction}
-                            />
-                          </div>
-                        )}
-                        {msg.choices && msg.choices.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            {msg.choices.map((c) => (
-                              <button
-                                key={c.value}
-                                className={cn(
-                                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all",
-                                  c.variant === "primary"
-                                    ? "bg-primary text-white hover:bg-primary/90"
-                                    : "border border-border text-foreground hover:bg-accent"
-                                )}
-                                onClick={() => handleOnboardingAction(c.value)}
-                              >
-                                {c.label}
-                                {c.icon === "arrow" && <ArrowRight className="w-3 h-3" />}
-                                {c.icon === "eye" && <Eye className="w-3 h-3" />}
-                                {c.icon === "rocket" && <Rocket className="w-3 h-3" />}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* ── Divider between onboarding and topics ── */}
-            {obMessages.length > 0 && groupedCards.length > 0 && (
-              <div className="flex items-center gap-3 my-4 pt-2">
-                <div className="flex-1 h-px bg-border" />
-                <span className="text-[10px] font-medium text-muted-foreground px-2">Topics</span>
-                <div className="flex-1 h-px bg-border" />
-              </div>
-            )}
-
-            {/* ── Topic Cards ── */}
-            {groupedCards.map((group, gi) => (
+          <div className="max-w-[680px] mx-auto px-5 py-4 space-y-3">
+            {groupedMessages.map((group, gi) => (
               <div key={gi}>
-                <div className="flex items-center gap-3 my-3">
+                {/* Date divider */}
+                <div className="flex items-center gap-3 my-4">
                   <div className="flex-1 h-px bg-border" />
                   <span className="text-[10px] font-medium text-muted-foreground px-2">{formatDateGroup(group.date)}</span>
                   <div className="flex-1 h-px bg-border" />
                 </div>
+
                 <div className="space-y-3">
-                  {group.cards.map((card) => (
-                    <div key={card.id} id={`card-${card.id}`} className="transition-all duration-300">
-                      <TopicCardView
-                        card={card}
-                        onAction={handleAction}
-                        onOpenThread={handleOpenThread}
-                      />
-                    </div>
-                  ))}
+                  {group.messages.map((msg) => {
+                    // Show topic label before the first message of each topic
+                    const showTopicLabel = msg.isTopicStart && !shownTopics.has(msg.topicId);
+                    if (msg.isTopicStart) shownTopics.add(msg.topicId);
+
+                    return (
+                      <div key={msg.id} id={msg.isTopicStart ? `msg-${msg.topicId}-start` : undefined} className="transition-colors duration-500 rounded-lg">
+                        {showTopicLabel && (
+                          <TopicLabel title={msg.topicTitle} status={msg.topicStatus} />
+                        )}
+                        <MessageBubble
+                          msg={msg}
+                          onAction={handleAction}
+                          onReply={handleReply}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
@@ -1626,13 +831,13 @@ export default function MessagesPage() {
 
         {/* Input */}
         <div className="px-5 py-3 border-t border-border bg-white">
-          <div className="max-w-[720px] mx-auto">
-            <div className="flex items-center gap-2 rounded-lg border border-border bg-white px-4 py-2 focus-within:ring-1 focus-within:ring-primary/30 focus-within:border-primary/40 transition-all">
+          <div className="max-w-[680px] mx-auto">
+            <div className="flex items-center gap-2 rounded-xl border border-border bg-white px-4 py-2.5 focus-within:ring-1 focus-within:ring-primary/30 focus-within:border-primary/40 transition-all">
               <input
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
-                placeholder={obPhase === "rep_name" ? `Type a name for your rep (e.g. Alex)...` : "Message Team Lead..."}
+                placeholder="Message Rep..."
                 className="flex-1 text-[12.5px] bg-transparent outline-none placeholder:text-muted-foreground/50"
               />
               <button
@@ -1649,13 +854,18 @@ export default function MessagesPage() {
 
       {/* Thread side panel */}
       {threadPanel && (
-        <ThreadSidePanel card={threadPanel} onClose={() => setThreadPanel(null)} />
+        <ThreadSidePanel
+          topicId={threadPanel.topicId}
+          topicTitle={threadPanel.topicTitle}
+          contextMsg={threadPanel.contextMsg}
+          onClose={() => setThreadPanel(null)}
+        />
       )}
 
       {/* Topics panel */}
       {showTopics && !threadPanel && (
         <TopicsPanel
-          cards={allRegularCards}
+          topics={topicsList}
           onSelectTopic={handleSelectTopic}
           onClose={() => setShowTopics(false)}
         />
