@@ -27,7 +27,15 @@ const TYPE_COLOR: Record<TopicType, string> = {
   knowledge_gap: "text-amber-500", performance_report: "text-blue-500",
   open_question: "text-slate-500", escalation_review: "text-orange-500", rule_update: "text-violet-500",
 };
-type FilterTab = "all" | "unread" | "pending" | "resolved";
+const TYPE_BG: Record<TopicType, string> = {
+  knowledge_gap: "bg-amber-50 text-amber-700", performance_report: "bg-blue-50 text-blue-700",
+  open_question: "bg-slate-50 text-slate-600", escalation_review: "bg-orange-50 text-orange-700", rule_update: "bg-violet-50 text-violet-700",
+};
+const TYPE_LABEL: Record<TopicType, string> = {
+  knowledge_gap: "Knowledge Gap", performance_report: "Performance",
+  open_question: "Question", escalation_review: "Escalation", rule_update: "Rule Update",
+};
+type FilterTab = "all" | "open" | "resolved";
 const PRIORITY: Record<TopicType, number> = {
   knowledge_gap: 0, escalation_review: 1, open_question: 2, rule_update: 3, performance_report: 4,
 };
@@ -580,16 +588,15 @@ export default function Inbox() {
   /* ── Regular topic handlers ── */
   const counts = {
     all: topics.length,
-    unread: topics.filter((t) => t.status === "unread").length,
-    pending: topics.filter((t) => t.status === ("pending" as TopicStatus) || t.status === "read").length,
+    open: topics.filter((t) => t.status !== "resolved").length,
     resolved: topics.filter((t) => t.status === "resolved").length,
   };
 
   const filtered = topics
     .filter((t) => {
       if (tab === "all") return true;
-      if (tab === "pending") return t.status === ("pending" as TopicStatus) || t.status === "read";
-      return t.status === tab;
+      if (tab === "open") return t.status !== "resolved";
+      return t.status === "resolved";
     })
     .filter((t) => !search || t.title.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
@@ -711,9 +718,9 @@ export default function Inbox() {
         <div className="h-11 px-4 flex items-center justify-between border-b border-border shrink-0">
           <div className="flex items-center gap-2">
             <h1 className="text-[14px] font-semibold text-foreground">Inbox</h1>
-            {counts.unread > 0 && (
+            {counts.open > 0 && (
               <span className="bg-primary/10 text-primary text-[10px] font-medium px-1.5 py-0.5 rounded-full leading-none">
-                {counts.unread}
+                {counts.open}
               </span>
             )}
           </div>
@@ -728,7 +735,7 @@ export default function Inbox() {
             <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 h-8 text-[13px] bg-background" />
           </div>
           <div className="flex gap-0.5 bg-muted/50 rounded-md p-0.5">
-            {(["all", "unread", "pending", "resolved"] as FilterTab[]).map((f) => (
+            {(["all", "open", "resolved"] as FilterTab[]).map((f) => (
               <button
                 key={f} onClick={() => setTab(f)}
                 className={cn(
@@ -752,21 +759,47 @@ export default function Inbox() {
               const Icon = isOb ? Sparkles : TYPE_ICON[topic.type];
               const isActive = selectedId === topic.id;
               const isUnread = topic.status === "unread";
+              const isResolved = topic.status === "resolved";
               return (
                 <button
                   key={topic.id} onClick={() => setSelectedId(topic.id)}
                   className={cn(
-                    "w-full text-left px-4 py-3 border-b border-border/50 transition-colors",
+                    "w-full text-left px-4 py-2.5 border-b border-border/50 transition-colors",
                     isActive ? "bg-primary/5 border-l-2 border-l-primary" : "hover:bg-muted/30 border-l-2 border-l-transparent"
                   )}
                 >
-                  <div className="flex items-center gap-2.5">
-                    <Icon className={cn("w-4 h-4 shrink-0", isOb ? "text-primary" : TYPE_COLOR[topic.type])} />
+                  {/* Row 1: title + time */}
+                  <div className="flex items-center gap-2">
                     <span className={cn("text-[13px] truncate flex-1", isUnread || isOb ? "font-semibold text-foreground" : "font-medium text-foreground/80")}>
+                      {isOb && <Sparkles className="w-3 h-3 text-primary inline mr-1.5 -mt-0.5" />}
                       {topic.title}
                     </span>
                     <span className="text-[11px] text-muted-foreground shrink-0">{fmtTime(topic.updatedAt)}</span>
                     {isUnread && !isOb && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
+                  </div>
+                  {/* Row 2: preview */}
+                  {topic.preview && (
+                    <p className="text-[11px] text-muted-foreground truncate mt-0.5 leading-relaxed">
+                      {topic.preview.slice(0, 80)}{topic.preview.length > 80 ? "..." : ""}
+                    </p>
+                  )}
+                  {/* Row 3: tag + status */}
+                  <div className="flex items-center gap-1.5 mt-1">
+                    {!isOb && (
+                      <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium leading-none", TYPE_BG[topic.type])}>
+                        {TYPE_LABEL[topic.type]}
+                      </span>
+                    )}
+                    {isOb && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium leading-none bg-primary/10 text-primary">
+                        Setup
+                      </span>
+                    )}
+                    {isResolved && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium leading-none bg-emerald-50 text-emerald-600">
+                        Resolved
+                      </span>
+                    )}
                   </div>
                 </button>
               );

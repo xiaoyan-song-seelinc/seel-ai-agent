@@ -8,7 +8,6 @@ import {
   PERFORMANCE_SUMMARY,
   DAILY_METRICS,
   INTENT_METRICS,
-  ACTIONABLE_ITEMS,
 } from "@/lib/mock-data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,8 +16,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   TrendingUp,
   TrendingDown,
-  ArrowRight,
-  Lightbulb,
   BarChart3,
   Target,
   Clock,
@@ -37,7 +34,7 @@ import {
   Bar,
   Cell,
 } from "recharts";
-import { useLocation } from "wouter";
+
 
 type TimeRange = "7d" | "14d" | "30d";
 
@@ -50,7 +47,6 @@ const METRIC_ICONS: Record<string, typeof BarChart3> = {
 
 export default function Performance() {
   const [timeRange, setTimeRange] = useState<TimeRange>("30d");
-  const [, navigate] = useLocation();
 
   const daysMap: Record<TimeRange, number> = { "7d": 7, "14d": 14, "30d": 30 };
   const visibleMetrics = DAILY_METRICS.slice(-daysMap[timeRange]);
@@ -68,28 +64,6 @@ export default function Performance() {
     <ScrollArea className="h-full">
       <div className="max-w-[1020px] mx-auto px-6 py-6">
         {/* Header */}
-        {/* Needs Your Attention — high-level action items */}
-        {ACTIONABLE_ITEMS.length > 0 && (
-          <div className="mb-5 p-3.5 rounded-lg border border-border bg-white">
-            <p className="text-[12px] font-medium text-foreground mb-2">Needs Your Attention</p>
-            <div className="space-y-1">
-              {ACTIONABLE_ITEMS.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => navigate(item.linkedTopicId ? `/inbox?topic=${item.linkedTopicId}` : '/inbox')}
-                  className="w-full flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-accent transition-colors group text-left"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                    <span className="text-[12px] text-foreground">{item.title}</span>
-                  </div>
-                  <ArrowRight className="w-3 h-3 text-muted-foreground/40 group-hover:text-primary transition-colors" />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
         <div className="flex items-center justify-between mb-5">
           <div>
             <h1 className="text-[16px] font-semibold text-foreground">Performance</h1>
