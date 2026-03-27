@@ -1,28 +1,21 @@
-# Round 3 Changes
+# Current Task: Onboarding Integration + Agent Page
 
-## Visual System
-- [ ] Apply new color system (#007bff primary, neutral grays, functional colors)
-- [ ] Switch font from DM Sans to Inter as primary
-- [ ] Apply new spacing system (4px base unit)
-- [ ] Apply new border radius, shadow, and component specs
-- [ ] Update index.css with new CSS variables
-- [ ] Update index.html Google Fonts link
+## Requirement 1: Onboarding in Messages
+- [ ] Integrate onboarding as the first conversation in Messages page
+- [ ] Onboarding appears at the top (earliest date) of the message stream
+- [ ] Add a test entry point to re-experience onboarding flow
+- [ ] Conversational style, not form-based
 
-## Inbox (renamed from Instruct)
-- [ ] Rename "Instruct" to "Inbox" across all files
-- [ ] Simplify topic card preview (less content, maybe no preview)
-- [ ] Clean up header area (search bar + title height too tall)
-- [ ] Review and clarify topic status meanings (unread/pending/resolved)
-- [ ] Update DashboardLayout nav label
+## Requirement 2: Onboarding Phase Split
+- [ ] Phase (a): Connect to your system (Zendesk + Shopify integrations)
+- [ ] Phase (b): Set up a playbook (upload docs, configure rules/actions)
+- [ ] Phase (c): Hire a rep (agent identity, permissions, sanity check)
 
-## Zendesk App
-- [ ] Research: does Zendesk have native Takeover/reassign? If yes, remove custom Takeover button
-- [ ] Add AI thinking process link (link to backend detail page)
-- [ ] Simplify button layout (Approve + Mark Bad Case, remove Takeover if native)
-
-## Onboarding Chat
-- [ ] Fix bug in chat version (identify and fix)
-
-## Routing
-- [ ] Update App.tsx route from /instruct to /inbox
-- [ ] Update DashboardLayout sidebar nav
+## Requirement 3: Agent Page (split from Playbook)
+- [ ] Create new "Agent" nav item and page
+- [ ] Move Rep-level config from Playbook to Agent page
+  - Agent identity (name, tone, avatar)
+  - Agent mode (production/shadow/off)
+  - Action permissions (what the rep can do)
+- [ ] Playbook keeps: Knowledge (docs/rules), Escalation rules, Integrations
+- [ ] Update sidebar navigation

@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import DashboardLayout from "./components/DashboardLayout";
 import Performance from "./pages/Performance";
 import PlaybookPage from "./pages/PlaybookPage";
+import AgentPage from "./pages/AgentPage";
 import OnboardingWrapper from "./pages/OnboardingWrapper";
 import ZendeskApp from "./pages/ZendeskApp";
 import MessagesPage from "./pages/ConversationPage";
@@ -19,6 +20,7 @@ function Router() {
       <Route path="/messages" component={MessagesPage} />
       <Route path="/performance" component={Performance} />
       <Route path="/playbook" component={PlaybookPage} />
+      <Route path="/agent" component={AgentPage} />
 
       {/* Legacy route redirects */}
       <Route path="/conversation">

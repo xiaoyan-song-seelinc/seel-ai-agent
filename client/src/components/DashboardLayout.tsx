@@ -15,6 +15,7 @@ import {
   Sparkles,
   BookOpen,
   MessageSquare,
+  User,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { TOPICS, AGENT_MODE } from "@/lib/mock-data";
@@ -48,6 +49,12 @@ const NAV_ITEMS: NavItem[] = [
     href: "/playbook",
     icon: BookOpen,
     matchPaths: ["/playbook"],
+  },
+  {
+    label: "Agent",
+    href: "/agent",
+    icon: User,
+    matchPaths: ["/agent"],
   },
 ];
 
