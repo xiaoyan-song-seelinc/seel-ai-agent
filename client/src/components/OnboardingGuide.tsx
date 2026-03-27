@@ -67,10 +67,10 @@ const GUIDE_STEPS: GuideStep[] = [
   {
     id: "done",
     title: "You're all set!",
-    message: "That's the basics. Alex is ready to start working on your tickets. Check the **Inbox** for updates, questions, and performance reports.",
+    message: "That's the basics. Alex is ready to start working on your tickets. Check **Messages** for updates, questions, and performance reports.",
     sectionId: "",
     choices: [
-      { label: "Go to Inbox", action: "complete" },
+      { label: "Go to Messages", action: "complete" },
     ],
   },
 ];
@@ -108,7 +108,7 @@ export default function OnboardingGuide() {
     if (isLastStep) {
       setOpen(false);
       // Navigate to inbox
-      window.location.href = "/inbox";
+      window.location.href = "/messages";
     } else {
       const nextIdx = currentStep + 1;
       setCurrentStep(nextIdx);

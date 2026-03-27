@@ -798,8 +798,8 @@ export default function Onboarding() {
                   <Button
                     className="gap-2 bg-emerald-600 hover:bg-emerald-700"
                     onClick={() => {
-                      toast.success("Alex is now live! Redirecting to Inbox...");
-                      setTimeout(() => navigate("/inbox"), 1500);
+                      toast.success("Alex is now live! Redirecting to Messages...");
+                      setTimeout(() => navigate("/messages"), 1500);
                     }}
                   >
                     <Rocket className="w-4 h-4" />

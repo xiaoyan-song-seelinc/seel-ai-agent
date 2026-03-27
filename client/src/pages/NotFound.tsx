@@ -7,7 +7,7 @@ export default function NotFound() {
         <h1 className="text-5xl font-bold text-gray-200 mb-3">404</h1>
         <p className="text-sm text-gray-500 mb-4">Page not found</p>
         <Link href="/" className="text-sm text-primary hover:underline">
-          Back to Inbox
+          Back to Messages
         </Link>
       </div>
     </div>

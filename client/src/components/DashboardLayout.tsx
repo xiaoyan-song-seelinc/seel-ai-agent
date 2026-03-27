@@ -7,7 +7,6 @@ import { type ReactNode, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import {
-  Inbox,
   BarChart3,
   Bot,
   ChevronLeft,
@@ -15,7 +14,7 @@ import {
   ExternalLink,
   Sparkles,
   BookOpen,
-  MessageCircle,
+  MessageSquare,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { TOPICS, AGENT_MODE } from "@/lib/mock-data";
@@ -23,24 +22,20 @@ import { TOPICS, AGENT_MODE } from "@/lib/mock-data";
 interface NavItem {
   label: string;
   href: string;
-  icon: typeof Inbox;
+  icon: typeof BarChart3;
   badge?: number;
   matchPaths?: string[];
 }
 
+const unreadCount = TOPICS.filter((t) => t.status === "unread").length;
+
 const NAV_ITEMS: NavItem[] = [
   {
-    label: "Inbox",
-    href: "/inbox",
-    icon: Inbox,
-    badge: TOPICS.filter((t) => t.status === "unread").length,
-    matchPaths: ["/inbox"],
-  },
-  {
-    label: "Conversation",
-    href: "/conversation",
-    icon: MessageCircle,
-    matchPaths: ["/conversation", "/"],
+    label: "Messages",
+    href: "/messages",
+    icon: MessageSquare,
+    badge: unreadCount,
+    matchPaths: ["/messages", "/"],
   },
   {
     label: "Performance",
@@ -145,7 +140,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     >
                       <Icon className="w-4 h-4" />
                       {item.badge && item.badge > 0 && (
-                        <span className="absolute top-1 right-2.5 w-1 h-1 rounded-full bg-primary" />
+                        <span className="absolute top-0.5 right-2 w-1.5 h-1.5 rounded-full bg-red-400" />
                       )}
                     </div>
                   </Link>
@@ -168,8 +163,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   <Icon className="w-4 h-4 shrink-0" />
                   <span className="text-[12px] font-medium flex-1">{item.label}</span>
                   {item.badge && item.badge > 0 && (
-                    <span className="h-4 min-w-4 px-1 text-[10px] font-medium bg-primary/10 text-primary rounded flex items-center justify-center">
-                      {item.badge}
+                    <span className="relative flex items-center">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                      <span className="ml-1 text-[10px] text-muted-foreground">{item.badge}</span>
                     </span>
                   )}
                 </div>

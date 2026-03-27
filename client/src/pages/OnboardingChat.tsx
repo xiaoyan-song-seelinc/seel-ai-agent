@@ -250,7 +250,7 @@ export default function OnboardingChat() {
           }),
           makeMsg("ai", "Where would you like to go?", {
             choices: [
-              { label: "Go to Inbox", value: "inbox", icon: "arrow", variant: "primary" },
+              { label: "Go to Messages", value: "messages", icon: "arrow", variant: "primary" },
               { label: "Open Settings", value: "settings", icon: "settings", variant: "outline" },
               { label: "Upload more documents", value: "documents", icon: "docs", variant: "outline" },
             ],
@@ -267,7 +267,7 @@ export default function OnboardingChat() {
           setTimeout(() => navigate("/playbook"), 600);
         } else {
           toast.success("Setup complete! Redirecting...");
-          setTimeout(() => navigate("/inbox"), 600);
+          setTimeout(() => navigate("/messages"), 600);
         }
         break;
     }

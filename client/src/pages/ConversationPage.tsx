@@ -1,9 +1,15 @@
-/* ── ConversationPage v2 ─────────────────────────────────────
-   Slack-like IM interface: DM with Team Lead
-   - Main flow: continuous message stream with tags
-   - Thread panel: slides in from right on "Reply in thread"
-   - Inline actions: Approve/Reject directly on message cards
-   - Scribe messages: title only, no preview
+/* ── MessagesPage (v3) ─────────────────────────────────────
+   IM-style DM with Team Lead.
+   Key changes from v2:
+   1. Rule proposals: structured "New Rule" vs "Update Rule" cards
+   2. Unified topic type — no category tags, default propose-first
+   3. Manager rule update → confirmation flow (Yes/No)
+   4. Accept / Reject / Reply actions on every proposal
+   5. Rule change shown as structured diff card, not inline quote
+   6. Inline threads: short threads show below message, long ones collapse
+   7. Topics panel: Waiting / Done tabs with red dot count
+   8. Red dot = subtle unread indicator
+   9. Renamed to Messages
    ──────────────────────────────────────────────────────────── */
 
 import { useState, useRef, useEffect, useMemo } from "react";
@@ -11,63 +17,58 @@ import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Send,
   MessageSquare,
-  X,
   Check,
+  X,
   XCircle,
-  AlertTriangle,
-  BookOpen,
-  BarChart3,
-  HelpCircle,
-  RefreshCw,
-  FileText,
-  ChevronDown,
+  Reply,
   Bot,
   List,
+  Plus,
+  ArrowRight,
+  ChevronDown,
+  ChevronUp,
+  FileText,
+  BarChart3,
 } from "lucide-react";
-import { TOPICS, type Topic, type Message, type TopicType } from "@/lib/mock-data";
+import { TOPICS, type Topic, type TopicType } from "@/lib/mock-data";
 
 // ── Types ──────────────────────────────────────────────────
 
-interface ConversationMessage {
+interface ThreadReply {
   id: string;
-  topicId: string;
-  topicTitle: string;
-  topicType: TopicType;
   sender: "ai" | "manager";
   content: string;
   timestamp: string;
-  actions?: { label: string; type: "accept" | "reject" | "link"; targetUrl?: string }[];
-  threadMessages?: { id: string; sender: "ai" | "manager"; content: string; timestamp: string }[];
-  isScribe?: boolean; // performance_report or rule_update — show title only
+  isConfirmation?: boolean; // for Yes/No confirmation UI
+}
+
+interface RuleChange {
+  type: "new" | "update";
+  ruleName: string;
+  before?: string; // only for "update"
+  after: string;
+  source?: string; // e.g. "Observed from tickets #4521, #4533, #4540"
+}
+
+interface ConvMessage {
+  id: string;
+  topicId: string;
+  topicTitle: string;
+  sender: "ai" | "manager";
+  content: string;
+  timestamp: string;
+  ruleChange?: RuleChange;
+  actions?: ("accept" | "reject" | "reply")[];
+  threadReplies?: ThreadReply[];
+  isScribe?: boolean; // performance report — title only
+  status: "waiting" | "done";
 }
 
 // ── Helpers ────────────────────────────────────────────────
-
-const TYPE_CONFIG: Record<TopicType, { label: string; color: string; icon: typeof BookOpen }> = {
-  knowledge_gap: { label: "Knowledge Gap", color: "bg-amber-50 text-amber-700 border-amber-200", icon: BookOpen },
-  performance_report: { label: "Performance", color: "bg-blue-50 text-blue-700 border-blue-200", icon: BarChart3 },
-  escalation_review: { label: "Escalation", color: "bg-red-50 text-red-700 border-red-200", icon: AlertTriangle },
-  open_question: { label: "Question", color: "bg-purple-50 text-purple-700 border-purple-200", icon: HelpCircle },
-  rule_update: { label: "Rule Update", color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: RefreshCw },
-};
-
-function formatRelativeTime(dateStr: string): string {
-  const now = new Date("2026-03-27T10:00:00Z");
-  const date = new Date(dateStr);
-  const diffMs = now.getTime() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
-  const diffDay = Math.floor(diffHr / 24);
-  if (diffDay === 1) return "yesterday";
-  if (diffDay < 7) return `${diffDay}d ago`;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
 
 function formatTime(dateStr: string): string {
   const d = new Date(dateStr);
@@ -85,121 +86,359 @@ function formatDateGroup(dateStr: string): string {
   return d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
 }
 
-// ── Build flat message list from topics ────────────────────
-
-function buildConversationMessages(topics: Topic[]): ConversationMessage[] {
-  const messages: ConversationMessage[] = [];
-
-  for (const topic of topics) {
-    const isScribe = topic.type === "performance_report" || topic.type === "rule_update";
-
-    // First AI message becomes the "card" in the main flow
-    const firstAiMsg = topic.messages.find((m) => m.sender === "ai");
-    const firstManagerMsg = topic.messages.find((m) => m.sender === "manager");
-
-    if (firstAiMsg) {
-      // Thread = remaining messages after the first AI message
-      const threadMsgs = topic.messages
-        .filter((m) => m.id !== firstAiMsg.id)
-        .map((m) => ({ id: m.id, sender: m.sender, content: m.content, timestamp: m.timestamp }));
-
-      messages.push({
-        id: firstAiMsg.id,
-        topicId: topic.id,
-        topicTitle: topic.title,
-        topicType: topic.type,
-        sender: "ai",
-        content: firstAiMsg.content,
-        timestamp: firstAiMsg.timestamp,
-        actions: firstAiMsg.actions,
-        threadMessages: threadMsgs.length > 0 ? threadMsgs : undefined,
-        isScribe,
-      });
-    }
-
-    // If topic was initiated by manager (rule_update), show manager message as card
-    if (!firstAiMsg && firstManagerMsg) {
-      const threadMsgs = topic.messages
-        .filter((m) => m.id !== firstManagerMsg.id)
-        .map((m) => ({ id: m.id, sender: m.sender, content: m.content, timestamp: m.timestamp }));
-
-      messages.push({
-        id: firstManagerMsg.id,
-        topicId: topic.id,
-        topicTitle: topic.title,
-        topicType: topic.type,
-        sender: "manager",
-        content: firstManagerMsg.content,
-        timestamp: firstManagerMsg.timestamp,
-        threadMessages: threadMsgs.length > 0 ? threadMsgs : undefined,
-        isScribe,
-      });
-    }
-  }
-
-  // Sort by timestamp descending (newest first at bottom)
-  messages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-  return messages;
+function formatRelativeTime(dateStr: string): string {
+  const now = new Date("2026-03-27T10:00:00Z");
+  const date = new Date(dateStr);
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay === 1) return "yesterday";
+  if (diffDay < 7) return `${diffDay}d ago`;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-// ── Components ─────────────────────────────────────────────
+// ── Build messages from TOPICS ────────────────────────────
+
+function buildMessages(topics: Topic[]): ConvMessage[] {
+  const msgs: ConvMessage[] = [];
+
+  for (const topic of topics) {
+    const isPerf = topic.type === "performance_report";
+    const isResolved = topic.status === "resolved";
+    const firstAi = topic.messages.find((m) => m.sender === "ai");
+    const firstManager = topic.messages.find((m) => m.sender === "manager");
+    const anchor = firstAi || firstManager;
+    if (!anchor) continue;
+
+    // Build thread replies (all messages after the anchor)
+    const threadMsgs = topic.messages
+      .filter((m) => m.id !== anchor.id)
+      .map((m) => ({
+        id: m.id,
+        sender: m.sender,
+        content: m.content,
+        timestamp: m.timestamp,
+      }));
+
+    // Determine if this is a rule proposal
+    let ruleChange: RuleChange | undefined;
+    if (topic.proposedRule) {
+      ruleChange = {
+        type: "new",
+        ruleName: topic.proposedRule.category + " — " + topic.title,
+        after: topic.proposedRule.text,
+        source: topic.proposedRule.evidence.map((e) => e).join(" | "),
+      };
+    }
+
+    // For escalation_review topics that learned from observation, create an "update" rule
+    if (topic.type === "escalation_review" && !ruleChange) {
+      // Extract rule update from AI messages
+      const ruleMsg = topic.messages.find((m) => m.sender === "ai" && m.content.includes("Proposed update"));
+      if (ruleMsg) {
+        ruleChange = {
+          type: "update",
+          ruleName: topic.title,
+          before: "Require photo evidence for all damage claims regardless of order value.",
+          after: "For damage claims on items under $80, process replacement or refund without photo. For items $80+, still request photo.",
+          source: `Observed from ticket #${topic.sourceTicketId}`,
+        };
+      }
+    }
+
+    // For rule_update topics initiated by manager
+    if (topic.type === "rule_update" && anchor.sender === "manager") {
+      ruleChange = {
+        type: "new",
+        ruleName: topic.title,
+        after: anchor.content,
+        source: "Manager directive",
+      };
+    }
+
+    // For knowledge_gap about return shipping cost (t-7)
+    if (topic.id === "t-7") {
+      ruleChange = {
+        type: "update",
+        ruleName: "Return Shipping Cost",
+        before: "Customer pays $8.95 return shipping fee for all returns.",
+        after: "Defective/wrong items → free return shipping (we pay). Change of mind → customer pays ($8.95 deducted from refund).",
+        source: "Learned from denied approval on ticket #4498",
+      };
+    }
+
+    const hasActions = anchor.sender === "ai" && !isPerf && !isResolved;
+
+    msgs.push({
+      id: anchor.id,
+      topicId: topic.id,
+      topicTitle: topic.title,
+      sender: anchor.sender,
+      content: anchor.content,
+      timestamp: anchor.timestamp,
+      ruleChange,
+      actions: hasActions ? ["accept", "reject", "reply"] : undefined,
+      threadReplies: threadMsgs.length > 0 ? threadMsgs : undefined,
+      isScribe: isPerf,
+      status: isResolved ? "done" : "waiting",
+    });
+  }
+
+  msgs.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  return msgs;
+}
+
+// ── Rule Change Card ──────────────────────────────────────
+
+function RuleChangeCard({ change }: { change: RuleChange }) {
+  return (
+    <div className="mt-2 rounded-lg border border-border overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-3 py-2 bg-muted/40 border-b border-border">
+        {change.type === "new" ? (
+          <Plus className="w-3 h-3 text-emerald-600" />
+        ) : (
+          <ArrowRight className="w-3 h-3 text-blue-600" />
+        )}
+        <span className="text-[11px] font-semibold text-foreground">
+          {change.type === "new" ? "New Rule" : "Rule Update"}
+        </span>
+        <span className="text-[10px] text-muted-foreground">— {change.ruleName}</span>
+      </div>
+
+      {/* Body */}
+      <div className="px-3 py-2.5 space-y-2">
+        {change.type === "update" && change.before && (
+          <div>
+            <span className="text-[9px] font-medium text-red-500 uppercase tracking-wider">Before</span>
+            <p className="text-[11px] text-muted-foreground leading-relaxed mt-0.5 line-through decoration-red-300">
+              {change.before}
+            </p>
+          </div>
+        )}
+        <div>
+          <span className={cn(
+            "text-[9px] font-medium uppercase tracking-wider",
+            change.type === "update" ? "text-emerald-600" : "text-emerald-600"
+          )}>
+            {change.type === "update" ? "After" : "Proposed Rule"}
+          </span>
+          <p className="text-[11.5px] text-foreground leading-relaxed mt-0.5">
+            {change.after}
+          </p>
+        </div>
+        {change.source && (
+          <p className="text-[9.5px] text-muted-foreground/70 pt-1 border-t border-border/50">
+            Source: {change.source}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Inline Thread ─────────────────────────────────────────
+
+function InlineThread({
+  replies,
+  onReplyInThread,
+}: {
+  replies: ThreadReply[];
+  onReplyInThread: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const count = replies.length;
+
+  // Short thread (1-2 replies): show all inline
+  // Long thread (3+): show first, collapsed middle, last
+  const showAll = count <= 2 || expanded;
+  const visibleReplies = showAll
+    ? replies
+    : [replies[0], replies[replies.length - 1]];
+  const hiddenCount = count - 2;
+
+  return (
+    <div className="ml-9 mt-1 border-l-2 border-border/60 pl-3 space-y-1.5">
+      {showAll ? (
+        replies.map((r) => (
+          <InlineReplyBubble key={r.id} reply={r} />
+        ))
+      ) : (
+        <>
+          <InlineReplyBubble reply={visibleReplies[0]} />
+          <button
+            onClick={() => setExpanded(true)}
+            className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 py-0.5 transition-colors"
+          >
+            <ChevronDown className="w-3 h-3" />
+            {hiddenCount} more {hiddenCount === 1 ? "reply" : "replies"}
+          </button>
+          <InlineReplyBubble reply={visibleReplies[1]} />
+        </>
+      )}
+
+      {expanded && count > 2 && (
+        <button
+          onClick={() => setExpanded(false)}
+          className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground py-0.5 transition-colors"
+        >
+          <ChevronUp className="w-3 h-3" />
+          Collapse
+        </button>
+      )}
+
+      <button
+        onClick={onReplyInThread}
+        className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary py-0.5 transition-colors"
+      >
+        <Reply className="w-3 h-3" />
+        Reply
+      </button>
+    </div>
+  );
+}
+
+function InlineReplyBubble({ reply }: { reply: ThreadReply }) {
+  const isAi = reply.sender === "ai";
+  return (
+    <div className="flex items-start gap-2">
+      {isAi ? (
+        <div className="w-5 h-5 rounded-full bg-primary/8 flex items-center justify-center shrink-0 mt-0.5">
+          <Bot className="w-2.5 h-2.5 text-primary" />
+        </div>
+      ) : (
+        <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center shrink-0 mt-0.5">
+          <span className="text-[8px] font-medium text-white">JC</span>
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-medium text-foreground">
+            {isAi ? "Team Lead" : "You"}
+          </span>
+          <span className="text-[9px] text-muted-foreground">{formatTime(reply.timestamp)}</span>
+        </div>
+        <div className="text-[11px] text-foreground/80 leading-relaxed mt-0.5 whitespace-pre-wrap">
+          {reply.content.split("\n").map((line, i) => {
+            if (line.startsWith("> ")) {
+              return (
+                <span key={i} className="block border-l-2 border-primary/20 pl-2 my-0.5 text-muted-foreground italic text-[10.5px]">
+                  {line.slice(2)}
+                </span>
+              );
+            }
+            return <span key={i} className="block" dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") }} />;
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Confirmation Card (for manager rule updates) ──────────
+
+function ConfirmationCard({
+  content,
+  onConfirm,
+  onReject,
+}: {
+  content: string;
+  onConfirm: () => void;
+  onReject: () => void;
+}) {
+  const [decided, setDecided] = useState<"yes" | "no" | null>(null);
+
+  return (
+    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+      <p className="text-[11px] text-foreground leading-relaxed mb-2.5">
+        {content}
+      </p>
+      {decided === null ? (
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            className="h-7 text-[11px] px-4 rounded-full bg-primary text-white hover:bg-primary/90"
+            onClick={() => { setDecided("yes"); onConfirm(); }}
+          >
+            <Check className="w-3 h-3 mr-1" />
+            Yes, confirm
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-[11px] px-4 rounded-full text-muted-foreground"
+            onClick={() => { setDecided("no"); onReject(); }}
+          >
+            <X className="w-3 h-3 mr-1" />
+            No, discard
+          </Button>
+        </div>
+      ) : (
+        <div className={cn(
+          "flex items-center gap-1.5 text-[11px]",
+          decided === "yes" ? "text-emerald-600" : "text-muted-foreground"
+        )}>
+          {decided === "yes" ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+          {decided === "yes" ? "Confirmed" : "Discarded"}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Message Card ──────────────────────────────────────────
 
 function MessageCard({
   msg,
-  onOpenThread,
+  onReplyInThread,
   onAction,
 }: {
-  msg: ConversationMessage;
-  onOpenThread: (msg: ConversationMessage) => void;
+  msg: ConvMessage;
+  onReplyInThread: (msg: ConvMessage) => void;
   onAction: (msgId: string, action: string) => void;
 }) {
-  const config = TYPE_CONFIG[msg.topicType];
-  const Icon = config.icon;
   const isAi = msg.sender === "ai";
-  const threadCount = msg.threadMessages?.length || 0;
-  const lastThreadMsg = msg.threadMessages?.[msg.threadMessages.length - 1];
   const [actioned, setActioned] = useState<string | null>(null);
 
+  // Parse content: strip out the proposed rule text if we have a ruleChange card
+  const displayContent = msg.ruleChange && msg.sender === "ai"
+    ? msg.content.split("\n").filter(line =>
+        !line.startsWith("> ") && !line.includes("Proposed rule:") && !line.includes("Proposed update:")
+      ).join("\n").trim()
+    : msg.content;
+
   return (
-    <div className={cn("group relative", !isAi && "flex flex-col items-end")}>
-      {/* AI messages: left-aligned with avatar */}
+    <div className="group">
       {isAi ? (
-        <div className="flex gap-2.5 max-w-[85%]">
-          {/* Avatar */}
+        <div className="flex gap-2.5 max-w-[88%]">
           <div className="w-7 h-7 rounded-full bg-primary/8 flex items-center justify-center shrink-0 mt-0.5">
             <Bot className="w-3.5 h-3.5 text-primary" />
           </div>
-
           <div className="flex-1 min-w-0">
-            {/* Header: name + tag + time */}
             <div className="flex items-center gap-2 mb-1">
               <span className="text-[12px] font-semibold text-foreground">Team Lead</span>
-              <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 h-4 font-normal border", config.color)}>
-                <Icon className="w-2.5 h-2.5 mr-0.5" />
-                {config.label}
-              </Badge>
               <span className="text-[10px] text-muted-foreground">{formatTime(msg.timestamp)}</span>
             </div>
 
-            {/* Content card */}
-            <div className="rounded-lg border border-border bg-white p-3 text-[12.5px] leading-relaxed text-foreground">
+            {/* Content */}
+            <div className="rounded-lg border border-border bg-white p-3 text-[12px] leading-relaxed text-foreground">
               {msg.isScribe ? (
-                // Scribe: title only
                 <div className="flex items-center gap-2">
-                  <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  {msg.topicTitle.includes("Performance") ? (
+                    <BarChart3 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  ) : (
+                    <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  )}
                   <span className="font-medium">{msg.topicTitle}</span>
                 </div>
               ) : (
-                // Regular message: full content
-                <div className="prose-sm prose-neutral max-w-none [&_strong]:font-semibold [&_p]:mb-2 [&_p:last-child]:mb-0 whitespace-pre-wrap">
-                  {msg.content.split("\n").map((line, i) => {
-                    if (line.startsWith("> ")) {
-                      return (
-                        <blockquote key={i} className="border-l-2 border-primary/30 pl-2.5 my-1.5 text-muted-foreground italic text-[11.5px]">
-                          {line.slice(2)}
-                        </blockquote>
-                      );
-                    }
+                <div className="whitespace-pre-wrap">
+                  {displayContent.split("\n").map((line, i) => {
+                    if (line.trim() === "") return <div key={i} className="h-1.5" />;
                     if (line.startsWith("- ")) {
                       return (
                         <div key={i} className="flex gap-1.5 ml-1">
@@ -208,157 +447,235 @@ function MessageCard({
                         </div>
                       );
                     }
-                    if (line.trim() === "") return <div key={i} className="h-2" />;
                     return (
                       <p key={i} dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") }} />
                     );
                   })}
                 </div>
               )}
+
+              {/* Rule Change Card */}
+              {msg.ruleChange && <RuleChangeCard change={msg.ruleChange} />}
             </div>
 
-            {/* Inline actions */}
+            {/* Actions: Accept / Reject / Reply */}
             {msg.actions && !actioned && (
               <div className="flex gap-1.5 mt-1.5">
-                {msg.actions.map((action) => (
-                  <Button
-                    key={action.label}
-                    size="sm"
-                    variant={action.type === "accept" ? "default" : "outline"}
-                    className={cn(
-                      "h-7 text-[11px] px-3 rounded-full",
-                      action.type === "accept"
-                        ? "bg-primary text-white hover:bg-primary/90"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                    onClick={() => {
-                      setActioned(action.label);
-                      onAction(msg.id, action.label);
-                    }}
-                  >
-                    {action.type === "accept" ? <Check className="w-3 h-3 mr-1" /> : <XCircle className="w-3 h-3 mr-1" />}
-                    {action.label}
-                  </Button>
-                ))}
+                <Button
+                  size="sm"
+                  className="h-7 text-[11px] px-3 rounded-full bg-primary text-white hover:bg-primary/90"
+                  onClick={() => { setActioned("Accepted"); onAction(msg.id, "accept"); }}
+                >
+                  <Check className="w-3 h-3 mr-1" />
+                  Accept
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-[11px] px-3 rounded-full text-muted-foreground hover:text-foreground"
+                  onClick={() => { setActioned("Rejected"); onAction(msg.id, "reject"); }}
+                >
+                  <XCircle className="w-3 h-3 mr-1" />
+                  Reject
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-[11px] px-3 rounded-full text-muted-foreground hover:text-foreground"
+                  onClick={() => onReplyInThread(msg)}
+                >
+                  <Reply className="w-3 h-3 mr-1" />
+                  Reply
+                </Button>
               </div>
             )}
 
             {actioned && (
-              <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-emerald-600">
-                <Check className="w-3 h-3" />
-                <span>{actioned}</span>
+              <div className={cn(
+                "flex items-center gap-1.5 mt-1.5 text-[11px]",
+                actioned === "Accepted" ? "text-emerald-600" : "text-red-500"
+              )}>
+                {actioned === "Accepted" ? <Check className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                {actioned}
               </div>
-            )}
-
-            {/* Thread indicator */}
-            {threadCount > 0 && (
-              <button
-                onClick={() => onOpenThread(msg)}
-                className="flex items-center gap-1.5 mt-1.5 text-[11px] text-primary hover:text-primary/80 transition-colors"
-              >
-                <MessageSquare className="w-3 h-3" />
-                <span>{threadCount} {threadCount === 1 ? "reply" : "replies"}</span>
-                {lastThreadMsg && (
-                  <span className="text-muted-foreground ml-1">
-                    — {lastThreadMsg.sender === "ai" ? "Team Lead" : "You"} · {formatRelativeTime(lastThreadMsg.timestamp)}
-                  </span>
-                )}
-              </button>
             )}
           </div>
         </div>
       ) : (
-        /* Manager messages: right-aligned */
-        <div className="max-w-[70%]">
-          <div className="flex items-center justify-end gap-2 mb-1">
-            <span className="text-[10px] text-muted-foreground">{formatTime(msg.timestamp)}</span>
-            <span className="text-[12px] font-semibold text-foreground">You</span>
-          </div>
-          <div className="rounded-lg bg-primary/6 border border-primary/10 p-3 text-[12.5px] leading-relaxed text-foreground">
-            <div className="whitespace-pre-wrap">
-              {msg.content.split("\n").map((line, i) => (
-                <p key={i} dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") }} />
-              ))}
+        /* Manager message */
+        <div className="flex flex-col items-end">
+          <div className="max-w-[75%]">
+            <div className="flex items-center justify-end gap-2 mb-1">
+              <span className="text-[10px] text-muted-foreground">{formatTime(msg.timestamp)}</span>
+              <span className="text-[12px] font-semibold text-foreground">You</span>
+            </div>
+            <div className="rounded-lg bg-primary/6 border border-primary/10 p-3 text-[12px] leading-relaxed text-foreground">
+              <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{
+                __html: msg.content.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+              }} />
             </div>
           </div>
         </div>
+      )}
+
+      {/* Inline thread replies */}
+      {msg.threadReplies && msg.threadReplies.length > 0 && (
+        <InlineThread
+          replies={msg.threadReplies}
+          onReplyInThread={() => onReplyInThread(msg)}
+        />
       )}
     </div>
   );
 }
 
-function ThreadPanel({
-  msg,
+// ── Topics Panel ──────────────────────────────────────────
+
+function TopicsPanel({
+  messages,
+  onSelectTopic,
   onClose,
 }: {
-  msg: ConversationMessage;
+  messages: ConvMessage[];
+  onSelectTopic: (msg: ConvMessage) => void;
   onClose: () => void;
 }) {
-  const [threadInput, setThreadInput] = useState("");
-  const [localReplies, setLocalReplies] = useState<{ id: string; sender: "ai" | "manager"; content: string; timestamp: string }[]>([]);
-  const threadEndRef = useRef<HTMLDivElement>(null);
-  const config = TYPE_CONFIG[msg.topicType];
-  const Icon = config.icon;
+  const [tab, setTab] = useState<"waiting" | "done">("waiting");
 
-  const allReplies = [...(msg.threadMessages || []), ...localReplies];
+  const waiting = messages.filter((m) => m.status === "waiting" && m.sender === "ai");
+  const done = messages.filter((m) => m.status === "done" && m.sender === "ai");
 
-  useEffect(() => {
-    threadEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [allReplies.length]);
-
-  const handleSendReply = () => {
-    if (!threadInput.trim()) return;
-    const newReply = {
-      id: `tr-${Date.now()}`,
-      sender: "manager" as const,
-      content: threadInput.trim(),
-      timestamp: new Date().toISOString(),
-    };
-    setLocalReplies((prev) => [...prev, newReply]);
-    setThreadInput("");
-
-    // Simulate AI reply after 1.5s
-    setTimeout(() => {
-      setLocalReplies((prev) => [
-        ...prev,
-        {
-          id: `tr-ai-${Date.now()}`,
-          sender: "ai" as const,
-          content: "Got it, I'll update my rules accordingly. Thanks for the guidance!",
-          timestamp: new Date().toISOString(),
-        },
-      ]);
-    }, 1500);
-  };
+  const list = tab === "waiting" ? waiting : done;
 
   return (
-    <div className="w-[380px] border-l border-border bg-white flex flex-col h-full shrink-0">
-      {/* Thread header */}
-      <div className="flex items-center justify-between px-4 h-11 border-b border-border shrink-0">
+    <div className="w-[280px] border-l border-border bg-white flex flex-col h-full shrink-0">
+      <div className="flex items-center justify-between px-3 h-11 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
-          <MessageSquare className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className="text-[12px] font-semibold text-foreground">Thread</span>
-          <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 h-4 font-normal border", config.color)}>
-            <Icon className="w-2.5 h-2.5 mr-0.5" />
-            {config.label}
-          </Badge>
+          <List className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-[12px] font-semibold text-foreground">Topics</span>
         </div>
         <button onClick={onClose} className="p-1 rounded hover:bg-accent transition-colors">
           <X className="w-3.5 h-3.5 text-muted-foreground" />
         </button>
       </div>
 
-      {/* Original message */}
-      <div className="px-4 py-3 border-b border-border bg-muted/30">
-        <div className="flex items-center gap-2 mb-1.5">
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "waiting" | "done")} className="flex-1 flex flex-col">
+        <TabsList className="mx-3 mt-2 h-8 bg-muted/50">
+          <TabsTrigger value="waiting" className="text-[11px] h-6 px-3 data-[state=active]:bg-white relative">
+            Waiting
+            {waiting.length > 0 && (
+              <span className="ml-1.5 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] flex items-center justify-center font-medium">
+                {waiting.length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="done" className="text-[11px] h-6 px-3 data-[state=active]:bg-white">
+            Done
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={tab} className="flex-1 mt-0">
+          <ScrollArea className="h-full">
+            <div className="py-1">
+              {list.length === 0 && (
+                <p className="text-[11px] text-muted-foreground text-center py-8">
+                  {tab === "waiting" ? "All caught up!" : "No resolved topics yet."}
+                </p>
+              )}
+              {list.map((msg) => (
+                <button
+                  key={msg.id}
+                  onClick={() => onSelectTopic(msg)}
+                  className="w-full flex items-start gap-2.5 px-3 py-2.5 hover:bg-accent/50 transition-colors text-left border-b border-border/30"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-medium text-foreground truncate">{msg.topicTitle}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {formatRelativeTime(msg.threadReplies?.[msg.threadReplies.length - 1]?.timestamp || msg.timestamp)}
+                      {msg.threadReplies && ` · ${msg.threadReplies.length} replies`}
+                    </p>
+                  </div>
+                  {msg.status === "waiting" && msg.actions && (
+                    <span className="w-2 h-2 rounded-full bg-red-400 shrink-0 mt-1.5" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </ScrollArea>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+// ── Thread Side Panel (for Reply action) ──────────────────
+
+function ThreadSidePanel({
+  msg,
+  onClose,
+}: {
+  msg: ConvMessage;
+  onClose: () => void;
+}) {
+  const [input, setInput] = useState("");
+  const [localReplies, setLocalReplies] = useState<ThreadReply[]>([]);
+  const endRef = useRef<HTMLDivElement>(null);
+
+  const allReplies = [...(msg.threadReplies || []), ...localReplies];
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [allReplies.length]);
+
+  const handleSend = () => {
+    if (!input.trim()) return;
+    const newReply: ThreadReply = {
+      id: `tr-${Date.now()}`,
+      sender: "manager",
+      content: input.trim(),
+      timestamp: new Date().toISOString(),
+    };
+    setLocalReplies((prev) => [...prev, newReply]);
+    setInput("");
+
+    // Simulate AI confirmation request
+    setTimeout(() => {
+      setLocalReplies((prev) => [
+        ...prev,
+        {
+          id: `tr-ai-${Date.now()}`,
+          sender: "ai",
+          content: `Got it. I'll update the rule to reflect this. Here's what I'll change:\n\n**Updated rule:** ${input.trim()}\n\nPlease confirm this is correct.`,
+          timestamp: new Date().toISOString(),
+          isConfirmation: true,
+        },
+      ]);
+    }, 1500);
+  };
+
+  return (
+    <div className="w-[360px] border-l border-border bg-white flex flex-col h-full shrink-0">
+      <div className="flex items-center justify-between px-4 h-11 border-b border-border shrink-0">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-[12px] font-semibold text-foreground truncate max-w-[240px]">{msg.topicTitle}</span>
+        </div>
+        <button onClick={onClose} className="p-1 rounded hover:bg-accent transition-colors">
+          <X className="w-3.5 h-3.5 text-muted-foreground" />
+        </button>
+      </div>
+
+      {/* Original message summary */}
+      <div className="px-4 py-2.5 border-b border-border bg-muted/20">
+        <div className="flex items-center gap-2 mb-1">
           <div className="w-5 h-5 rounded-full bg-primary/8 flex items-center justify-center">
             <Bot className="w-2.5 h-2.5 text-primary" />
           </div>
-          <span className="text-[11px] font-semibold text-foreground">Team Lead</span>
-          <span className="text-[10px] text-muted-foreground">{formatTime(msg.timestamp)}</span>
+          <span className="text-[10px] font-semibold text-foreground">Team Lead</span>
+          <span className="text-[9px] text-muted-foreground">{formatTime(msg.timestamp)}</span>
         </div>
-        <p className="text-[11.5px] text-muted-foreground leading-relaxed line-clamp-3">
-          {msg.content.replace(/\*\*/g, "").slice(0, 200)}...
+        <p className="text-[10.5px] text-muted-foreground leading-relaxed line-clamp-2 ml-7">
+          {msg.content.replace(/\*\*/g, "").slice(0, 150)}...
         </p>
       </div>
 
@@ -366,55 +683,64 @@ function ThreadPanel({
       <ScrollArea className="flex-1 px-4">
         <div className="py-3 space-y-3">
           {allReplies.map((reply) => (
-            <div key={reply.id} className={cn("flex gap-2", reply.sender === "manager" && "flex-row-reverse")}>
-              {reply.sender === "ai" ? (
-                <div className="w-5 h-5 rounded-full bg-primary/8 flex items-center justify-center shrink-0 mt-0.5">
-                  <Bot className="w-2.5 h-2.5 text-primary" />
-                </div>
-              ) : (
-                <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center shrink-0 mt-0.5">
-                  <span className="text-[9px] font-medium text-white">JC</span>
-                </div>
-              )}
-              <div className={cn("max-w-[80%]", reply.sender === "manager" && "text-right")}>
-                <div className={cn("flex items-center gap-1.5 mb-0.5", reply.sender === "manager" && "justify-end")}>
-                  <span className="text-[10px] font-medium text-foreground">
-                    {reply.sender === "ai" ? "Team Lead" : "You"}
-                  </span>
-                  <span className="text-[9px] text-muted-foreground">{formatTime(reply.timestamp)}</span>
-                </div>
-                <div
-                  className={cn(
-                    "rounded-lg px-2.5 py-1.5 text-[11.5px] leading-relaxed",
-                    reply.sender === "ai"
-                      ? "bg-muted/50 text-foreground"
-                      : "bg-primary/6 text-foreground"
-                  )}
-                >
-                  <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{
-                    __html: reply.content.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-                  }} />
+            <div key={reply.id}>
+              <div className={cn("flex gap-2", reply.sender === "manager" && "flex-row-reverse")}>
+                {reply.sender === "ai" ? (
+                  <div className="w-5 h-5 rounded-full bg-primary/8 flex items-center justify-center shrink-0 mt-0.5">
+                    <Bot className="w-2.5 h-2.5 text-primary" />
+                  </div>
+                ) : (
+                  <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="text-[8px] font-medium text-white">JC</span>
+                  </div>
+                )}
+                <div className={cn("max-w-[85%]", reply.sender === "manager" && "text-right")}>
+                  <div className={cn("flex items-center gap-1.5 mb-0.5", reply.sender === "manager" && "justify-end")}>
+                    <span className="text-[10px] font-medium text-foreground">
+                      {reply.sender === "ai" ? "Team Lead" : "You"}
+                    </span>
+                    <span className="text-[9px] text-muted-foreground">{formatTime(reply.timestamp)}</span>
+                  </div>
+                  <div className={cn(
+                    "rounded-lg px-2.5 py-1.5 text-[11px] leading-relaxed",
+                    reply.sender === "ai" ? "bg-muted/50 text-foreground" : "bg-primary/6 text-foreground"
+                  )}>
+                    <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{
+                      __html: reply.content.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+                    }} />
+                  </div>
                 </div>
               </div>
+
+              {/* Confirmation card for AI replies that need confirmation */}
+              {reply.isConfirmation && reply.sender === "ai" && (
+                <div className="ml-7 mt-1.5">
+                  <ConfirmationCard
+                    content="Apply this rule update?"
+                    onConfirm={() => {}}
+                    onReject={() => {}}
+                  />
+                </div>
+              )}
             </div>
           ))}
-          <div ref={threadEndRef} />
+          <div ref={endRef} />
         </div>
       </ScrollArea>
 
-      {/* Thread input */}
+      {/* Input */}
       <div className="px-3 py-2.5 border-t border-border">
         <div className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-1.5 focus-within:ring-1 focus-within:ring-primary/30 focus-within:border-primary/40">
           <input
-            value={threadInput}
-            onChange={(e) => setThreadInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendReply()}
-            placeholder="Reply in thread..."
-            className="flex-1 text-[12px] bg-transparent outline-none placeholder:text-muted-foreground/50"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
+            placeholder="Reply..."
+            className="flex-1 text-[11.5px] bg-transparent outline-none placeholder:text-muted-foreground/50"
           />
           <button
-            onClick={handleSendReply}
-            disabled={!threadInput.trim()}
+            onClick={handleSend}
+            disabled={!input.trim()}
             className="p-1 rounded text-primary hover:bg-primary/8 transition-colors disabled:opacity-30"
           >
             <Send className="w-3.5 h-3.5" />
@@ -425,112 +751,24 @@ function ThreadPanel({
   );
 }
 
-// ── Thread List Panel ──────────────────────────────────────
-
-function ThreadListPanel({
-  messages,
-  onSelectThread,
-  onClose,
-}: {
-  messages: ConversationMessage[];
-  onSelectThread: (msg: ConversationMessage) => void;
-  onClose: () => void;
-}) {
-  const threadsWithReplies = messages.filter((m) => m.threadMessages && m.threadMessages.length > 0);
-  const openThreads = messages.filter((m) => !m.threadMessages || m.threadMessages.length === 0);
-
-  return (
-    <div className="w-[300px] border-l border-border bg-white flex flex-col h-full shrink-0">
-      <div className="flex items-center justify-between px-4 h-11 border-b border-border shrink-0">
-        <div className="flex items-center gap-2">
-          <List className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className="text-[12px] font-semibold text-foreground">All Threads</span>
-          <span className="text-[10px] text-muted-foreground">({messages.length})</span>
-        </div>
-        <button onClick={onClose} className="p-1 rounded hover:bg-accent transition-colors">
-          <X className="w-3.5 h-3.5 text-muted-foreground" />
-        </button>
-      </div>
-
-      <ScrollArea className="flex-1">
-        <div className="py-1">
-          {/* Open / needs attention */}
-          {openThreads.length > 0 && (
-            <div className="px-3 py-1.5">
-              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Needs Attention</span>
-            </div>
-          )}
-          {openThreads.map((msg) => {
-            const config = TYPE_CONFIG[msg.topicType];
-            const Icon = config.icon;
-            return (
-              <button
-                key={msg.id}
-                onClick={() => onSelectThread(msg)}
-                className="w-full flex items-start gap-2.5 px-3 py-2 hover:bg-accent/50 transition-colors text-left"
-              >
-                <div className={cn("w-5 h-5 rounded flex items-center justify-center shrink-0 mt-0.5", config.color)}>
-                  <Icon className="w-2.5 h-2.5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[11px] font-medium text-foreground truncate">{msg.topicTitle}</p>
-                  <p className="text-[10px] text-muted-foreground">{formatRelativeTime(msg.timestamp)}</p>
-                </div>
-                {msg.actions && msg.actions.length > 0 && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0 mt-2" />
-                )}
-              </button>
-            );
-          })}
-
-          {/* Resolved threads */}
-          {threadsWithReplies.length > 0 && (
-            <div className="px-3 py-1.5 mt-1">
-              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Resolved</span>
-            </div>
-          )}
-          {threadsWithReplies.map((msg) => {
-            const config = TYPE_CONFIG[msg.topicType];
-            const Icon = config.icon;
-            return (
-              <button
-                key={msg.id}
-                onClick={() => onSelectThread(msg)}
-                className="w-full flex items-start gap-2.5 px-3 py-2 hover:bg-accent/50 transition-colors text-left opacity-60"
-              >
-                <div className={cn("w-5 h-5 rounded flex items-center justify-center shrink-0 mt-0.5", config.color)}>
-                  <Icon className="w-2.5 h-2.5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[11px] font-medium text-foreground truncate">{msg.topicTitle}</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {msg.threadMessages?.length} replies · {formatRelativeTime(msg.threadMessages?.[msg.threadMessages.length - 1]?.timestamp || msg.timestamp)}
-                  </p>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </ScrollArea>
-    </div>
-  );
-}
-
 // ── Main Page ──────────────────────────────────────────────
 
-export default function ConversationPage() {
-  const [activeThread, setActiveThread] = useState<ConversationMessage | null>(null);
-  const [showThreadList, setShowThreadList] = useState(false);
+export default function MessagesPage() {
+  const [threadPanel, setThreadPanel] = useState<ConvMessage | null>(null);
+  const [showTopics, setShowTopics] = useState(false);
   const [inputValue, setInputValue] = useState("");
-  const [extraMessages, setExtraMessages] = useState<ConversationMessage[]>([]);
+  const [extraMessages, setExtraMessages] = useState<ConvMessage[]>([]);
+  const [confirmations, setConfirmations] = useState<Map<string, ConvMessage>>(new Map());
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const baseMessages = useMemo(() => buildConversationMessages(TOPICS), []);
+  const baseMessages = useMemo(() => buildMessages(TOPICS), []);
   const allMessages = [...baseMessages, ...extraMessages];
 
-  // Group messages by date
+  const waitingCount = allMessages.filter((m) => m.status === "waiting" && m.sender === "ai").length;
+
+  // Group by date
   const groupedMessages = useMemo(() => {
-    const groups: { date: string; messages: ConversationMessage[] }[] = [];
+    const groups: { date: string; messages: ConvMessage[] }[] = [];
     let currentDate = "";
     for (const msg of allMessages) {
       const dateKey = new Date(msg.timestamp).toISOString().split("T")[0];
@@ -550,53 +788,62 @@ export default function ConversationPage() {
 
   const handleSendMessage = () => {
     if (!inputValue.trim()) return;
-    const newMsg: ConversationMessage = {
+    const newMsg: ConvMessage = {
       id: `cm-${Date.now()}`,
       topicId: `new-${Date.now()}`,
-      topicTitle: inputValue.trim().slice(0, 50),
-      topicType: "rule_update",
+      topicTitle: inputValue.trim().slice(0, 60),
       sender: "manager",
       content: inputValue.trim(),
       timestamp: new Date().toISOString(),
+      status: "waiting",
     };
     setExtraMessages((prev) => [...prev, newMsg]);
     setInputValue("");
 
-    // Simulate Team Lead reply
+    // AI replies with confirmation request
     setTimeout(() => {
-      setExtraMessages((prev) => [
-        ...prev,
-        {
-          id: `cm-ai-${Date.now()}`,
-          topicId: newMsg.topicId,
-          topicTitle: newMsg.topicTitle,
-          topicType: "rule_update",
-          sender: "ai",
-          content: "Got it! I've noted this down. I'll apply this rule going forward. Let me know if you'd like to adjust anything.",
-          timestamp: new Date().toISOString(),
+      const confirmMsg: ConvMessage = {
+        id: `cm-ai-${Date.now()}`,
+        topicId: newMsg.topicId,
+        topicTitle: newMsg.topicTitle,
+        sender: "ai",
+        content: `I understand. Let me update the rules to reflect this change.`,
+        timestamp: new Date().toISOString(),
+        ruleChange: {
+          type: "new",
+          ruleName: newMsg.topicTitle,
+          after: newMsg.content,
+          source: "Manager directive",
         },
-      ]);
+        status: "waiting",
+      };
+      setExtraMessages((prev) => [...prev, confirmMsg]);
+      setConfirmations((prev) => new Map(prev).set(confirmMsg.id, confirmMsg));
     }, 1500);
   };
 
   const handleAction = (msgId: string, action: string) => {
-    // In a real app, this would update the backend
     console.log(`Action: ${action} on message ${msgId}`);
   };
 
-  const handleOpenThread = (msg: ConversationMessage) => {
-    setActiveThread(msg);
-    setShowThreadList(false);
+  const handleReplyInThread = (msg: ConvMessage) => {
+    setThreadPanel(msg);
+    setShowTopics(false);
   };
 
-  // Count unresolved items
-  const unresolvedCount = allMessages.filter(
-    (m) => m.sender === "ai" && m.actions && m.actions.length > 0
-  ).length;
+  const handleSelectTopic = (msg: ConvMessage) => {
+    // Scroll to the message in the main flow
+    const el = document.getElementById(`msg-${msg.id}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("ring-2", "ring-primary/30", "rounded-lg");
+      setTimeout(() => el.classList.remove("ring-2", "ring-primary/30", "rounded-lg"), 2000);
+    }
+  };
 
   return (
     <div className="flex h-full">
-      {/* Main conversation area */}
+      {/* Main area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <div className="flex items-center justify-between px-5 h-11 border-b border-border shrink-0 bg-white">
@@ -604,30 +851,26 @@ export default function ConversationPage() {
             <div className="w-6 h-6 rounded-full bg-primary/8 flex items-center justify-center">
               <Bot className="w-3 h-3 text-primary" />
             </div>
-            <div>
-              <span className="text-[13px] font-semibold text-foreground">Team Lead</span>
-              <span className="text-[10px] text-muted-foreground ml-2">Your AI team's daily updates</span>
-            </div>
+            <span className="text-[13px] font-semibold text-foreground">Team Lead</span>
+            <span className="text-[10px] text-muted-foreground">Your AI team's updates & decisions</span>
           </div>
-          <div className="flex items-center gap-2">
-            {unresolvedCount > 0 && (
-              <Badge variant="outline" className="text-[10px] h-5 px-2 border-amber-200 bg-amber-50 text-amber-700">
-                {unresolvedCount} needs attention
-              </Badge>
+          <button
+            onClick={() => { setShowTopics(!showTopics); setThreadPanel(null); }}
+            className={cn(
+              "flex items-center gap-1.5 px-2.5 h-7 rounded-md text-[11px] transition-colors relative",
+              showTopics
+                ? "bg-primary/8 text-primary"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent"
             )}
-            <button
-              onClick={() => { setShowThreadList(!showThreadList); setActiveThread(null); }}
-              className={cn(
-                "flex items-center gap-1.5 px-2.5 h-7 rounded-md text-[11px] transition-colors",
-                showThreadList
-                  ? "bg-primary/8 text-primary"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
-              )}
-            >
-              <List className="w-3.5 h-3.5" />
-              Threads
-            </button>
-          </div>
+          >
+            <List className="w-3.5 h-3.5" />
+            Topics
+            {waitingCount > 0 && !showTopics && (
+              <span className="w-4 h-4 rounded-full bg-red-500 text-white text-[9px] flex items-center justify-center font-medium ml-0.5">
+                {waitingCount}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Messages */}
@@ -635,22 +878,42 @@ export default function ConversationPage() {
           <div className="max-w-[780px] mx-auto px-5 py-4">
             {groupedMessages.map((group, gi) => (
               <div key={gi}>
-                {/* Date separator */}
                 <div className="flex items-center gap-3 my-4">
                   <div className="flex-1 h-px bg-border" />
                   <span className="text-[10px] font-medium text-muted-foreground px-2">{formatDateGroup(group.date)}</span>
                   <div className="flex-1 h-px bg-border" />
                 </div>
-
-                {/* Messages in this date group */}
                 <div className="space-y-4">
                   {group.messages.map((msg) => (
-                    <MessageCard
-                      key={msg.id}
-                      msg={msg}
-                      onOpenThread={handleOpenThread}
-                      onAction={handleAction}
-                    />
+                    <div key={msg.id} id={`msg-${msg.id}`} className="transition-all duration-300">
+                      <MessageCard
+                        msg={msg}
+                        onReplyInThread={handleReplyInThread}
+                        onAction={handleAction}
+                      />
+                      {/* Confirmation card for manager-initiated rule updates */}
+                      {confirmations.has(msg.id) && (
+                        <div className="ml-9 mt-2">
+                          <ConfirmationCard
+                            content="Apply this rule update?"
+                            onConfirm={() => {
+                              setConfirmations((prev) => {
+                                const next = new Map(prev);
+                                next.delete(msg.id);
+                                return next;
+                              });
+                            }}
+                            onReject={() => {
+                              setConfirmations((prev) => {
+                                const next = new Map(prev);
+                                next.delete(msg.id);
+                                return next;
+                              });
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -678,24 +941,21 @@ export default function ConversationPage() {
                 <Send className="w-4 h-4" />
               </button>
             </div>
-            <p className="text-[9px] text-muted-foreground/50 mt-1 text-center">
-              Messages go directly to your AI Team Lead. Reply to specific items using threads.
-            </p>
           </div>
         </div>
       </div>
 
-      {/* Thread panel (slides in from right) */}
-      {activeThread && (
-        <ThreadPanel msg={activeThread} onClose={() => setActiveThread(null)} />
+      {/* Thread side panel */}
+      {threadPanel && (
+        <ThreadSidePanel msg={threadPanel} onClose={() => setThreadPanel(null)} />
       )}
 
-      {/* Thread list panel */}
-      {showThreadList && !activeThread && (
-        <ThreadListPanel
-          messages={allMessages.filter((m) => m.sender === "ai")}
-          onSelectThread={handleOpenThread}
-          onClose={() => setShowThreadList(false)}
+      {/* Topics panel */}
+      {showTopics && !threadPanel && (
+        <TopicsPanel
+          messages={allMessages}
+          onSelectTopic={handleSelectTopic}
+          onClose={() => setShowTopics(false)}
         />
       )}
     </div>

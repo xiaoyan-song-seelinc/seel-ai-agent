@@ -97,7 +97,7 @@ export default function ZendeskApp() {
             variant="ghost"
             size="sm"
             className="h-7 text-white/70 hover:text-white hover:bg-white/10 gap-1 text-[11px]"
-            onClick={() => navigate("/inbox")}
+            onClick={() => navigate("/messages")}
           >
             <ArrowLeft className="w-3 h-3" />
             Back to Seel
@@ -358,7 +358,7 @@ export default function ZendeskApp() {
                     className="text-[10px] text-primary hover:underline flex items-center gap-1"
                     onClick={() => {
                       toast.info("Opens detailed reasoning in Seel Backend");
-                      navigate("/inbox");
+                      navigate("/messages");
                     }}
                   >
                     View reasoning

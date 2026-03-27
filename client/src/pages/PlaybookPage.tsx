@@ -155,7 +155,7 @@ export default function PlaybookPage() {
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] text-foreground leading-relaxed">
                   This is where you configure how I work. Each section controls a different part of my behavior.
-                  You can also update rules by chatting with me in <a href="/inbox" className="text-primary font-medium hover:underline">Inbox</a>.
+                  You can also update rules by chatting with me in <a href="/messages" className="text-primary font-medium hover:underline">Messages</a>.
                 </p>
               </div>
               <button
@@ -559,7 +559,7 @@ export default function PlaybookPage() {
                         <Badge variant="secondary" className="h-[16px] px-1.5 text-[10px] shrink-0">{skill.intent}</Badge>
                         {skill.updatedByTopicId && (
                           <Badge variant="outline" className="h-[16px] px-1 text-[9px] text-primary/70 border-primary/20 shrink-0">
-                            via Inbox
+                            via Messages
                           </Badge>
                         )}
                       </button>
@@ -570,7 +570,7 @@ export default function PlaybookPage() {
                             <span>Updated {new Date(skill.lastUpdated).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
                             <span>Confidence: {Math.round(skill.confidence * 100)}%</span>
                             {skill.updatedByTopicId && (
-                              <a href={`/inbox?topic=${skill.updatedByTopicId}`} className="text-primary hover:underline">
+                              <a href={`/messages?topic=${skill.updatedByTopicId}`} className="text-primary hover:underline">
                                 View source conversation
                               </a>
                             )}
@@ -583,7 +583,7 @@ export default function PlaybookPage() {
 
                 <div className="pt-3 text-center">
                   <p className="text-[11px] text-muted-foreground">
-                    Rules are updated through conversations in <a href="/inbox" className="text-primary hover:underline">Inbox</a> or by uploading documents above.
+                    Rules are updated through conversations in <a href="/messages" className="text-primary hover:underline">Messages</a> or by uploading documents above.
                   </p>
                 </div>
               </div>
