@@ -26,6 +26,8 @@ import {
   ChevronDown,
   ChevronUp,
   MessageSquarePlus,
+  Copy,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -80,6 +82,31 @@ function StatusBadge({ state, approvalStatus }: { state: ZendeskTicket["state"];
   );
 }
 
+// ── Draft with Copy Button ───────────────────────────────
+
+function DraftWithCopy({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <div className="relative group">
+      <p className="text-[11.5px] text-[#2f3941] leading-relaxed whitespace-pre-wrap pr-7">
+        {text}
+      </p>
+      <button
+        onClick={handleCopy}
+        className="absolute top-0 right-0 p-1 rounded text-[#87929d] hover:text-[#2f3941] hover:bg-[#e9ebed] transition-colors opacity-0 group-hover:opacity-100"
+        title="Copy to clipboard"
+      >
+        {copied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+      </button>
+    </div>
+  );
+}
+
 // ── Sidebar Content ──────────────────────────────────────
 
 function SidebarContent({
@@ -111,7 +138,7 @@ function SidebarContent({
         <div className="rounded-md bg-[#f8f9fa] border border-[#e9ebed] p-2.5">
           <div className="flex items-center gap-1.5 mb-1.5">
             <Bot className="w-3 h-3 text-[#68737d]" />
-            <span className="text-[10px] font-semibold text-[#68737d] uppercase tracking-wider">Alex's Note</span>
+            <span className="text-[10px] font-semibold text-[#68737d] uppercase tracking-wider">Rep's Note</span>
           </div>
           <p className="text-[11.5px] text-[#2f3941] leading-relaxed">{ticket.internalNote}</p>
         </div>
@@ -127,9 +154,7 @@ function SidebarContent({
           </div>
           <div className="p-2.5">
             {ticket.suggestedAction.type === "reply" && ticket.suggestedAction.draft ? (
-              <p className="text-[11.5px] text-[#2f3941] leading-relaxed whitespace-pre-wrap">
-                {ticket.suggestedAction.draft}
-              </p>
+              <DraftWithCopy text={ticket.suggestedAction.draft} />
             ) : ticket.suggestedAction.details ? (
               <div className="space-y-1">
                 {Object.entries(ticket.suggestedAction.details).map(([key, val]) => (
@@ -219,10 +244,10 @@ function SidebarContent({
           <div className="space-y-2">
             <div className="flex items-center gap-1.5">
               <MessageSquarePlus className="w-3 h-3 text-[#68737d]" />
-              <span className="text-[10px] font-semibold text-[#68737d] uppercase tracking-wider">Give Instruction</span>
+              <span className="text-[10px] font-semibold text-[#68737d] uppercase tracking-wider">Notes to Rep</span>
             </div>
             <textarea
-              placeholder="Tell Alex how to handle this in the future..."
+              placeholder="Leave a note for how to handle this in the future..."
               value={instructText}
               onChange={(e) => setInstructText(e.target.value)}
               className="w-full text-[11px] border border-[#d8dcde] rounded px-2 py-1.5 resize-none min-h-[56px] outline-none focus:border-[#1f73b7] placeholder:text-[#b0b8c0]"
@@ -255,7 +280,7 @@ function SidebarContent({
             className="w-full flex items-center gap-1.5 px-2.5 py-2 rounded-md text-[11px] text-[#68737d] hover:text-[#2f3941] hover:bg-[#f0f1f2] transition-colors"
           >
             <MessageSquarePlus className="w-3.5 h-3.5" />
-            Give Instruction
+            Notes to Rep
           </button>
         )
       ) : (
@@ -283,21 +308,21 @@ export default function ZendeskApp() {
     setTickets((prev) =>
       prev.map((t) => (t.id === ticketId ? { ...t, approvalStatus: "approved" as ApprovalStatus } : t))
     );
-    toast.success("Approved — Alex will proceed");
+    toast.success("Approved — rep will proceed");
   };
 
   const handleDeny = (ticketId: string, reason?: string) => {
     setTickets((prev) =>
       prev.map((t) => (t.id === ticketId ? { ...t, approvalStatus: "denied" as ApprovalStatus } : t))
     );
-    toast.success(reason ? "Denied with feedback" : "Denied — Alex will escalate");
+    toast.success(reason ? "Denied with feedback" : "Denied — rep will escalate");
   };
 
   const handleInstruct = (ticketId: string, text: string) => {
     setTickets((prev) =>
       prev.map((t) => (t.id === ticketId ? { ...t, instruction: text } : t))
     );
-    toast.success("Instruction saved — Alex will learn from this");
+    toast.success("Note saved — rep will learn from this");
   };
 
   const pendingCount = tickets.filter((t) => t.state === "approval" && t.approvalStatus === "pending").length;
