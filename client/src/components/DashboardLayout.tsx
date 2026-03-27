@@ -8,13 +8,13 @@ import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import {
   Inbox,
-  Settings,
   BarChart3,
   Bot,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
   Sparkles,
+  BookOpen,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { TOPICS, AGENT_MODE } from "@/lib/mock-data";
@@ -42,10 +42,10 @@ const NAV_ITEMS: NavItem[] = [
     matchPaths: ["/performance"],
   },
   {
-    label: "Settings",
-    href: "/settings",
-    icon: Settings,
-    matchPaths: ["/settings"],
+    label: "Playbook",
+    href: "/playbook",
+    icon: BookOpen,
+    matchPaths: ["/playbook"],
   },
 ];
 

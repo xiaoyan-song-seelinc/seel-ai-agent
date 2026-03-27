@@ -129,6 +129,7 @@ export default function OnboardingChat() {
       makeMsg("ai", "First, let's connect your Zendesk so I can read and respond to tickets.", {
         choices: [
           { label: "Connect Zendesk", value: "start_zendesk", icon: "arrow", variant: "primary" },
+          { label: "Skip for now", value: "skip_zendesk", variant: "outline" },
         ],
       }),
     ]);
@@ -138,17 +139,29 @@ export default function OnboardingChat() {
   const handleChoice = (value: string) => {
     switch (phase) {
       case "welcome":
-        setMessages((prev) => [...prev, makeMsg("manager", "Connect Zendesk")]);
-        setPhase("connect_zendesk");
-        addAiMessages([
-          makeMsg("ai", "", {
-            widget: "connect_zendesk",
-          }),
-        ]);
+        if (value === "skip_zendesk") {
+          // Skip Zendesk, go straight to Shopify
+          setPhase("connect_shopify");
+          addAiMessages([
+            makeMsg("ai", "No problem — you can connect Zendesk later in **Playbook → Integrations**."),
+            makeMsg("ai", "How about Shopify? Connecting it lets me look up orders and process refunds.", {
+              choices: [
+                { label: "Connect Shopify", value: "start_shopify", icon: "arrow", variant: "primary" },
+                { label: "Skip for now", value: "skip_shopify", variant: "outline" },
+              ],
+            }),
+          ]);
+        } else {
+          setPhase("connect_zendesk");
+          addAiMessages([
+            makeMsg("ai", "", {
+              widget: "connect_zendesk",
+            }),
+          ]);
+        }
         break;
 
       case "connect_zendesk":
-        setMessages((prev) => [...prev, makeMsg("manager", "Zendesk connected ✓")]);
         setPhase("connect_shopify");
         addAiMessages([
           makeMsg("ai", "Zendesk connected! Now let's hook up Shopify so I can look up orders and process refunds.", {
@@ -161,11 +174,6 @@ export default function OnboardingChat() {
         break;
 
       case "connect_shopify":
-        if (value === "skip_shopify") {
-          setMessages((prev) => [...prev, makeMsg("manager", "Skip for now")]);
-        } else {
-          setMessages((prev) => [...prev, makeMsg("manager", "Shopify connected ✓")]);
-        }
         setPhase("upload_doc");
         addAiMessages([
           makeMsg("ai", "Now I need to learn your business rules. Upload a document — your SOP, return policy, or playbook — and I'll extract the rules from it."),
@@ -176,7 +184,6 @@ export default function OnboardingChat() {
         break;
 
       case "upload_doc":
-        setMessages((prev) => [...prev, makeMsg("manager", "Uploaded: Seel_Return_Policy_v2.pdf")]);
         setPhase("importing");
         setImportProgress(0);
         addAiMessages([
@@ -190,7 +197,7 @@ export default function OnboardingChat() {
             if (prev >= 100) {
               clearInterval(interval);
               setTimeout(() => {
-                setPhase("parse_result");
+                setPhase("conflict");
                 addAiMessages([
                   makeMsg("ai", "I've gone through everything. Here's what I pulled out:", {
                     widget: "parse_result",
@@ -216,20 +223,13 @@ export default function OnboardingChat() {
         }, 180);
         break;
 
-      case "parse_result":
-        // This phase auto-advances via conflict display
-        break;
-
-      case "conflict":
-        if (value === "30_days") {
-          setMessages((prev) => [...prev, makeMsg("manager", "30 days from delivery")]);
-        } else {
-          setMessages((prev) => [...prev, makeMsg("manager", "28 calendar days from delivery")]);
-        }
-        setPhase("conflict_resolved");
+      case "conflict": {
+        const choiceLabel = value === "30_days" ? "30 days from delivery" : "28 calendar days from delivery";
+        setMessages((prev) => [...prev, makeMsg("manager", choiceLabel)]);
+        setPhase("go_live");
         addAiMessages([
-          makeMsg("ai", `Got it — I'll use "${value === "30_days" ? "30 days from delivery" : "28 calendar days from delivery"}" as the rule. ✓`),
-          makeMsg("ai", "That's the Quick Start done! You can upload more documents and review extracted rules anytime in **Settings → Documents**."),
+          makeMsg("ai", `Got it — I'll use "${choiceLabel}" as the rule. ✓`),
+          makeMsg("ai", "That's the Quick Start done! You can upload more documents and review extracted rules anytime in **Playbook → Knowledge Base**."),
           makeMsg("ai", "Now let's get your agent live. I recommend starting in **Shadow Mode** — I'll draft replies as Internal Notes in Zendesk, but won't send anything until you approve.", {
             choices: [
               { label: "Start in Shadow Mode", value: "shadow", icon: "eye", variant: "primary" },
@@ -237,15 +237,10 @@ export default function OnboardingChat() {
             ],
           }),
         ]);
-        setPhase("go_live");
         break;
+      }
 
       case "go_live":
-        if (value === "shadow") {
-          setMessages((prev) => [...prev, makeMsg("manager", "Start in Shadow Mode")]);
-        } else {
-          setMessages((prev) => [...prev, makeMsg("manager", "Go live in Production")]);
-        }
         setPhase("done");
         const modeName = value === "shadow" ? "Shadow Mode" : "Production Mode";
         addAiMessages([
@@ -265,11 +260,11 @@ export default function OnboardingChat() {
 
       case "done":
         if (value === "settings") {
-          toast.success("Redirecting to Settings...");
-          setTimeout(() => navigate("/settings"), 600);
+          toast.success("Redirecting to Playbook...");
+          setTimeout(() => navigate("/playbook"), 600);
         } else if (value === "documents") {
           toast.success("Redirecting to Documents...");
-          setTimeout(() => navigate("/settings?tab=knowledge"), 600);
+          setTimeout(() => navigate("/playbook"), 600);
         } else {
           toast.success("Setup complete! Redirecting...");
           setTimeout(() => navigate("/inbox"), 600);

@@ -7,7 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import DashboardLayout from "./components/DashboardLayout";
 import Inbox from "./pages/Instruct";
 import Performance from "./pages/Performance";
-import SettingsPage from "./pages/SettingsPage";
+import PlaybookPage from "./pages/PlaybookPage";
 import OnboardingWrapper from "./pages/OnboardingWrapper";
 import ZendeskApp from "./pages/ZendeskApp";
 
@@ -18,7 +18,15 @@ function Router() {
       <Route path="/" component={Inbox} />
       <Route path="/inbox" component={Inbox} />
       <Route path="/performance" component={Performance} />
-      <Route path="/settings" component={SettingsPage} />
+      <Route path="/playbook" component={PlaybookPage} />
+
+      {/* Legacy route redirect */}
+      <Route path="/settings">
+        {() => {
+          window.location.href = "/playbook";
+          return null;
+        }}
+      </Route>
 
       {/* Full-width routes (bypass DashboardLayout shell) */}
       <Route path="/onboarding" component={OnboardingWrapper} />
