@@ -5,7 +5,7 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import DashboardLayout from "./components/DashboardLayout";
-import Instruct from "./pages/Instruct";
+import Inbox from "./pages/Instruct";
 import Performance from "./pages/Performance";
 import SettingsPage from "./pages/SettingsPage";
 import OnboardingWrapper from "./pages/OnboardingWrapper";
@@ -15,8 +15,8 @@ function Router() {
   return (
     <Switch>
       {/* Main app routes */}
-      <Route path="/" component={Instruct} />
-      <Route path="/instruct" component={Instruct} />
+      <Route path="/" component={Inbox} />
+      <Route path="/inbox" component={Inbox} />
       <Route path="/performance" component={Performance} />
       <Route path="/settings" component={SettingsPage} />
 

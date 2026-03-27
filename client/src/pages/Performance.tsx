@@ -70,7 +70,7 @@ export default function Performance() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-xl font-heading font-bold text-foreground">Performance Review</h1>
+            <h1 className="text-xl font-sans font-bold text-foreground">Performance Review</h1>
             <p className="text-[13px] text-muted-foreground mt-0.5">
               How Alex is performing across all customer interactions.
             </p>
@@ -109,7 +109,7 @@ export default function Performance() {
                     <span className="text-[12px] text-muted-foreground font-medium">{metric.label}</span>
                   </div>
                   <div className="flex items-end gap-2">
-                    <span className="text-2xl font-heading font-bold text-foreground">
+                    <span className="text-2xl font-sans font-bold text-foreground">
                       {metric.value}
                       <span className="text-sm font-normal text-muted-foreground">{metric.unit}</span>
                     </span>
@@ -261,7 +261,7 @@ export default function Performance() {
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Lightbulb className="w-4 h-4 text-amber-500" />
-            <h3 className="text-[15px] font-heading font-semibold text-foreground">Actionable Items</h3>
+            <h3 className="text-[15px] font-sans font-semibold text-foreground">Actionable Items</h3>
           </div>
           <div className="space-y-3">
             {ACTIONABLE_ITEMS.map((item) => (

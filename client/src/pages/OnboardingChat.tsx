@@ -89,12 +89,17 @@ export default function OnboardingChat() {
   // Simulate AI typing delay then add messages
   const addAiMessages = (msgs: ChatMessage[], delayBetween = 600) => {
     setTypingIndicator(true);
+    // Copy msgs to avoid closure issues
+    const msgsCopy = [...msgs];
     let i = 0;
     const addNext = () => {
-      if (i < msgs.length) {
-        setMessages((prev) => [...prev, msgs[i]]);
+      if (i < msgsCopy.length) {
+        const msg = msgsCopy[i];
+        if (msg) {
+          setMessages((prev) => [...prev, msg]);
+        }
         i++;
-        if (i < msgs.length) {
+        if (i < msgsCopy.length) {
           setTimeout(addNext, delayBetween);
         } else {
           setTypingIndicator(false);
@@ -272,7 +277,7 @@ export default function OnboardingChat() {
 
       case "done":
         toast.success("Setup complete! Redirecting...");
-        setTimeout(() => navigate("/instruct"), 1000);
+        setTimeout(() => navigate("/inbox"), 1000);
         break;
     }
   };
@@ -554,7 +559,7 @@ export default function OnboardingChat() {
                     />
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-lg font-heading font-bold">{CAPABILITY_SUMMARY.estimatedCoverage}%</span>
+                    <span className="text-lg font-semibold">{CAPABILITY_SUMMARY.estimatedCoverage}%</span>
                   </div>
                 </div>
                 <div>
@@ -742,10 +747,10 @@ export default function OnboardingChat() {
       <div className="w-[240px] border-r border-border bg-card/50 flex flex-col shrink-0">
         <div className="px-5 pt-8 pb-4">
           <div className="flex items-center gap-2.5 mb-1">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-white" />
             </div>
-            <span className="text-lg font-heading font-bold text-foreground">Seel AI</span>
+            <span className="text-lg font-semibold text-foreground">Seel AI</span>
           </div>
           <p className="text-[12px] text-muted-foreground mt-2">Setting up your AI agent</p>
         </div>
@@ -772,17 +777,17 @@ export default function OnboardingChat() {
                 key={idx}
                 className={cn(
                   "flex items-center gap-2.5 px-3 py-2 rounded-lg mb-0.5 transition-all",
-                  isActive && "bg-sidebar-accent text-sidebar-accent-foreground",
-                  !isActive && isCompleted && "text-sidebar-foreground/60",
-                  !isActive && !isCompleted && "text-sidebar-foreground/25"
+                  isActive && "bg-primary/10 text-primary",
+                  !isActive && isCompleted && "text-foreground/60",
+                  !isActive && !isCompleted && "text-muted-foreground/50"
                 )}
               >
                 <div
                   className={cn(
                     "w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-medium border",
                     isCompleted && "bg-emerald-500 border-emerald-500 text-white",
-                    isActive && !isCompleted && "border-sidebar-primary bg-sidebar-primary/20 text-sidebar-primary",
-                    !isActive && !isCompleted && "border-sidebar-border text-sidebar-foreground/40"
+                    isActive && !isCompleted && "border-primary bg-primary/20 text-primary",
+                    !isActive && !isCompleted && "border-border text-muted-foreground/40"
                   )}
                 >
                   {isCompleted ? <Check className="w-2.5 h-2.5" /> : idx + 1}
@@ -804,7 +809,7 @@ export default function OnboardingChat() {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4" ref={scrollRef}>
-          {messages.map((msg) => (
+          {messages.filter(Boolean).map((msg) => (
             <div
               key={msg.id}
               className={cn(

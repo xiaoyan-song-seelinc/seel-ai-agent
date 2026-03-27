@@ -114,7 +114,7 @@ export default function Onboarding() {
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center">
                 <Sparkles className="w-4 h-4 text-white" />
               </div>
-              <span className="text-lg font-heading font-bold text-foreground">Seel AI</span>
+              <span className="text-lg font-sans font-bold text-foreground">Seel AI</span>
             </div>
             <p className="text-[13px] text-muted-foreground mt-2">Let's set up your AI support agent.</p>
             <img
@@ -138,17 +138,17 @@ export default function Onboarding() {
                 disabled={!isAccessible}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all mb-0.5",
-                  isActive && "bg-sidebar-accent text-sidebar-accent-foreground",
-                  !isActive && isAccessible && "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/40",
-                  !isAccessible && "text-sidebar-foreground/25 cursor-not-allowed"
+                  isActive && "bg-primary/10 text-primary",
+                  !isActive && isAccessible && "text-gray-600 hover:text-gray-900 hover:bg-gray-100",
+                  !isAccessible && "text-gray-300 cursor-not-allowed"
                 )}
               >
                 <div
                   className={cn(
                     "w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[11px] font-medium border transition-colors",
                     isCompleted && "bg-emerald-500 border-emerald-500 text-white",
-                    isActive && !isCompleted && "border-sidebar-primary bg-sidebar-primary/20 text-sidebar-primary",
-                    !isActive && !isCompleted && "border-sidebar-border text-sidebar-foreground/40"
+                    isActive && !isCompleted && "border-primary bg-primary/20 text-primary",
+                    !isActive && !isCompleted && "border-gray-300 text-gray-400"
                   )}
                 >
                   {isCompleted ? <Check className="w-3 h-3" /> : idx + 1}
@@ -161,7 +161,7 @@ export default function Onboarding() {
 
         <div className="px-5 pb-5">
           <Progress value={progressPercent} className="h-1.5" />
-          <p className="text-[10px] text-sidebar-foreground/40 mt-1.5 text-center">
+          <p className="text-[10px] text-gray-400 mt-1.5 text-center">
             Step {currentStepIdx + 1} of {STEPS.length}
           </p>
         </div>
@@ -262,7 +262,7 @@ export default function Onboarding() {
                     {importing && (
                       <div className="py-8 text-center">
                         <Bot className="w-10 h-10 text-primary mx-auto mb-4 animate-pulse" />
-                        <p className="text-[14px] font-heading font-semibold text-foreground mb-2">
+                        <p className="text-[14px] font-sans font-semibold text-foreground mb-2">
                           Analyzing your knowledge base...
                         </p>
                         <p className="text-[12px] text-muted-foreground mb-4">
@@ -281,7 +281,7 @@ export default function Onboarding() {
                     {!importing && importProgress >= 100 && (
                       <div className="py-4 text-center">
                         <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-3" />
-                        <p className="text-[14px] font-heading font-semibold text-foreground mb-1">
+                        <p className="text-[14px] font-sans font-semibold text-foreground mb-1">
                           Analysis Complete
                         </p>
                         <p className="text-[12px] text-muted-foreground mb-4">
@@ -509,7 +509,7 @@ export default function Onboarding() {
                         />
                       </svg>
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-2xl font-heading font-bold text-foreground">
+                        <span className="text-2xl font-sans font-bold text-foreground">
                           {CAPABILITY_SUMMARY.estimatedCoverage}%
                         </span>
                       </div>
@@ -523,7 +523,7 @@ export default function Onboarding() {
 
                 {/* Can handle */}
                 <div className="mb-4">
-                  <h3 className="text-[13px] font-heading font-semibold text-foreground mb-2 flex items-center gap-2">
+                  <h3 className="text-[13px] font-sans font-semibold text-foreground mb-2 flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                     Alex can handle
                   </h3>
@@ -539,7 +539,7 @@ export default function Onboarding() {
 
                 {/* Will escalate */}
                 <div className="mb-6">
-                  <h3 className="text-[13px] font-heading font-semibold text-foreground mb-2 flex items-center gap-2">
+                  <h3 className="text-[13px] font-sans font-semibold text-foreground mb-2 flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-amber-500" />
                     Alex will escalate
                   </h3>
@@ -683,7 +683,7 @@ export default function Onboarding() {
                       <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center mx-auto mb-3 group-hover:bg-amber-100 transition-colors">
                         <Eye className="w-6 h-6 text-amber-600" />
                       </div>
-                      <h3 className="text-[14px] font-heading font-semibold text-foreground mb-1">Shadow Mode</h3>
+                      <h3 className="text-[14px] font-sans font-semibold text-foreground mb-1">Shadow Mode</h3>
                       <p className="text-[12px] text-muted-foreground leading-relaxed">
                         Alex drafts responses but doesn't send them. You review and approve each one.
                       </p>
@@ -696,7 +696,7 @@ export default function Onboarding() {
                       <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center mx-auto mb-3 group-hover:bg-emerald-100 transition-colors">
                         <Rocket className="w-6 h-6 text-emerald-600" />
                       </div>
-                      <h3 className="text-[14px] font-heading font-semibold text-foreground mb-1">Production Mode</h3>
+                      <h3 className="text-[14px] font-sans font-semibold text-foreground mb-1">Production Mode</h3>
                       <p className="text-[12px] text-muted-foreground leading-relaxed">
                         Alex handles tickets autonomously, following the rules and permissions you've set.
                       </p>
@@ -777,7 +777,7 @@ function StepContainer({
       <div className="flex items-center gap-3 mb-2">
         <div className="w-10 h-10 rounded-xl bg-primary/8 flex items-center justify-center">{icon}</div>
         <div>
-          <h2 className="text-[17px] font-heading font-bold text-foreground">{title}</h2>
+          <h2 className="text-[17px] font-sans font-bold text-foreground">{title}</h2>
           <p className="text-[13px] text-muted-foreground mt-0.5">{description}</p>
         </div>
       </div>

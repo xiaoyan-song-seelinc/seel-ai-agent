@@ -22,7 +22,7 @@ export default class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="min-h-screen flex items-center justify-center bg-background p-8">
           <div className="text-center max-w-md">
-            <h2 className="text-lg font-heading font-semibold text-foreground mb-2">Something went wrong</h2>
+            <h2 className="text-lg font-sans font-semibold text-foreground mb-2">Something went wrong</h2>
             <p className="text-sm text-muted-foreground mb-4">{this.state.error?.message}</p>
             <button
               onClick={() => window.location.reload()}

@@ -73,7 +73,7 @@ export default function SettingsPage() {
     <div className="flex h-full">
       {/* Tab sidebar */}
       <div className="w-[220px] border-r border-border bg-card/30 py-6 px-3 shrink-0">
-        <h1 className="text-lg font-heading font-bold text-foreground px-3 mb-5">Settings</h1>
+        <h1 className="text-lg font-sans font-bold text-foreground px-3 mb-5">Settings</h1>
         <nav className="space-y-0.5">
           {TABS.map((tab) => {
             const Icon = tab.icon;
@@ -103,7 +103,7 @@ export default function SettingsPage() {
           {activeTab === "general" && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-lg font-heading font-semibold text-foreground">General Settings</h2>
+                <h2 className="text-lg font-sans font-semibold text-foreground">General Settings</h2>
                 <p className="text-[13px] text-muted-foreground mt-1">Manage agent mode and integrations.</p>
               </div>
 
@@ -173,7 +173,7 @@ export default function SettingsPage() {
                       <div className="flex items-center gap-3">
                         <div
                           className={cn(
-                            "w-9 h-9 rounded-lg flex items-center justify-center text-white font-heading font-bold text-[13px]",
+                            "w-9 h-9 rounded-lg flex items-center justify-center text-white font-sans font-bold text-[13px]",
                             intg.platform === "zendesk" ? "bg-[#03363D]" : "bg-[#96BF48]"
                           )}
                         >
@@ -206,7 +206,7 @@ export default function SettingsPage() {
           {activeTab === "actions" && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-lg font-heading font-semibold text-foreground">Action Permissions</h2>
+                <h2 className="text-lg font-sans font-semibold text-foreground">Action Permissions</h2>
                 <p className="text-[13px] text-muted-foreground mt-1">
                   Control what Alex can do autonomously, what requires your approval, and what's disabled.
                 </p>
@@ -316,7 +316,7 @@ export default function SettingsPage() {
           {activeTab === "escalation" && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-lg font-heading font-semibold text-foreground">Escalation Rules</h2>
+                <h2 className="text-lg font-sans font-semibold text-foreground">Escalation Rules</h2>
                 <p className="text-[13px] text-muted-foreground mt-1">
                   Define when Alex should escalate a ticket to a human agent instead of handling it.
                 </p>
@@ -376,7 +376,7 @@ export default function SettingsPage() {
           {activeTab === "identity" && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-lg font-heading font-semibold text-foreground">Agent Identity</h2>
+                <h2 className="text-lg font-sans font-semibold text-foreground">Agent Identity</h2>
                 <p className="text-[13px] text-muted-foreground mt-1">
                   Customize how Alex presents itself to customers.
                 </p>
@@ -466,7 +466,7 @@ export default function SettingsPage() {
           {activeTab === "knowledge" && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-lg font-heading font-semibold text-foreground">Knowledge Base</h2>
+                <h2 className="text-lg font-sans font-semibold text-foreground">Knowledge Base</h2>
                 <p className="text-[13px] text-muted-foreground mt-1">
                   View the rules and skills Alex has learned. Updates happen through the Instruct module.
                 </p>

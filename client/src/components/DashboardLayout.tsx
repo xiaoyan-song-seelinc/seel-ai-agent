@@ -1,13 +1,13 @@
 /* ── DashboardLayout ──────────────────────────────────────────
-   Nordic Control Room: dark sidebar + warm content area
-   Sidebar: deep teal-charcoal with amber active indicators
+   Clean sidebar + white content area
+   Uses new design system: #007bff primary, Inter, neutral grays
    ──────────────────────────────────────────────────────────── */
 
 import { type ReactNode, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import {
-  MessageSquare,
+  Inbox,
   Settings,
   BarChart3,
   Bot,
@@ -23,18 +23,18 @@ import { TOPICS, AGENT_MODE } from "@/lib/mock-data";
 interface NavItem {
   label: string;
   href: string;
-  icon: typeof MessageSquare;
+  icon: typeof Inbox;
   badge?: number;
   matchPaths?: string[];
 }
 
 const NAV_ITEMS: NavItem[] = [
   {
-    label: "Instruct",
-    href: "/instruct",
-    icon: MessageSquare,
+    label: "Inbox",
+    href: "/inbox",
+    icon: Inbox,
     badge: TOPICS.filter((t) => t.status === "unread").length,
-    matchPaths: ["/instruct", "/"],
+    matchPaths: ["/inbox", "/"],
   },
   {
     label: "Performance",
@@ -52,11 +52,11 @@ const NAV_ITEMS: NavItem[] = [
 
 function AgentStatusDot({ mode }: { mode: string }) {
   const colors: Record<string, string> = {
-    production: "bg-emerald-400",
-    shadow: "bg-amber-400",
-    off: "bg-zinc-500",
+    production: "bg-emerald-500",
+    shadow: "bg-amber-500",
+    off: "bg-gray-400",
   };
-  return <span className={cn("w-2 h-2 rounded-full inline-block", colors[mode] || "bg-zinc-500")} />;
+  return <span className={cn("w-2 h-2 rounded-full inline-block", colors[mode] || "bg-gray-400")} />;
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -75,29 +75,26 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "flex flex-col h-full bg-sidebar text-sidebar-foreground border-r border-sidebar-border transition-all duration-300 ease-in-out",
-          collapsed ? "w-[68px]" : "w-[240px]"
+          "flex flex-col h-full bg-gray-50 border-r border-gray-200 transition-all duration-200 ease-out",
+          collapsed ? "w-[64px]" : "w-[232px]"
         )}
       >
         {/* Logo area */}
-        <div className="flex items-center gap-3 px-4 h-16 border-b border-sidebar-border shrink-0">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center shrink-0">
-            <Sparkles className="w-4 h-4 text-white" />
+        <div className="flex items-center gap-2.5 px-4 h-14 border-b border-gray-200 shrink-0">
+          <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center shrink-0">
+            <Sparkles className="w-3.5 h-3.5 text-white" />
           </div>
           {!collapsed && (
             <div className="flex flex-col min-w-0">
-              <span className="text-sm font-heading font-semibold text-sidebar-accent-foreground truncate">
+              <span className="text-sm font-semibold text-gray-900 truncate">
                 Seel AI
-              </span>
-              <span className="text-[11px] text-sidebar-foreground/50 truncate">
-                Support Agent
               </span>
             </div>
           )}
         </div>
 
         {/* Agent status */}
-        <div className={cn("px-4 py-3 border-b border-sidebar-border", collapsed && "px-3")}>
+        <div className={cn("px-3 py-3 border-b border-gray-200", collapsed && "px-2")}>
           {collapsed ? (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -111,22 +108,22 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             </Tooltip>
           ) : (
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-full bg-sidebar-accent flex items-center justify-center shrink-0">
-                <Bot className="w-3.5 h-3.5 text-sidebar-accent-foreground" />
+              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <Bot className="w-3.5 h-3.5 text-primary" />
               </div>
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[13px] font-medium text-sidebar-accent-foreground">Alex</span>
+                  <span className="text-[13px] font-medium text-gray-900">Alex</span>
                   <AgentStatusDot mode={AGENT_MODE} />
                 </div>
-                <span className="text-[11px] text-sidebar-foreground/50 capitalize">{AGENT_MODE} Mode</span>
+                <span className="text-[11px] text-gray-500 capitalize">{AGENT_MODE} Mode</span>
               </div>
             </div>
           )}
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
+        <nav className="flex-1 py-2 px-2 space-y-0.5 overflow-y-auto">
           {NAV_ITEMS.map((item) => {
             const isActive = item.matchPaths?.some((p) =>
               p === "/" ? location === "/" : location.startsWith(p)
@@ -139,15 +136,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   <Link href={item.href}>
                     <div
                       className={cn(
-                        "flex items-center justify-center w-full h-10 rounded-lg transition-all duration-200 relative",
+                        "flex items-center justify-center w-full h-9 rounded-md transition-all duration-150 relative",
                         isActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                          ? "bg-primary/10 text-primary"
+                          : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
                       )}
                     >
                       <Icon className="w-[18px] h-[18px]" />
                       {item.badge && item.badge > 0 && (
-                        <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-amber-400" />
+                        <span className="absolute top-1 right-2 w-1.5 h-1.5 rounded-full bg-primary" />
                       )}
                     </div>
                   </Link>
@@ -161,18 +158,18 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               <Link key={item.href} href={item.href}>
                 <div
                   className={cn(
-                    "flex items-center gap-2.5 px-3 h-10 rounded-lg transition-all duration-200 group",
+                    "flex items-center gap-2.5 px-3 h-9 rounded-md transition-all duration-150 group",
                     isActive
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                   )}
                 >
                   <Icon className="w-[18px] h-[18px] shrink-0" />
-                  <span className="text-[13px] font-medium flex-1">{item.label}</span>
+                  <span className="text-[13px] flex-1">{item.label}</span>
                   {item.badge && item.badge > 0 && (
                     <Badge
                       variant="secondary"
-                      className="h-5 min-w-5 px-1.5 text-[10px] font-semibold bg-amber-400/20 text-amber-300 border-0"
+                      className="h-5 min-w-5 px-1.5 text-[10px] font-medium bg-primary/10 text-primary border-0"
                     >
                       {item.badge}
                     </Badge>
@@ -183,41 +180,37 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           })}
         </nav>
 
-        {/* Zendesk App link */}
-        <div className="px-2 pb-2">
+        {/* Demo links */}
+        <div className="px-2 pb-1.5 space-y-0.5">
           <Link href="/zendesk">
             <div
               className={cn(
-                "flex items-center gap-2.5 px-3 h-9 rounded-lg text-sidebar-foreground/40 hover:text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-all duration-200",
+                "flex items-center gap-2 px-3 h-8 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all duration-150",
                 collapsed && "justify-center px-0"
               )}
             >
-              <ExternalLink className="w-4 h-4 shrink-0" />
-              {!collapsed && <span className="text-[12px]">Zendesk Sidebar Preview</span>}
+              <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+              {!collapsed && <span className="text-[11px]">Zendesk Sidebar</span>}
             </div>
           </Link>
-        </div>
-
-        {/* Onboarding link */}
-        <div className="px-2 pb-2">
           <Link href="/onboarding">
             <div
               className={cn(
-                "flex items-center gap-2.5 px-3 h-9 rounded-lg text-sidebar-foreground/40 hover:text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-all duration-200",
+                "flex items-center gap-2 px-3 h-8 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all duration-150",
                 collapsed && "justify-center px-0"
               )}
             >
-              <Sparkles className="w-4 h-4 shrink-0" />
-              {!collapsed && <span className="text-[12px]">Onboarding Demo</span>}
+              <Sparkles className="w-3.5 h-3.5 shrink-0" />
+              {!collapsed && <span className="text-[11px]">Onboarding Demo</span>}
             </div>
           </Link>
         </div>
 
         {/* Collapse toggle */}
-        <div className="px-2 pb-3 pt-1 border-t border-sidebar-border">
+        <div className="px-2 pb-2.5 pt-1 border-t border-gray-200">
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="flex items-center justify-center w-full h-8 rounded-lg text-sidebar-foreground/40 hover:text-sidebar-foreground/70 hover:bg-sidebar-accent/30 transition-all duration-200"
+            className="flex items-center justify-center w-full h-8 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all duration-150"
           >
             {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
@@ -225,7 +218,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto bg-white">
         {children}
       </main>
     </div>

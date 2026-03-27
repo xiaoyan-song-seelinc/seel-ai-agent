@@ -1,9 +1,10 @@
 /* ── Zendesk App Sidebar Simulation ───────────────────────────
-   Simulates the Zendesk sidebar iframe with:
-   - Approval cards (Approve / Deny)
-   - Takeover button
-   - Bad Case marking
-   - Agent activity timeline
+   Simulates the Zendesk sidebar iframe (320px wide).
+   Features:
+   - Approval cards (Approve / Deny with reason)
+   - Bad Case marking with note
+   - AI Activity timeline with "View reasoning" link
+   Note: Takeover uses Zendesk native reassignment (not in App)
    ──────────────────────────────────────────────────────────── */
 
 import { useState } from "react";
@@ -11,7 +12,6 @@ import { cn } from "@/lib/utils";
 import {
   ZENDESK_TICKETS,
   type ZendeskTicket,
-  type ApprovalStatus,
 } from "@/lib/mock-data";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -25,18 +25,15 @@ import {
   XCircle,
   Clock,
   AlertTriangle,
-  Hand,
   Flag,
   Send,
-  ChevronDown,
-  ChevronUp,
-  RotateCcw,
   DollarSign,
   Package,
   MessageSquare,
   ArrowLeft,
   Sparkles,
   Zap,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -57,22 +54,14 @@ export default function ZendeskApp() {
     setTickets((prev) =>
       prev.map((t) =>
         t.id === ticketId
-          ? {
-              ...t,
-              approval: t.approval
-                ? { ...t.approval, status, respondedAt: new Date().toISOString() }
-                : t.approval,
-            }
+          ? { ...t, approval: t.approval ? { ...t.approval, status, respondedAt: new Date().toISOString() } : t.approval }
           : t
       )
     );
     if (status === "approved") {
       toast.success("Action approved — Alex will proceed");
     } else {
-      toast.success(reason
-        ? "Action denied with feedback — Alex will learn from this"
-        : "Action denied — Alex will escalate"
-      );
+      toast.success(reason ? "Action denied with feedback — Alex will learn from this" : "Action denied — Alex will escalate");
     }
     setShowDenyReason(false);
     setDenyReason("");
@@ -90,20 +79,9 @@ export default function ZendeskApp() {
     }
   };
 
-  const handleTakeover = (ticketId: string) => {
-    setTickets((prev) =>
-      prev.map((t) =>
-        t.id === ticketId ? { ...t, takenOver: true } : t
-      )
-    );
-    toast.success("Takeover activated — Alex will stop responding on this ticket");
-  };
-
   const handleBadCase = (ticketId: string) => {
     setTickets((prev) =>
-      prev.map((t) =>
-        t.id === ticketId ? { ...t, markedBadCase: true, badCaseNote } : t
-      )
+      prev.map((t) => (t.id === ticketId ? { ...t, markedBadCase: true, badCaseNote } : t))
     );
     setBadCaseNote("");
     setShowBadCaseInput(false);
@@ -112,14 +90,14 @@ export default function ZendeskApp() {
 
   return (
     <div className="flex h-screen bg-[#f8f9fa]">
-      {/* Left: Fake Zendesk ticket view */}
+      {/* Left: Simulated Zendesk ticket view */}
       <div className="flex-1 bg-white border-r border-[#d8dcde]">
         <div className="h-12 bg-[#03363D] flex items-center px-4 gap-3">
           <Button
             variant="ghost"
             size="sm"
             className="h-7 text-white/70 hover:text-white hover:bg-white/10 gap-1 text-[11px]"
-            onClick={() => navigate("/instruct")}
+            onClick={() => navigate("/inbox")}
           >
             <ArrowLeft className="w-3 h-3" />
             Back to Seel
@@ -141,6 +119,7 @@ export default function ZendeskApp() {
                   onClick={() => {
                     setSelectedTicketId(ticket.id);
                     setShowBadCaseInput(false);
+                    setShowDenyReason(false);
                   }}
                   className={cn(
                     "w-full text-left px-3 py-3 border-b border-[#e9ebed] transition-colors",
@@ -154,11 +133,6 @@ export default function ZendeskApp() {
                         Needs Approval
                       </Badge>
                     )}
-                    {ticket.takenOver && (
-                      <Badge className="h-[14px] px-1 text-[8px] bg-red-100 text-red-700 border-0">
-                        Taken Over
-                      </Badge>
-                    )}
                   </div>
                   <p className="text-[12px] text-[#2f3941] font-medium truncate">{ticket.subject}</p>
                   <p className="text-[10px] text-[#68737d] mt-0.5">{ticket.customerName}</p>
@@ -167,7 +141,7 @@ export default function ZendeskApp() {
             </ScrollArea>
           </div>
 
-          {/* Ticket detail (simplified) */}
+          {/* Ticket detail */}
           {selectedTicket && (
             <div className="flex-1 p-6">
               <div className="max-w-[560px]">
@@ -178,9 +152,8 @@ export default function ZendeskApp() {
                   <span className="text-[12px] text-[#68737d]">{selectedTicket.customerEmail}</span>
                 </div>
 
-                {/* Conversation */}
                 <div className="space-y-4">
-                  {selectedTicket.messages.map((msg: {from: string; text: string; timestamp: string}, idx: number) => (
+                  {selectedTicket.messages.map((msg: { from: string; text: string; timestamp: string }, idx: number) => (
                     <div key={idx} className={cn("flex gap-3", msg.from === "agent" && "flex-row-reverse")}>
                       <div
                         className={cn(
@@ -201,9 +174,7 @@ export default function ZendeskApp() {
                         )}
                       >
                         {msg.from === "internal" && (
-                          <span className="text-[9px] font-medium text-amber-600 uppercase tracking-wider block mb-1">
-                            Internal Note
-                          </span>
+                          <span className="text-[9px] font-medium text-amber-600 uppercase tracking-wider block mb-1">Internal Note</span>
                         )}
                         <p className="leading-relaxed">{msg.text}</p>
                         <span className="text-[9px] text-[#87929d] mt-1 block">
@@ -219,32 +190,20 @@ export default function ZendeskApp() {
         </div>
       </div>
 
-      {/* Right: Zendesk App Sidebar */}
+      {/* Right: Zendesk App Sidebar (320px) */}
       <div className="w-[320px] bg-white flex flex-col shrink-0">
-        <div className="relative h-12 bg-[#03363D] flex items-center px-4 gap-2 overflow-hidden">
-          <img
-            src="https://d2xsxph8kpxj0f.cloudfront.net/310519663446549828/ZnnRRhGjRupXpf5q3zCYHR/zendesk-sidebar-header-mwZH6DNLWGBiVzVoYR7RDU.webp"
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover opacity-10"
-          />
-          <Sparkles className="relative w-4 h-4 text-teal-300" />
-          <span className="relative text-[13px] font-semibold text-white">Seel AI Agent</span>
+        <div className="h-12 bg-[#03363D] flex items-center px-4 gap-2">
+          <Sparkles className="w-4 h-4 text-teal-300" />
+          <span className="text-[13px] font-semibold text-white">Seel AI Agent</span>
         </div>
 
         {selectedTicket && (
           <ScrollArea className="flex-1">
-            <div className="p-4 space-y-4">
-              {/* Agent Status */}
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#f8f9fa] border border-[#e9ebed]">
-                <div
-                  className={cn(
-                    "w-2 h-2 rounded-full",
-                    selectedTicket.takenOver ? "bg-red-400" : "bg-emerald-400"
-                  )}
-                />
-                <span className="text-[12px] text-[#2f3941] font-medium">
-                  {selectedTicket.takenOver ? "Human Takeover Active" : "Alex is handling this ticket"}
-                </span>
+            <div className="p-4 space-y-3">
+              {/* Agent Status Bar */}
+              <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-[#f8f9fa] border border-[#e9ebed]">
+                <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span className="text-[12px] text-[#2f3941] font-medium flex-1">Alex is handling this ticket</span>
               </div>
 
               {/* Approval Card */}
@@ -255,32 +214,30 @@ export default function ZendeskApp() {
                   selectedTicket.approval.status === "approved" && "border-l-emerald-400",
                   selectedTicket.approval.status === "denied" && "border-l-red-400"
                 )}>
-                  <CardContent className="pt-4 pb-4">
+                  <CardContent className="pt-3 pb-3">
                     <div className="flex items-center gap-2 mb-2">
-                      {selectedTicket.approval.status === "pending" && <Clock className="w-4 h-4 text-amber-500" />}
-                      {selectedTicket.approval.status === "approved" && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
-                      {selectedTicket.approval.status === "denied" && <XCircle className="w-4 h-4 text-red-500" />}
-                      <span className="text-[13px] font-semibold text-[#2f3941]">
-                        {selectedTicket.approval.status === "pending" ? "Approval Required" : 
+                      {selectedTicket.approval.status === "pending" && <Clock className="w-3.5 h-3.5 text-amber-500" />}
+                      {selectedTicket.approval.status === "approved" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+                      {selectedTicket.approval.status === "denied" && <XCircle className="w-3.5 h-3.5 text-red-500" />}
+                      <span className="text-[12px] font-semibold text-[#2f3941]">
+                        {selectedTicket.approval.status === "pending" ? "Approval Required" :
                          selectedTicket.approval.status === "approved" ? "Approved" : "Denied"}
                       </span>
                     </div>
 
-                    <p className="text-[12px] text-[#68737d] mb-3">{selectedTicket.approval.reason}</p>
+                    <p className="text-[11px] text-[#68737d] mb-2">{selectedTicket.approval.reason}</p>
 
                     {/* Action details */}
-                    <div className="rounded-md bg-[#f8f9fa] p-3 mb-3 border border-[#e9ebed]">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        {selectedTicket.approval.actionType === "refund" && <DollarSign className="w-3.5 h-3.5 text-[#68737d]" />}
-                        {selectedTicket.approval.actionType === "replacement" && <Package className="w-3.5 h-3.5 text-[#68737d]" />}
-                        <span className="text-[12px] font-medium text-[#2f3941] capitalize">
-                          {selectedTicket.approval.actionType}
-                        </span>
+                    <div className="rounded bg-[#f8f9fa] p-2.5 mb-2 border border-[#e9ebed]">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        {selectedTicket.approval.actionType === "refund" && <DollarSign className="w-3 h-3 text-[#68737d]" />}
+                        {selectedTicket.approval.actionType === "replacement" && <Package className="w-3 h-3 text-[#68737d]" />}
+                        <span className="text-[11px] font-medium text-[#2f3941] capitalize">{selectedTicket.approval.actionType}</span>
                       </div>
                       {selectedTicket.approval.details && (
-                        <div className="space-y-1">
+                        <div className="space-y-0.5">
                           {Object.entries(selectedTicket.approval.details).map(([key, val]) => (
-                            <div key={key} className="flex justify-between text-[11px]">
+                            <div key={key} className="flex justify-between text-[10px]">
                               <span className="text-[#87929d] capitalize">{key.replace(/([A-Z])/g, " $1")}</span>
                               <span className="text-[#2f3941] font-medium">{String(val)}</span>
                             </div>
@@ -291,13 +248,13 @@ export default function ZendeskApp() {
 
                     {/* Timeout warning */}
                     {selectedTicket.approval.status === "pending" && selectedTicket.approval.timeoutMinutes && (
-                      <div className="flex items-center gap-1.5 mb-3 text-[11px] text-amber-600">
+                      <div className="flex items-center gap-1.5 mb-2 text-[10px] text-amber-600">
                         <AlertTriangle className="w-3 h-3" />
-                        Auto-escalates in {selectedTicket.approval.timeoutMinutes} min if no response
+                        Auto-escalates in {selectedTicket.approval.timeoutMinutes} min
                       </div>
                     )}
 
-                    {/* Action buttons */}
+                    {/* Approve / Deny buttons */}
                     {selectedTicket.approval.status === "pending" && !showDenyReason && (
                       <div className="flex gap-2">
                         <Button
@@ -323,31 +280,23 @@ export default function ZendeskApp() {
                     {/* Deny reason input */}
                     {showDenyReason && denyTargetTicketId === selectedTicket.id && (
                       <div className="space-y-2">
-                        <p className="text-[11px] text-[#68737d]">Why are you denying? This helps Alex learn. (Optional)</p>
+                        <p className="text-[10px] text-[#68737d]">Why are you denying? Helps Alex learn. (Optional)</p>
                         <Textarea
                           placeholder="e.g. We don't offer refunds on sale items..."
                           value={denyReason}
                           onChange={(e) => setDenyReason(e.target.value)}
-                          className="text-[12px] min-h-[50px] resize-none"
+                          className="text-[11px] min-h-[44px] resize-none"
                           autoFocus
                         />
                         <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            className="flex-1 h-7 text-[11px] bg-red-600 hover:bg-red-700"
-                            onClick={handleDenyConfirm}
-                          >
+                          <Button size="sm" className="flex-1 h-7 text-[11px] bg-red-600 hover:bg-red-700" onClick={handleDenyConfirm}>
                             Deny{denyReason.trim() ? " with Feedback" : ""}
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
                             className="h-7 text-[11px]"
-                            onClick={() => {
-                              setShowDenyReason(false);
-                              setDenyReason("");
-                              setDenyTargetTicketId(null);
-                            }}
+                            onClick={() => { setShowDenyReason(false); setDenyReason(""); setDenyTargetTicketId(null); }}
                           >
                             Cancel
                           </Button>
@@ -358,76 +307,36 @@ export default function ZendeskApp() {
                 </Card>
               )}
 
-              {/* Takeover */}
-              {!selectedTicket.takenOver && (
-                <Button
-                  variant="outline"
-                  className="w-full h-9 text-[12px] gap-2 border-red-200 text-red-600 hover:bg-red-50"
-                  onClick={() => handleTakeover(selectedTicket.id)}
-                >
-                  <Hand className="w-4 h-4" />
-                  Takeover — Stop AI
-                </Button>
-              )}
-
-              {selectedTicket.takenOver && (
-                <div className="w-full px-3 py-2.5 rounded-lg bg-red-50 border border-red-200">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Hand className="w-3.5 h-3.5 text-red-500" />
-                    <span className="text-[12px] font-medium text-red-700">Human Takeover Active</span>
-                  </div>
-                  <p className="text-[11px] text-red-600/70 leading-relaxed">
-                    AI has stopped responding. You own this ticket until it's closed. Alex will learn from how you resolve it.
-                  </p>
-                </div>
-              )}
-
-              <Separator />
-
               {/* Bad Case */}
               <div>
                 <Button
                   variant="ghost"
                   className={cn(
-                    "w-full h-9 text-[12px] gap-2 justify-start",
-                    selectedTicket.markedBadCase
-                      ? "text-red-600"
-                      : "text-[#68737d] hover:text-[#2f3941]"
+                    "w-full h-8 text-[12px] gap-2 justify-start",
+                    selectedTicket.markedBadCase ? "text-red-600" : "text-[#68737d] hover:text-[#2f3941]"
                   )}
                   onClick={() => {
                     if (selectedTicket.markedBadCase) return;
                     setShowBadCaseInput(!showBadCaseInput);
                   }}
                 >
-                  <Flag className={cn("w-4 h-4", selectedTicket.markedBadCase && "fill-red-600")} />
+                  <Flag className={cn("w-3.5 h-3.5", selectedTicket.markedBadCase && "fill-red-600")} />
                   {selectedTicket.markedBadCase ? "Marked as Bad Case" : "Mark as Bad Case"}
                 </Button>
 
                 {showBadCaseInput && !selectedTicket.markedBadCase && (
-                  <div className="mt-2 space-y-2">
+                  <div className="mt-2 space-y-2 px-1">
                     <Textarea
                       placeholder="What went wrong? (optional)"
                       value={badCaseNote}
                       onChange={(e) => setBadCaseNote(e.target.value)}
-                      className="text-[12px] min-h-[60px] resize-none"
+                      className="text-[11px] min-h-[44px] resize-none"
                     />
                     <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        className="flex-1 h-7 text-[11px]"
-                        onClick={() => handleBadCase(selectedTicket.id)}
-                      >
+                      <Button size="sm" className="flex-1 h-7 text-[11px]" onClick={() => handleBadCase(selectedTicket.id)}>
                         Submit
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-[11px]"
-                        onClick={() => {
-                          setShowBadCaseInput(false);
-                          setBadCaseNote("");
-                        }}
-                      >
+                      <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => { setShowBadCaseInput(false); setBadCaseNote(""); }}>
                         Cancel
                       </Button>
                     </div>
@@ -435,9 +344,7 @@ export default function ZendeskApp() {
                 )}
 
                 {selectedTicket.markedBadCase && selectedTicket.badCaseNote && (
-                  <p className="text-[11px] text-[#87929d] mt-1 px-3">
-                    Note: "{selectedTicket.badCaseNote}"
-                  </p>
+                  <p className="text-[10px] text-[#87929d] mt-1 px-3">Note: "{selectedTicket.badCaseNote}"</p>
                 )}
               </div>
 
@@ -445,10 +352,22 @@ export default function ZendeskApp() {
 
               {/* AI Activity Timeline */}
               <div>
-                <h4 className="text-[12px] font-semibold text-[#2f3941] mb-3">AI Activity</h4>
-                <div className="space-y-3">
-                  {selectedTicket.aiActivity.map((activity: {type: string; description: string; timestamp: string}, idx: number) => (
-                    <div key={idx} className="flex gap-2.5">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-[12px] font-semibold text-[#2f3941]">AI Activity</h4>
+                  <button
+                    className="text-[10px] text-primary hover:underline flex items-center gap-1"
+                    onClick={() => {
+                      toast.info("Opens detailed reasoning in Seel Backend");
+                      navigate("/inbox");
+                    }}
+                  >
+                    View reasoning
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+                <div className="space-y-2.5">
+                  {selectedTicket.aiActivity.map((activity: { type: string; description: string; timestamp: string }, idx: number) => (
+                    <div key={idx} className="flex gap-2">
                       <div className="flex flex-col items-center">
                         <div
                           className={cn(
@@ -468,18 +387,22 @@ export default function ZendeskApp() {
                           <div className="w-px h-full bg-[#e9ebed] mt-1" />
                         )}
                       </div>
-                      <div className="pb-3">
-                        <p className="text-[12px] text-[#2f3941]">{activity.description}</p>
-                        <span className="text-[10px] text-[#87929d]">
-                          {new Date(activity.timestamp).toLocaleTimeString("en-US", {
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}
+                      <div className="pb-2">
+                        <p className="text-[11px] text-[#2f3941]">{activity.description}</p>
+                        <span className="text-[9px] text-[#87929d]">
+                          {new Date(activity.timestamp).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
                         </span>
                       </div>
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* Zendesk native hint */}
+              <div className="px-3 py-2 rounded bg-[#f8f9fa] border border-[#e9ebed]">
+                <p className="text-[10px] text-[#87929d] leading-relaxed">
+                  To take over this ticket, use Zendesk's native Assignee field to reassign it to yourself.
+                </p>
               </div>
             </div>
           </ScrollArea>
