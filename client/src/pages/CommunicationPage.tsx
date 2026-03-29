@@ -1,8 +1,9 @@
 /* ──────────────────────────────────────────────────────────
-   AI Support → Communication tab — v4
-   15 adjustments: conflict UX, hire dialog, sanity check,
-   escalation cards, profile, topic cards, rule proposal,
-   performance summary, direct input, pre-setup rep, etc.
+   AI Support → Communication tab — v5
+   10 adjustments: narrow sidebar, separator, no hire more,
+   keep onboarding tab, topic grouping, unread badges,
+   adjustment flow, simplified profile, config collapsed,
+   performance fields.
    ──────────────────────────────────────────────────────────── */
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
@@ -23,9 +24,9 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  Send, Check, X, Plus, ArrowRight, ChevronDown,
+  Send, Check, X, ArrowRight, ChevronDown, ChevronRight,
   MessageCircle, ExternalLink, Pencil, Upload, FileText,
-  CheckCircle2, Globe, UserPlus, Clock, BarChart3, List, User,
+  CheckCircle2, Globe, Clock, BarChart3, List,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -101,6 +102,8 @@ function TopicCard({
   const firstMsg = topic.messages[0];
   const isRuleProposal = !!topic.proposedRule;
   const isPerfSummary = topic.type === "performance_summary";
+  const hasPendingAction = topic.proposedRule?.status === "pending";
+  const hasUnread = replies.length > 0 && replies.some((r) => r.sender === "ai");
 
   return (
     <div className="flex gap-2.5 group">
@@ -109,13 +112,19 @@ function TopicCard({
         <span className="text-[12px]">&#x1F454;</span>
       </div>
       <div className="flex-1 min-w-0">
-        {/* Sender + time */}
+        {/* Sender + time + badges */}
         <div className="flex items-center gap-1.5 mb-1">
           <span className="text-[11px] font-semibold text-foreground">Alex</span>
           <span className="text-[9px] text-muted-foreground/50">{formatRelativeTime(topic.createdAt)}</span>
+          {hasPendingAction && (
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title="Needs your response" />
+          )}
+          {hasUnread && !hasPendingAction && (
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" title="Unread" />
+          )}
         </div>
 
-        {/* Performance summary — bigger title, no auto action items */}
+        {/* Performance summary — bigger title */}
         {isPerfSummary && firstMsg && (
           <div className="rounded-xl rounded-tl-sm bg-muted/40 px-3.5 py-2.5 mb-1.5">
             <p className="text-[14px] font-bold text-foreground mb-2">Weekly Performance Summary</p>
@@ -125,7 +134,7 @@ function TopicCard({
           </div>
         )}
 
-        {/* Regular message (not rule proposal, not perf summary) */}
+        {/* Regular message */}
         {firstMsg && !isRuleProposal && !isPerfSummary && (
           <div className="rounded-xl rounded-tl-sm bg-muted/40 px-3.5 py-2.5 mb-1.5">
             <div className="text-[12px] leading-relaxed text-foreground whitespace-pre-wrap">
@@ -309,12 +318,10 @@ function FullThreadPanel({
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 mb-0.5">
-                  <span className="text-[10px] font-semibold text-foreground">
-                    {msg.sender === "ai" ? "Alex" : "You"}
-                  </span>
-                  <span className="text-[9px] text-muted-foreground/50">{formatTime(msg.timestamp)}</span>
+                  <span className="text-[10px] font-semibold">{msg.sender === "ai" ? "Alex" : "You"}</span>
+                  <span className="text-[8px] text-muted-foreground/50">{formatTime(msg.timestamp)}</span>
                 </div>
-                <div className="text-[11.5px] leading-relaxed text-foreground whitespace-pre-wrap">
+                <div className="text-[11.5px] leading-relaxed text-foreground">
                   {renderMd(msg.content)}
                 </div>
               </div>
@@ -324,20 +331,35 @@ function FullThreadPanel({
         </div>
       </ScrollArea>
 
+      {/* Reply input */}
       <div className="px-3 py-2.5 border-t border-border">
         <div className="flex items-end gap-2">
           <Textarea
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
-            placeholder="Reply to topic..."
-            className="min-h-[36px] max-h-[100px] text-[11.5px] resize-none"
+            placeholder="Reply to this topic..."
+            className="min-h-[36px] max-h-[80px] text-[11px] resize-none"
             rows={1}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                if (replyText.trim()) {
+                  toast.success("Reply sent");
+                  setReplyText("");
+                }
+              }
+            }}
           />
           <Button
             size="sm"
             className="h-8 w-8 p-0 shrink-0"
             disabled={!replyText.trim()}
-            onClick={() => { toast.success("Reply sent"); setReplyText(""); }}
+            onClick={() => {
+              if (replyText.trim()) {
+                toast.success("Reply sent");
+                setReplyText("");
+              }
+            }}
           >
             <Send className="w-3.5 h-3.5" />
           </Button>
@@ -348,7 +370,7 @@ function FullThreadPanel({
 }
 
 // ══════════════════════════════════════════════════════════
-// ── TOPICS LIST PANEL ───────────────────────────────────
+// ── TOPICS PANEL (side panel) ───────────────────────────
 // ══════════════════════════════════════════════════════════
 
 function TopicsPanel({
@@ -360,6 +382,11 @@ function TopicsPanel({
   onSelectTopic: (id: string) => void;
   onClose: () => void;
 }) {
+  const sorted = useMemo(
+    () => [...topics].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [topics]
+  );
+
   return (
     <div className="w-[280px] border-l border-border bg-white flex flex-col h-full shrink-0">
       <div className="flex items-center justify-between px-4 h-10 border-b border-border shrink-0">
@@ -370,23 +397,26 @@ function TopicsPanel({
       </div>
       <ScrollArea className="flex-1">
         <div className="py-1">
-          {topics.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => onSelectTopic(t.id)}
-              className="w-full text-left px-4 py-2.5 hover:bg-accent/30 transition-colors border-b border-border/30"
-            >
-              <div className="flex items-center gap-2">
-                <p className="text-[11.5px] font-medium text-foreground truncate flex-1">{t.title}</p>
-                {t.proposedRule?.status === "pending" && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                )}
-              </div>
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                {t.messages.length} messages · {formatRelativeTime(t.createdAt)}
-              </p>
-            </button>
-          ))}
+          {sorted.map((topic) => {
+            const hasPending = topic.proposedRule?.status === "pending";
+            const hasUnread = topic.messages.some((m) => m.sender === "ai");
+            return (
+              <button
+                key={topic.id}
+                onClick={() => onSelectTopic(topic.id)}
+                className="w-full text-left px-4 py-2.5 hover:bg-accent/30 transition-colors border-b border-border/30"
+              >
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[11px] font-medium text-foreground truncate flex-1">{topic.title}</p>
+                  {hasPending && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />}
+                  {!hasPending && hasUnread && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />}
+                </div>
+                <p className="text-[9px] text-muted-foreground mt-0.5">
+                  {topic.messages.length} messages · {formatRelativeTime(topic.createdAt)}
+                </p>
+              </button>
+            );
+          })}
         </div>
       </ScrollArea>
     </div>
@@ -394,92 +424,65 @@ function TopicsPanel({
 }
 
 
-
 // ══════════════════════════════════════════════════════════
-// ── SETUP TAB (Team Lead onboarding) ────────────────────
+// ── SETUP TAB (onboarding flow) ─────────────────────────
 // ══════════════════════════════════════════════════════════
 
-type SetupStep = "greeting" | "upload" | "processing" | "rules_extracted" | "conflicts" | "playbook_ready" | "hire_prompt";
-
-interface ConflictItem {
-  id: string;
-  title: string;
-  description: string;
-  options: { label: string; value: string }[];
-  resolved: boolean;
-  selectedOption?: string;
-}
-
-const DEMO_CONFLICTS: ConflictItem[] = [
-  {
-    id: "c-1",
-    title: "Return window for VIP customers",
-    description: "Your SOP says 30-day return window for everyone, but your team has been extending to 45 days for VIP customers (3+ orders). Which should I follow?",
-    options: [
-      { label: "30 days for everyone", value: "30_all" },
-      { label: "45 days for VIP customers", value: "45_vip" },
-      { label: "Dismiss — I'll clarify later", value: "dismiss" },
-    ],
-    resolved: false,
-  },
-  {
-    id: "c-2",
-    title: "Photo evidence for damaged items",
-    description: "Your policy requires photo evidence for all damage claims. But for items under $80, your team usually skips this step. Should I require photos for low-value items?",
-    options: [
-      { label: "Always require photos", value: "always_photo" },
-      { label: "Skip for items under $80", value: "skip_under_80" },
-      { label: "Dismiss — I'll clarify later", value: "dismiss" },
-    ],
-    resolved: false,
-  },
+const PERSONALITIES = [
+  { emoji: "👋", label: "Friendly" },
+  { emoji: "🏛️", label: "Neutral" },
+  { emoji: "📋", label: "Matter-of-fact" },
+  { emoji: "💼", label: "Professional" },
+  { emoji: "😄", label: "Humorous" },
 ];
 
-const DEMO_EXTRACTED_RULES = [
-  "Standard Return & Refund",
-  "Where Is My Order (WISMO)",
-  "Damaged / Wrong Item",
-  "Order Cancellation",
-  "Return Shipping Cost",
-  "International Returns",
-  "VIP Customer Handling",
-  "Discount & Coupon Policy",
-];
+type SetupStep = "greeting" | "upload" | "processing" | "rules_extracted" | "conflicts" | "done";
 
 function SetupTab({ onSetupComplete }: { onSetupComplete: () => void }) {
   const [step, setStep] = useState<SetupStep>("greeting");
-  const [conflicts, setConflicts] = useState(DEMO_CONFLICTS);
-  const [showAllRules, setShowAllRules] = useState(false);
-  const [currentConflictIdx, setCurrentConflictIdx] = useState(0);
+  const [useDemo, setUseDemo] = useState(false);
+  const [conflictIdx, setConflictIdx] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [step, currentConflictIdx]);
+  }, [step, conflictIdx]);
 
-  const handleConflictResolve = (id: string, value: string) => {
-    setConflicts((prev) => prev.map((c) => (c.id === id ? { ...c, resolved: true, selectedOption: value } : c)));
-    setTimeout(() => {
-      if (currentConflictIdx < conflicts.length - 1) {
-        setCurrentConflictIdx((i) => i + 1);
-      } else {
-        setStep("playbook_ready");
-      }
-    }, 500);
-  };
+  const demoRules = [
+    "Seel Return Protection — Full Refund Policy",
+    "Seel Return Protection — Partial Damage Handling",
+    "Seel Return Protection — Claim Window (30 days)",
+    "Seel Return Protection — Excluded Items",
+    "Seel Return Protection — Escalation to Claims Team",
+    "Seel Return Protection — Duplicate Claim Prevention",
+    "Seel Return Protection — Shipping Label Generation",
+  ];
 
-  const visibleRules = showAllRules ? DEMO_EXTRACTED_RULES : DEMO_EXTRACTED_RULES.slice(0, 5);
+  const conflicts = [
+    {
+      title: "Refund amount for partial damage",
+      description: "Your return policy says 'full refund for all returns', but the damage handling doc says 'partial refund based on damage assessment'. Which should I follow?",
+      options: ["Always full refund", "Partial refund based on assessment", "Escalate to manager"],
+    },
+    {
+      title: "Claim window after delivery",
+      description: "The main policy states 30-day claim window, but the FAQ mentions 14 days for electronics. Should electronics have a different window?",
+      options: ["30 days for all items", "14 days for electronics", "Escalate to manager"],
+    },
+  ];
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center gap-2.5 px-4 h-11 border-b border-border shrink-0">
-        <div className="w-6 h-6 rounded-full bg-teal-100 flex items-center justify-center">
-          <span className="text-[11px]">&#x1F454;</span>
-        </div>
-        <div>
-          <span className="text-[12px] font-semibold text-foreground">Alex</span>
-          <span className="text-[10px] text-muted-foreground ml-1.5">Team Lead</span>
+      <div className="flex items-center justify-between px-4 h-11 border-b border-border shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="w-6 h-6 rounded-full bg-teal-100 flex items-center justify-center">
+            <span className="text-[11px]">&#x1F454;</span>
+          </div>
+          <div>
+            <span className="text-[12px] font-semibold text-foreground">Alex</span>
+            <span className="text-[10px] text-muted-foreground ml-1.5">Team Lead · Setup</span>
+          </div>
         </div>
       </div>
 
@@ -530,39 +533,34 @@ function SetupTab({ onSetupComplete }: { onSetupComplete: () => void }) {
             <div className="ml-9">
               {/* Upload area */}
               <div
-                className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:border-primary/40 hover:bg-accent/20 transition-colors"
-                onClick={() => setStep("processing")}
+                className="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-primary/40 transition-colors"
+                onClick={() => { setUseDemo(false); setStep("processing"); }}
               >
-                <Upload className="w-5 h-5 text-muted-foreground mx-auto mb-1.5" />
-                <p className="text-[11px] font-medium text-foreground">Drop files here or click to upload</p>
-                <p className="text-[9.5px] text-muted-foreground mt-0.5">PDF, DOC, CSV — or paste a URL</p>
+                <Upload className="w-6 h-6 text-muted-foreground mx-auto mb-2" />
+                <p className="text-[11px] text-foreground font-medium">Drop files here or click to upload</p>
+                <p className="text-[9px] text-muted-foreground mt-1">PDF, DOCX, TXT — up to 10MB each</p>
               </div>
-              {/* URL input */}
+              <div className="flex items-center gap-3 mt-2">
+                <div className="h-px bg-border flex-1" />
+                <span className="text-[9px] text-muted-foreground">or</span>
+                <div className="h-px bg-border flex-1" />
+              </div>
               <div className="flex items-center gap-2 mt-2">
-                <div className="flex-1 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border bg-white">
-                  <Globe className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                  <input
-                    type="text"
-                    placeholder="Paste a URL..."
-                    className="text-[11px] bg-transparent outline-none flex-1 placeholder:text-muted-foreground/50"
-                    onKeyDown={(e) => { if (e.key === "Enter") setStep("processing"); }}
-                  />
-                </div>
-                <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => setStep("processing")}>
-                  Add
-                </Button>
+                <Globe className="w-3.5 h-3.5 text-muted-foreground" />
+                <Input placeholder="Paste a URL to import..." className="h-8 text-[11px] flex-1" />
+                <Button size="sm" variant="outline" className="h-8 text-[10px]">Import</Button>
               </div>
               <button
-                className="text-[10px] text-primary hover:underline mt-2 block"
-                onClick={() => setStep("processing")}
+                onClick={() => { setUseDemo(true); setStep("processing"); }}
+                className="mt-2 text-[10px] text-primary hover:underline"
               >
-                No docs handy? Try with Seel Return Guidelines (demo)
+                No docs handy? Try with Seel Return Guidelines →
               </button>
             </div>
           )}
 
           {/* Processing */}
-          {(step === "processing" || step === "rules_extracted" || step === "conflicts" || step === "playbook_ready" || step === "hire_prompt") && (
+          {step !== "greeting" && (
             <div className="flex gap-2.5">
               <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center shrink-0 mt-0.5">
                 <span className="text-[12px]">&#x1F454;</span>
@@ -575,48 +573,70 @@ function SetupTab({ onSetupComplete }: { onSetupComplete: () => void }) {
                 <div className="rounded-xl rounded-tl-sm bg-muted/40 px-3.5 py-2.5">
                   {step === "processing" ? (
                     <>
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                        <span className="text-[12px] font-medium text-foreground">Reading your docs...</span>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground leading-relaxed">
-                        This takes a moment for the demo. When you upload your own documents, processing may take 30–60 minutes. I'll notify you when it's ready.
+                      <p className="text-[12px] leading-relaxed text-foreground">
+                        {useDemo
+                          ? "Great, I'll use the Seel Return Guidelines as a demo. Give me a moment to read through them..."
+                          : "Got it! I'm reading through your documents now..."}
                       </p>
-                      {/* Auto-advance for demo */}
-                      <div className="mt-2">
-                        <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => setStep("rules_extracted")}>
-                          Skip (demo) →
-                        </Button>
+                      {!useDemo && (
+                        <p className="text-[12px] leading-relaxed text-muted-foreground mt-2">
+                          <Clock className="w-3 h-3 inline mr-1" />
+                          For your own documents, this usually takes 30–60 minutes. I'll notify you when it's ready — feel free to come back later.
+                        </p>
+                      )}
+                      <div className="mt-3 flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        <span className="text-[10px] text-muted-foreground">Analyzing documents...</span>
                       </div>
+                      {useDemo && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-3 h-7 text-[10px]"
+                          onClick={() => setStep("rules_extracted")}
+                        >
+                          Skip to results (demo)
+                        </Button>
+                      )}
                     </>
                   ) : (
                     <>
-                      <p className="text-[12px] text-foreground mb-2">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 inline mr-1" />
-                        Done! I extracted <strong>{DEMO_EXTRACTED_RULES.length} rules</strong> from your documents:
+                      <p className="text-[12px] leading-relaxed text-foreground">
+                        Done! I've extracted <strong>{demoRules.length} rules</strong> from your documents:
                       </p>
-                      <div className="space-y-1">
-                        {visibleRules.map((rule, i) => (
-                          <div key={i} className="flex items-center gap-1.5 text-[11px] text-foreground">
-                            <FileText className="w-3 h-3 text-muted-foreground shrink-0" />
-                            {rule}
+                      <div className="mt-2 space-y-1">
+                        {demoRules.slice(0, 5).map((rule, i) => (
+                          <div key={i} className="flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                            <span className="text-[11px] text-foreground">{rule}</span>
                           </div>
                         ))}
-                        {!showAllRules && DEMO_EXTRACTED_RULES.length > 5 && (
+                        {demoRules.length > 5 && (
                           <button
-                            className="text-[10px] text-primary hover:underline mt-1"
-                            onClick={() => setShowAllRules(true)}
+                            onClick={() => toast.info(`All ${demoRules.length} rules: ${demoRules.join(", ")}`)}
+                            className="text-[10px] text-primary hover:underline ml-4.5"
                           >
-                            Show {DEMO_EXTRACTED_RULES.length - 5} more...
+                            +{demoRules.length - 5} more rules
                           </button>
                         )}
                       </div>
-                      {step === "rules_extracted" && (
-                        <p className="text-[11px] text-muted-foreground mt-2">
-                          I found a couple of things that need your input...
-                          <Button size="sm" variant="link" className="h-auto p-0 ml-1 text-[11px]" onClick={() => { setStep("conflicts"); setCurrentConflictIdx(0); }}>
-                            Continue →
+                      {conflicts.length > 0 && step === "rules_extracted" && (
+                        <>
+                          <p className="text-[12px] leading-relaxed text-foreground mt-3">
+                            I found <strong>{conflicts.length} conflicts</strong> that need your input:
+                          </p>
+                          <Button
+                            size="sm"
+                            className="mt-2 h-7 text-[10px] bg-teal-600 hover:bg-teal-700"
+                            onClick={() => { setConflictIdx(0); setStep("conflicts"); }}
+                          >
+                            Review conflicts
                           </Button>
+                        </>
+                      )}
+                      {step === "done" && (
+                        <p className="text-[12px] leading-relaxed text-foreground mt-3">
+                          All conflicts resolved. Your playbook is ready!
                         </p>
                       )}
                     </>
@@ -626,57 +646,8 @@ function SetupTab({ onSetupComplete }: { onSetupComplete: () => void }) {
             </div>
           )}
 
-          {/* Conflicts — one at a time as chat bubbles */}
-          {(step === "conflicts" || step === "playbook_ready" || step === "hire_prompt") && conflicts.map((conflict, idx) => {
-            if (idx > currentConflictIdx && step === "conflicts") return null;
-            return (
-              <div key={conflict.id} className="flex gap-2.5">
-                <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center shrink-0 mt-0.5">
-                  <span className="text-[12px]">&#x1F454;</span>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span className="text-[11px] font-semibold">Alex (Team Lead)</span>
-                    <span className="text-[9px] text-muted-foreground/50">just now</span>
-                  </div>
-                  <div className="rounded-xl rounded-tl-sm bg-muted/40 px-3.5 py-2.5">
-                    <p className="text-[12px] font-medium text-foreground mb-1">{conflict.title}</p>
-                    <p className="text-[11.5px] text-foreground leading-relaxed">{conflict.description}</p>
-                  </div>
-                  {/* Options or resolved state */}
-                  {conflict.resolved ? (
-                    <div className="mt-1.5 flex justify-end">
-                      <div className="rounded-xl rounded-tr-sm bg-violet-50 px-3 py-1.5">
-                        <span className="text-[11px] text-violet-700">
-                          {conflict.options.find((o) => o.value === conflict.selectedOption)?.label}
-                        </span>
-                      </div>
-                    </div>
-                  ) : idx === currentConflictIdx && step === "conflicts" ? (
-                    <div className="mt-1.5 flex flex-wrap justify-end gap-1.5">
-                      {conflict.options.map((opt) => (
-                        <button
-                          key={opt.value}
-                          onClick={() => handleConflictResolve(conflict.id, opt.value)}
-                          className={cn(
-                            "px-3 py-1.5 rounded-full text-[10.5px] font-medium border transition-colors",
-                            opt.value === "dismiss"
-                              ? "border-border text-muted-foreground hover:bg-accent"
-                              : "border-primary/30 text-primary hover:bg-primary/5"
-                          )}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Playbook ready */}
-          {(step === "playbook_ready" || step === "hire_prompt") && (
+          {/* Conflicts — one bubble per conflict */}
+          {step === "conflicts" && conflictIdx < conflicts.length && (
             <div className="flex gap-2.5">
               <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center shrink-0 mt-0.5">
                 <span className="text-[12px]">&#x1F454;</span>
@@ -686,23 +657,50 @@ function SetupTab({ onSetupComplete }: { onSetupComplete: () => void }) {
                   <span className="text-[11px] font-semibold">Alex (Team Lead)</span>
                   <span className="text-[9px] text-muted-foreground/50">just now</span>
                 </div>
-                <div className="rounded-xl rounded-tl-sm bg-muted/40 px-3.5 py-2.5">
-                  <p className="text-[12px] text-foreground">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 inline mr-1" />
-                    Your playbook is set up with {DEMO_EXTRACTED_RULES.length} rules. You can review and edit them anytime in the Playbook tab.
+                <div className="rounded-xl rounded-tl-sm bg-amber-50/60 border border-amber-200/40 px-3.5 py-2.5">
+                  <p className="text-[10px] font-semibold text-amber-700 uppercase tracking-wider mb-1">
+                    Conflict {conflictIdx + 1} of {conflicts.length}
                   </p>
+                  <p className="text-[12px] font-medium text-foreground mb-1">{conflicts[conflictIdx].title}</p>
+                  <p className="text-[11.5px] text-foreground leading-relaxed">{conflicts[conflictIdx].description}</p>
                 </div>
-                {step === "playbook_ready" && (
-                  <Button size="sm" variant="link" className="h-auto p-0 mt-1 text-[11px]" onClick={() => setStep("hire_prompt")}>
-                    Continue →
-                  </Button>
-                )}
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {conflicts[conflictIdx].options.map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => {
+                        toast.success(`Selected: ${opt}`);
+                        if (conflictIdx + 1 >= conflicts.length) {
+                          setStep("done");
+                        } else {
+                          setConflictIdx(conflictIdx + 1);
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-full text-[10.5px] border border-border bg-white hover:bg-accent transition-colors"
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => {
+                      toast.info("Conflict dismissed — will use default behavior");
+                      if (conflictIdx + 1 >= conflicts.length) {
+                        setStep("done");
+                      } else {
+                        setConflictIdx(conflictIdx + 1);
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-full text-[10.5px] text-muted-foreground hover:bg-accent transition-colors"
+                  >
+                    Dismiss
+                  </button>
+                </div>
               </div>
             </div>
           )}
 
-          {/* Hire prompt */}
-          {step === "hire_prompt" && (
+          {/* Done — hire rep */}
+          {step === "done" && (
             <div className="flex gap-2.5">
               <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center shrink-0 mt-0.5">
                 <span className="text-[12px]">&#x1F454;</span>
@@ -723,10 +721,10 @@ function SetupTab({ onSetupComplete }: { onSetupComplete: () => void }) {
                 </div>
                 <div className="flex justify-end mt-2">
                   <Button
-                    className="bg-teal-600 hover:bg-teal-700 text-white text-[11.5px] h-9 px-4"
+                    className="h-9 px-5 text-[11px] bg-teal-600 hover:bg-teal-700 rounded-full"
                     onClick={onSetupComplete}
                   >
-                    Review & Hire Support Rep <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                    Review & Hire Support Rep <ArrowRight className="w-3.5 h-3.5 ml-1" />
                   </Button>
                 </div>
               </div>
@@ -742,42 +740,33 @@ function SetupTab({ onSetupComplete }: { onSetupComplete: () => void }) {
 // ── HIRE REP DIALOG ─────────────────────────────────────
 // ══════════════════════════════════════════════════════════
 
-const PERSONALITIES = [
-  { label: "Friendly", emoji: "👋" },
-  { label: "Neutral", emoji: "📋" },
-  { label: "Matter-of-fact", emoji: "📄" },
-  { label: "Professional", emoji: "💼" },
-  { label: "Humorous", emoji: "😊" },
-];
-
 function HireRepDialog({
   open,
   onOpenChange,
   onHire,
 }: {
   open: boolean;
-  onOpenChange: (o: boolean) => void;
+  onOpenChange: (v: boolean) => void;
   onHire: (name: string) => void;
 }) {
   const [name, setName] = useState("Ava");
   const [personality, setPersonality] = useState("Friendly");
-  const [strategy, setStrategy] = useState("conservative");
-  const [language, setLanguage] = useState("en-GB");
 
-  const groupedActions = useMemo(() => {
+  const actionGroups = useMemo(() => {
     const groups: Record<string, ActionPermission[]> = {};
     ACTION_PERMISSIONS.forEach((a) => {
-      if (!groups[a.category]) groups[a.category] = [];
-      groups[a.category].push(a);
+      const cat = a.category || "General";
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(a);
     });
     return groups;
   }, []);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[680px] max-h-[85vh] overflow-y-auto p-0">
+      <DialogContent className="max-w-[680px] p-0 overflow-hidden">
         {/* Header */}
-        <div className="bg-teal-600 px-6 py-4 rounded-t-lg">
+        <div className="bg-teal-600 px-6 py-4">
           <DialogHeader>
             <DialogTitle className="text-white text-[16px]">Hire Support Rep</DialogTitle>
             <DialogDescription className="text-teal-100 text-[12px]">
@@ -786,104 +775,73 @@ function HireRepDialog({
           </DialogHeader>
         </div>
 
-        <div className="px-6 py-4">
-          <div className="grid grid-cols-2 gap-6">
-            {/* Left column — basic info */}
+        <div className="flex max-h-[60vh]">
+          {/* Left column — basic config */}
+          <div className="flex-1 px-5 py-4 overflow-y-auto border-r border-border">
             <div className="space-y-4">
               <div>
                 <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Name</Label>
                 <Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 h-8 text-[12px]" />
               </div>
-
               <div>
-                <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Tone of Voice</Label>
-                <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  {PERSONALITIES.map((p) => (
-                    <button
-                      key={p.label}
-                      onClick={() => setPersonality(p.label)}
-                      className={cn(
-                        "px-2.5 py-1.5 rounded-full text-[10.5px] border transition-colors flex items-center gap-1",
-                        personality === p.label
-                          ? "border-teal-500 bg-teal-50 text-teal-700"
-                          : "border-border text-foreground hover:bg-accent"
-                      )}
-                    >
-                      <span className="text-[11px]">{p.emoji}</span> {p.label}
-                    </button>
-                  ))}
-                </div>
+                <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Personality</Label>
+                <div
+ className="flex flex-wrap gap-1.5 mt-1.5">
+                {PERSONALITIES.map((p) => (
+                  <button
+                    key={p.label}
+                    className={cn(
+                      "px-2.5 py-1.5 rounded-full text-[10.5px] border transition-colors flex items-center gap-1",
+                      p.label === personality
+                        ? "border-teal-400 bg-teal-50 text-teal-700"
+                        : "border-border text-foreground hover:bg-accent"
+                    )}
+                    onClick={() => setPersonality(p.label)}
+                  >
+                    <span className="text-[11px]">{p.emoji}</span> {p.label}
+                  </button>
+                ))}
               </div>
-
-              <div>
-                <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Strategy</Label>
-                <Select value={strategy} onValueChange={setStrategy}>
-                  <SelectTrigger className="mt-1 h-8 text-[11px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="conservative">Conservative</SelectItem>
-                    <SelectItem value="balanced">Balanced</SelectItem>
-                    <SelectItem value="aggressive">Aggressive</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
-
               <div>
-                <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Language</Label>
-                <Select value={language} onValueChange={setLanguage}>
-                  <SelectTrigger className="mt-1 h-8 text-[11px]">
-                    <SelectValue />
-                  </SelectTrigger>
+                <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Mode</Label>
+                <Select defaultValue="training">
+                  <SelectTrigger className="mt-1 h-8 text-[11px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="en-GB">English (British)</SelectItem>
-                    <SelectItem value="en-US">English (US)</SelectItem>
-                    <SelectItem value="es">Spanish</SelectItem>
-                    <SelectItem value="fr">French</SelectItem>
+                    <SelectItem value="training">Training</SelectItem>
+                    <SelectItem value="production">Production</SelectItem>
+                    <SelectItem value="off">Off</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
+          </div>
 
-            {/* Right column — actions */}
-            <div>
-              <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Allowed Actions</Label>
-              <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
-                {Object.entries(groupedActions).map(([category, actions]) => (
-                  <div key={category}>
-                    <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">{category}</p>
-                    <div className="space-y-0.5">
-                      {actions.map((action) => (
-                        <div key={action.id}>
-                          <label className="flex items-center gap-2 py-1 px-1.5 rounded hover:bg-accent/30 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              defaultChecked={action.permission === "autonomous"}
-                              className="rounded border-border text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <span className="text-[11px] text-foreground">{action.name}</span>
-                              {action.permission === "disabled" && (
-                                <span className="text-[9px] text-muted-foreground ml-1">(not assigned)</span>
-                              )}
-                            </div>
-                          </label>
-                          {action.guardrails && action.guardrails.length > 0 && action.permission === "autonomous" && (
-                            <div className="ml-7 mb-1">
-                              {action.guardrails.map((g) => (
-                                <div key={g.id} className="flex items-center gap-1.5 text-[9.5px] text-muted-foreground py-0.5">
-                                  <span className="w-1 h-1 rounded-full bg-amber-400 shrink-0" />
-                                  {g.label}{g.value ? `: ${g.value}${g.unit || ""}` : ""}
-                                </div>
-                              ))}
-                            </div>
-                          )}
+          {/* Right column — allowed actions */}
+          <div className="flex-1 px-5 py-4 overflow-y-auto">
+            <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Allowed Actions</Label>
+            <div className="mt-2 space-y-3">
+              {Object.entries(actionGroups).map(([cat, actions]) => (
+                <div key={cat}>
+                  <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">{cat}</p>
+                  <div className="space-y-1">
+                    {actions.map((action) => (
+                      <label key={action.id} className="flex items-start gap-2 py-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                  defaultChecked={action.permission === 'autonomous'}
+                          className="mt-0.5 rounded border-border"
+                        />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-[11px] text-foreground">{action.name}</span>
+                            {action.guardrails && action.guardrails.length > 0 && (
+                              <p className="text-[9px] text-muted-foreground mt-0.5">{action.guardrails[0].label}</p>                     )}
                         </div>
-                      ))}
-                    </div>
+                      </label>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -891,8 +849,8 @@ function HireRepDialog({
         {/* Footer */}
         <div className="px-6 py-3 border-t border-border">
           <Button
-            className="w-full bg-teal-600 hover:bg-teal-700 text-white h-10"
-            onClick={() => onHire(name)}
+            className="w-full h-10 bg-teal-600 hover:bg-teal-700 text-[13px]"
+            onClick={() => onHire(name || "Ava")}
           >
             Hire
           </Button>
@@ -910,26 +868,30 @@ function EscalationCard({ ticket }: { ticket: EscalationTicket }) {
   const isResolved = ticket.status === "resolved";
   return (
     <div className={cn(
-      "rounded-lg border px-3.5 py-2.5 transition-colors",
-      isResolved ? "border-border/40 bg-muted/20 opacity-60" : "border-border bg-white hover:shadow-sm"
+      "rounded-xl border px-3.5 py-2.5 transition-colors",
+      isResolved ? "border-border/40 bg-muted/20 opacity-60" : "border-border bg-white"
     )}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11.5px] font-medium text-foreground">
-              #{ticket.zendeskTicketId} · {ticket.subject}
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="text-[11px] font-medium text-foreground">
+              #{ticket.id} · {ticket.subject}
             </span>
           </div>
-          <p className="text-[10.5px] text-muted-foreground mt-0.5 leading-relaxed line-clamp-2">
-            {ticket.reason}
+          <p className="text-[10.5px] text-muted-foreground leading-relaxed line-clamp-2">
+            {ticket.summary}
           </p>
-          <p className="text-[9px] text-muted-foreground/60 mt-1">{formatRelativeTime(ticket.createdAt)}</p>
+          <p className="text-[9px] text-muted-foreground/60 mt-1">
+            {formatRelativeTime(ticket.createdAt)}
+          </p>
         </div>
         <Badge
           variant="outline"
           className={cn(
             "text-[8px] shrink-0",
-            isResolved ? "bg-muted/30 text-muted-foreground border-border/30" : "bg-amber-50 text-amber-600 border-amber-200"
+            isResolved
+              ? "bg-muted/30 text-muted-foreground border-border/40"
+              : "bg-amber-50 text-amber-700 border-amber-200"
           )}
         >
           {isResolved ? "Resolved" : "Needs attention"}
@@ -952,17 +914,25 @@ function RepProfilePanel({
 }) {
   const [, navigate] = useLocation();
   const [isEditing, setIsEditing] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
+  const [personality, setPersonality] = useState("Friendly");
   const initials = getInitials(repName);
 
   const configHistory = [
-    {
-      hash: "0413d17",
-      description: `${repName} onboarded — WISMO Specialist, Training mode`,
-      author: "Team Lead (Alex)",
-      date: "29 Mar 2026, 9:14 pm",
-    },
+    { hash: "0413d17", description: `${repName} onboarded — WISMO Specialist, Training mode`, author: "Team Lead (Alex)", date: "29 Mar 2026, 9:14 pm" },
   ];
 
+  const actionGroups = useMemo(() => {
+    const groups: Record<string, ActionPermission[]> = {};
+    ACTION_PERMISSIONS.forEach((a) => {
+      const cat = a.category || "General";
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(a);
+    });
+    return groups;
+  }, []);
+
+  // Edit mode
   if (isEditing) {
     return (
       <div className="w-[320px] border-l border-border bg-white flex flex-col h-full shrink-0">
@@ -973,29 +943,10 @@ function RepProfilePanel({
           </button>
         </div>
         <ScrollArea className="flex-1">
-          <div className="px-4 py-3 space-y-4">
+          <div className="px-4 py-4 space-y-3">
             <div>
               <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Name</Label>
               <Input defaultValue={repName} className="mt-1 h-8 text-[12px]" />
-            </div>
-            <div>
-              <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Role</Label>
-              <Input defaultValue="L1 — WISMO Specialist" className="mt-1 h-8 text-[12px]" />
-            </div>
-            <div>
-              <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Strategy</Label>
-              <Select defaultValue="conservative">
-                <SelectTrigger className="mt-1 h-8 text-[11px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="conservative">Conservative</SelectItem>
-                  <SelectItem value="balanced">Balanced</SelectItem>
-                  <SelectItem value="aggressive">Aggressive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Refund Cap</Label>
-              <Input defaultValue="£100" className="mt-1 h-8 text-[12px]" />
             </div>
             <div>
               <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Personality</Label>
@@ -1005,25 +956,16 @@ function RepProfilePanel({
                     key={p.label}
                     className={cn(
                       "px-2.5 py-1.5 rounded-full text-[10.5px] border transition-colors flex items-center gap-1",
-                      p.label === "Friendly"
+                      p.label === personality
                         ? "border-violet-400 bg-violet-50 text-violet-700"
                         : "border-border text-foreground hover:bg-accent"
                     )}
+                    onClick={() => setPersonality(p.label)}
                   >
                     <span className="text-[11px]">{p.emoji}</span> {p.label}
                   </button>
                 ))}
               </div>
-            </div>
-            <div>
-              <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Language</Label>
-              <Select defaultValue="en-GB">
-                <SelectTrigger className="mt-1 h-8 text-[11px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="en-GB">English (British)</SelectItem>
-                  <SelectItem value="en-US">English (US)</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
             <div>
               <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Mode</Label>
@@ -1036,6 +978,32 @@ function RepProfilePanel({
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Allowed Actions with Guardrails */}
+            <div>
+              <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Allowed Actions</Label>
+              <div className="mt-2 space-y-3">
+                {Object.entries(actionGroups).map(([cat, actions]) => (
+                  <div key={cat}>
+                    <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">{cat}</p>
+                    <div className="space-y-1">
+                      {actions.map((action) => (
+                        <label key={action.id} className="flex items-start gap-2 py-1 cursor-pointer">
+                          <input type="checkbox" defaultChecked={action.permission === 'autonomous'} className="mt-0.5 rounded border-border" />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-[11px] text-foreground">{action.name}</span>
+                            {action.guardrails && action.guardrails.length > 0 && (
+                              <p className="text-[9px] text-muted-foreground mt-0.5">{action.guardrails[0].label}</p>
+                            )}
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <Button className="w-full h-8 text-[11px]" onClick={() => { setIsEditing(false); toast.success("Profile updated"); }}>
               Save Changes
             </Button>
@@ -1045,6 +1013,7 @@ function RepProfilePanel({
     );
   }
 
+  // View mode
   return (
     <div className="w-[320px] border-l border-border bg-white flex flex-col h-full shrink-0">
       <div className="flex items-center justify-between px-4 h-10 border-b border-border shrink-0">
@@ -1076,16 +1045,13 @@ function RepProfilePanel({
             <Pencil className="w-3 h-3 mr-1" /> Edit Profile
           </Button>
 
-          {/* Details */}
+          {/* Details — simplified fields */}
           <div className="mb-4">
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Details</p>
             <div className="space-y-1.5">
               {[
-                ["Role", "L1 — WISMO Specialist"],
-                ["Strategy", "Conservative"],
-                ["Refund Cap", "£100"],
                 ["Personality", "Warm & Professional"],
-                ["Language", "English (British)"],
+                ["Mode", "Training"],
                 ["Started", "Mar 29, 2026"],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-center justify-between">
@@ -1096,7 +1062,7 @@ function RepProfilePanel({
             </div>
           </div>
 
-          {/* Performance */}
+          {/* Performance — no Cost, no Escalation, has Avg Response */}
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Performance</p>
@@ -1112,9 +1078,7 @@ function RepProfilePanel({
                 ["Tickets", "0 total / 0 today"],
                 ["Resolution", "0%"],
                 ["CSAT", "0"],
-                ["Avg Response", "—"],
-                ["Escalation", "0%"],
-                ["Cost/Ticket", "—"],
+                ["Avg Response", "2m 15s"],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-center justify-between">
                   <span className="text-[11px] text-muted-foreground">{label}</span>
@@ -1124,24 +1088,30 @@ function RepProfilePanel({
             </div>
           </div>
 
-          {/* Config History */}
+          {/* Config History — collapsed by default */}
           <div>
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+            <button
+              onClick={() => setConfigOpen(!configOpen)}
+              className="flex items-center gap-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 hover:text-foreground transition-colors"
+            >
+              {configOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
               Config History ({configHistory.length})
-            </p>
-            <div className="space-y-2">
-              {configHistory.map((entry, i) => (
-                <div key={i} className="flex gap-2">
-                  <Badge variant="outline" className="text-[8px] shrink-0 mt-0.5 font-mono bg-violet-50 text-violet-600 border-violet-200">
-                    {entry.hash}
-                  </Badge>
-                  <div>
-                    <p className="text-[10.5px] text-foreground leading-snug">{entry.description}</p>
-                    <p className="text-[9px] text-muted-foreground mt-0.5">{entry.author} · {entry.date}</p>
+            </button>
+            {configOpen && (
+              <div className="space-y-2">
+                {configHistory.map((entry, i) => (
+                  <div key={i} className="flex gap-2">
+                    <Badge variant="outline" className="text-[8px] shrink-0 mt-0.5 font-mono bg-violet-50 text-violet-600 border-violet-200">
+                      {entry.hash}
+                    </Badge>
+                    <div>
+                      <p className="text-[10.5px] text-foreground leading-snug">{entry.description}</p>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">{entry.author} · {entry.date}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </ScrollArea>
@@ -1164,7 +1134,7 @@ function RepView({
   showProfile: boolean;
   onToggleProfile: () => void;
 }) {
-  const [onboardingStep, setOnboardingStep] = useState<RepOnboardingStep>("done");
+  const [onboardingStep] = useState<RepOnboardingStep>("done");
   const initials = getInitials(repName);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -1199,8 +1169,7 @@ function RepView({
       <ScrollArea className="flex-1" ref={scrollRef}>
         <div className="px-4 py-4 space-y-4">
 
-          {/* Pre-completed onboarding conversation */}
-          {/* Greeting */}
+          {/* Pre-completed onboarding — Greeting */}
           <div className="flex gap-2.5">
             <div className="w-7 h-7 rounded-full bg-violet-500 flex items-center justify-center text-white text-[10px] font-bold shrink-0 mt-0.5">
               {initials}
@@ -1221,7 +1190,7 @@ function RepView({
             </div>
           </div>
 
-          {/* Scenario 1 */}
+          {/* Scenario 1 — self-handle */}
           <div className="flex gap-2.5">
             <div className="w-7 h-7 rounded-full bg-violet-500 flex items-center justify-center text-white text-[10px] font-bold shrink-0 mt-0.5">
               {initials}
@@ -1236,29 +1205,32 @@ function RepView({
                 <p className="text-[12px] text-foreground leading-relaxed">
                   Customer writes: <em>"Where is my order #DBH-29174? It's been a week and I haven't received anything."</em>
                 </p>
-                <p className="text-[12px] text-foreground leading-relaxed mt-2">Here's what I'd do:</p>
-                <p className="text-[12px] text-foreground leading-relaxed">1. Look up #DBH-29174 in Shopify</p>
-                <p className="text-[12px] text-foreground leading-relaxed">2. I see it's <strong>shipped</strong> via Royal Mail, tracking RM29174UK, expected Mar 25</p>
-                <p className="text-[12px] text-foreground leading-relaxed">3. I'd reply:</p>
-                <div className="ml-3 mt-1 pl-2.5 border-l-2 border-border/50">
-                  <p className="text-[11.5px] text-muted-foreground italic leading-relaxed">
-                    Hi Emma! Your order #DBH-29174 shipped via Royal Mail (tracking: RM29174UK) and is expected to arrive by March 25th. You can track it here: [link]. Let me know if you need anything else!
-                  </p>
-                </div>
+                <p className="text-[12px] text-foreground leading-relaxed mt-2">
+                  Here's what I'd do:
+                </p>
+                <ol className="text-[12px] text-foreground leading-relaxed mt-1 list-decimal list-inside space-y-0.5">
+                  <li>Look up #DBH-29174 in Shopify</li>
+                  <li>I see it's <strong>shipped</strong> via Royal Mail, tracking RM29174UK, expected Mar 25</li>
+                  <li>I'd reply:</li>
+                </ol>
+                <blockquote className="mt-2 pl-3 border-l-2 border-border text-[11.5px] text-muted-foreground italic">
+                  Hi Emma! Your order #DBH-29174 shipped via Royal Mail (tracking: RM29174UK) and is expected to arrive by March 25th. You can track it here: [link]. Let me know if you need anything else!
+                </blockquote>
                 <p className="text-[12px] text-foreground leading-relaxed mt-2">
                   This is read-only — I'm just looking up info and replying. Does this look right?
                 </p>
               </div>
-              {/* User response (pre-completed) */}
-              <div className="flex justify-end mt-1.5">
-                <div className="rounded-xl rounded-tr-sm bg-violet-50 px-3 py-1.5">
-                  <span className="text-[11px] text-violet-700">That's right</span>
-                </div>
-              </div>
             </div>
           </div>
 
-          {/* Scenario 2 — Escalation: unclear input */}
+          {/* User response — That's right */}
+          <div className="flex gap-2.5 justify-end">
+            <div className="rounded-xl rounded-tr-sm bg-violet-50 border border-violet-100 px-3.5 py-2 max-w-[80%]">
+              <p className="text-[12px] text-foreground">That's right</p>
+            </div>
+          </div>
+
+          {/* Scenario 2 — escalation (unclear input) */}
           <div className="flex gap-2.5">
             <div className="w-7 h-7 rounded-full bg-violet-500 flex items-center justify-center text-white text-[10px] font-bold shrink-0 mt-0.5">
               {initials}
@@ -1269,26 +1241,25 @@ function RepView({
                 <span className="text-[9px] text-muted-foreground/50">just now</span>
               </div>
               <div className="rounded-xl rounded-tl-sm bg-muted/40 px-3.5 py-2.5">
-                <p className="text-[13px] font-bold text-foreground mb-1.5">Scenario 2 — "I want to return this"</p>
+                <p className="text-[13px] font-bold text-foreground mb-1.5">Scenario 2 — "I want a refund but also keep the item"</p>
                 <p className="text-[12px] text-foreground leading-relaxed">
-                  Customer writes: <em>"I want to return this. It's not what I expected."</em>
+                  Customer writes: <em>"I bought this as a gift and the recipient doesn't want it. Can I get a refund without returning it?"</em>
                 </p>
                 <p className="text-[12px] text-foreground leading-relaxed mt-2">
-                  I'd need to know which order and item. But the customer hasn't given me an order number. I'd ask for it first. If they say it's damaged, I follow the damage rule. If it's change-of-mind, I follow the standard return rule.
+                  This one's tricky — the request is unclear and doesn't match any standard flow. I'd <strong>escalate to you</strong> with a note explaining the ambiguity so you can decide.
                 </p>
-                <p className="text-[12px] text-foreground leading-relaxed mt-2">
-                  <strong>But if the customer gets frustrated</strong> and says "I want to talk to a manager" — I'd escalate immediately. That triggers my escalation guardrail.
-                </p>
-              </div>
-              <div className="flex justify-end mt-1.5">
-                <div className="rounded-xl rounded-tr-sm bg-violet-50 px-3 py-1.5">
-                  <span className="text-[11px] text-violet-700">That's right</span>
-                </div>
               </div>
             </div>
           </div>
 
-          {/* Scenario 3 — Escalation: no permission */}
+          {/* User response */}
+          <div className="flex gap-2.5 justify-end">
+            <div className="rounded-xl rounded-tr-sm bg-violet-50 border border-violet-100 px-3.5 py-2 max-w-[80%]">
+              <p className="text-[12px] text-foreground">That's right</p>
+            </div>
+          </div>
+
+          {/* Scenario 3 — escalation (no permission) */}
           <div className="flex gap-2.5">
             <div className="w-7 h-7 rounded-full bg-violet-500 flex items-center justify-center text-white text-[10px] font-bold shrink-0 mt-0.5">
               {initials}
@@ -1299,23 +1270,25 @@ function RepView({
                 <span className="text-[9px] text-muted-foreground/50">just now</span>
               </div>
               <div className="rounded-xl rounded-tl-sm bg-muted/40 px-3.5 py-2.5">
-                <p className="text-[13px] font-bold text-foreground mb-1.5">Scenario 3 — "Can I get a discount?"</p>
+                <p className="text-[13px] font-bold text-foreground mb-1.5">Scenario 3 — "Process my refund now"</p>
                 <p className="text-[12px] text-foreground leading-relaxed">
-                  Customer writes: <em>"I've been a loyal customer for 2 years. Can I get a discount on my next order?"</em>
+                  Customer writes: <em>"I returned my order last week. Where's my refund?"</em>
                 </p>
                 <p className="text-[12px] text-foreground leading-relaxed mt-2">
-                  I don't have the "Create Coupon" action enabled, so I can't generate a discount code. I'd escalate this to you with a note: "Loyal customer requesting discount — I don't have permission to create coupons."
+                  I can look up the return status, but I don't have permission to <strong>process refunds</strong>. I'd <strong>escalate to you</strong> with the return details so you can trigger the refund.
                 </p>
-              </div>
-              <div className="flex justify-end mt-1.5">
-                <div className="rounded-xl rounded-tr-sm bg-violet-50 px-3 py-1.5">
-                  <span className="text-[11px] text-violet-700">That's right</span>
-                </div>
               </div>
             </div>
           </div>
 
-          {/* Mode selection (pre-completed) */}
+          {/* User response */}
+          <div className="flex gap-2.5 justify-end">
+            <div className="rounded-xl rounded-tr-sm bg-violet-50 border border-violet-100 px-3.5 py-2 max-w-[80%]">
+              <p className="text-[12px] text-foreground">That's right</p>
+            </div>
+          </div>
+
+          {/* Mode selection */}
           <div className="flex gap-2.5">
             <div className="w-7 h-7 rounded-full bg-violet-500 flex items-center justify-center text-white text-[10px] font-bold shrink-0 mt-0.5">
               {initials}
@@ -1326,29 +1299,30 @@ function RepView({
                 <span className="text-[9px] text-muted-foreground/50">just now</span>
               </div>
               <div className="rounded-xl rounded-tl-sm bg-muted/40 px-3.5 py-2.5">
-                <p className="text-[12px] text-foreground leading-relaxed">
+                <p className="text-[12px] leading-relaxed text-foreground">
                   Great — I'm confident I understand your policies.
                 </p>
-                <p className="text-[12px] text-foreground leading-relaxed mt-2">
+                <p className="text-[12px] leading-relaxed text-foreground mt-2">
                   One last question. How do you want me to work?
                 </p>
-                <p className="text-[12px] text-foreground leading-relaxed mt-2">
+                <p className="text-[12px] leading-relaxed text-foreground mt-2">
                   <strong>Training mode</strong> — I draft my responses and actions, but I check with you before anything goes out to the customer. Good if you want to review my work for a while.
                 </p>
-                <p className="text-[12px] text-foreground leading-relaxed mt-2">
+                <p className="text-[12px] leading-relaxed text-foreground mt-2">
                   <strong>Production mode</strong> — I handle tickets on my own. You can review everything after the fact. Good if you trust the sanity check and want me working immediately.
                 </p>
               </div>
-              {/* User chose Training */}
-              <div className="flex justify-end mt-1.5">
-                <div className="rounded-xl rounded-tr-sm bg-violet-50 px-3 py-1.5">
-                  <span className="text-[11px] text-violet-700">Training — check with me first</span>
-                </div>
-              </div>
             </div>
           </div>
 
-          {/* Ready + communication explanation */}
+          {/* User chose Training */}
+          <div className="flex gap-2.5 justify-end">
+            <div className="rounded-xl rounded-tr-sm bg-violet-50 border border-violet-100 px-3.5 py-2 max-w-[80%]">
+              <p className="text-[12px] text-foreground">Training — check with me first</p>
+            </div>
+          </div>
+
+          {/* Rep confirms + tells about escalation communication */}
           <div className="flex gap-2.5">
             <div className="w-7 h-7 rounded-full bg-violet-500 flex items-center justify-center text-white text-[10px] font-bold shrink-0 mt-0.5">
               {initials}
@@ -1359,27 +1333,23 @@ function RepView({
                 <span className="text-[9px] text-muted-foreground/50">just now</span>
               </div>
               <div className="rounded-xl rounded-tl-sm bg-muted/40 px-3.5 py-2.5">
-                <p className="text-[12px] text-foreground leading-relaxed">
+                <p className="text-[12px] leading-relaxed text-foreground">
                   I'm live in <strong>Training mode</strong>. I'll start picking up WISMO, cancellation, and address change tickets now.
                 </p>
-                <p className="text-[12px] text-foreground leading-relaxed mt-2">
-                  I'll message you here when I need your help — like when a customer situation falls outside my rules, or when I don't have permission to take an action. You can also adjust my settings anytime from my Profile.
-                </p>
-                <p className="text-[12px] text-foreground leading-relaxed mt-2">
-                  If something about my tone or approach needs adjustment, let Alex (Team Lead) know — he'll coach me on it.
+                <p className="text-[12px] leading-relaxed text-foreground mt-2">
+                  I'll message you here whenever I need your help — like when a ticket needs escalation or when I'm unsure about something. You'll see those as cards below.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Escalation cards — sorted by time */}
-          {sortedTickets.length > 0 && (
-            <div className="space-y-2 mt-2">
-              {sortedTickets.map((ticket) => (
-                <EscalationCard key={ticket.id} ticket={ticket} />
-              ))}
-            </div>
-          )}
+          {/* Escalation cards */}
+          <div className="space-y-2.5 mt-2">
+            {sortedTickets.map((ticket) => (
+              <EscalationCard key={ticket.id} ticket={ticket} />
+            ))}
+          </div>
+
         </div>
       </ScrollArea>
     </div>
@@ -1391,255 +1361,235 @@ function RepView({
 // ══════════════════════════════════════════════════════════
 
 export default function CommunicationPage() {
-  const [activeTab, setActiveTab] = useState<"alex" | string>("alex");
-  const [setupDone, setSetupDone] = useState(true);
-  const [hireDialogOpen, setHireDialogOpen] = useState(false);
-  const [reps, setReps] = useState<{ id: string; name: string }[]>([
-    { id: "rep-ava", name: "Ava" },
-  ]);
-  const [openThread, setOpenThread] = useState<string | null>(null);
-  const [showTopics, setShowTopics] = useState(false);
+  const [activeView, setActiveView] = useState<"teamlead" | "rep">("teamlead");
+  const [teamLeadTab, setTeamLeadTab] = useState<"conversation" | "setup">("conversation");
+  const [showHireDialog, setShowHireDialog] = useState(false);
+  const [repName, setRepName] = useState<string | null>("Ava");
   const [showProfile, setShowProfile] = useState(false);
-  const [newMessage, setNewMessage] = useState("");
-  const [topics, setTopics] = useState(TOPICS);
+  const [threadTopicId, setThreadTopicId] = useState<string | null>(null);
+  const [showTopics, setShowTopics] = useState(false);
+  const [topics, setTopics] = useState<Topic[]>(TOPICS);
+  const [newMsg, setNewMsg] = useState("");
 
-  const activeRep = reps.find((r) => r.id === activeTab);
-  const threadTopic = openThread ? topics.find((t) => t.id === openThread) : null;
+  const threadTopic = useMemo(
+    () => (threadTopicId ? topics.find((t) => t.id === threadTopicId) || null : null),
+    [threadTopicId, topics]
+  );
 
   const handleTopicAction = useCallback((topicId: string, action: string) => {
-    if (action === "accept") {
-      setTopics((prev) =>
-        prev.map((t) =>
-          t.id === topicId && t.proposedRule
-            ? { ...t, proposedRule: { ...t.proposedRule, status: "accepted" as const } }
-            : t
-        )
-      );
-      toast.success("Rule accepted and applied to playbook");
-    } else if (action === "reject") {
-      setTopics((prev) =>
-        prev.map((t) =>
-          t.id === topicId && t.proposedRule
-            ? { ...t, proposedRule: { ...t.proposedRule, status: "rejected" as const } }
-            : t
-        )
-      );
-      toast.info("Rule rejected");
-    } else if (action === "reply") {
-      setOpenThread(topicId);
+    if (action === "reply") {
+      setThreadTopicId(topicId);
+      return;
     }
+    setTopics((prev) =>
+      prev.map((t) => {
+        if (t.id !== topicId || !t.proposedRule) return t;
+        return {
+          ...t,
+          proposedRule: {
+            ...t.proposedRule,
+            status: action === "accept" ? ("accepted" as const) : ("rejected" as const),
+          },
+        };
+      })
+    );
+    toast.success(action === "accept" ? "Rule accepted" : "Rule rejected");
   }, []);
 
-  const handleHire = (name: string) => {
-    const newRep = { id: `rep-${name.toLowerCase()}`, name };
-    if (!reps.find((r) => r.name === name)) {
-      setReps((prev) => [...prev, newRep]);
-    }
-    setHireDialogOpen(false);
-    setActiveTab(newRep.id);
-    toast.success(`${name} has been hired!`);
-  };
+  const sortedTopics = useMemo(
+    () => [...topics].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [topics]
+  );
 
-  const handleSetupComplete = () => {
-    setHireDialogOpen(true);
-  };
-
-  const handleSendMessage = () => {
-    if (!newMessage.trim()) return;
-    toast.success("Message sent — Alex will respond shortly");
-    setNewMessage("");
-  };
-
-  // Group topics by date
-  const topicsByDate = useMemo(() => {
-    const sorted = [...topics].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-    const groups: { date: string; topics: Topic[] }[] = [];
-    sorted.forEach((t) => {
-      const dateKey = formatDateGroup(t.createdAt);
-      const existing = groups.find((g) => g.date === dateKey);
-      if (existing) existing.topics.push(t);
-      else groups.push({ date: dateKey, topics: [t] });
-    });
-    return groups;
-  }, [topics]);
+  const pendingCount = useMemo(
+    () => topics.filter((t) => t.proposedRule?.status === "pending").length,
+    [topics]
+  );
 
   return (
-    <div className="flex h-full">
-      {/* Left sidebar — contacts */}
-      <div className="w-[200px] border-r border-border bg-white flex flex-col shrink-0">
-        <div className="px-3 py-2.5 border-b border-border">
-          <p className="text-[11px] font-semibold text-foreground">Messages</p>
-        </div>
-        <ScrollArea className="flex-1">
-          <div className="py-1">
-            {/* Alex (Team Lead) */}
-            <button
-              onClick={() => { setActiveTab("alex"); setShowProfile(false); }}
-              className={cn(
-                "w-full text-left px-3 py-2 flex items-center gap-2.5 transition-colors",
-                activeTab === "alex" ? "bg-accent" : "hover:bg-accent/30"
-              )}
-            >
-              <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
-                <span className="text-[11px]">&#x1F454;</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-medium text-foreground truncate">Alex</p>
-                <p className="text-[9px] text-muted-foreground truncate">Team Lead</p>
-              </div>
-            </button>
-
-            {/* Reps */}
-            {reps.map((rep) => (
+    <div className="flex h-[calc(100vh-48px)]">
+      {/* ── Narrow sidebar ── */}
+      <div className="w-14 border-r border-border bg-white flex flex-col items-center py-3 shrink-0">
+        <TooltipProvider delayDuration={200}>
+          {/* Team Lead */}
+          <Tooltip>
+            <TooltipTrigger asChild>
               <button
-                key={rep.id}
-                onClick={() => { setActiveTab(rep.id); setShowProfile(false); }}
+                onClick={() => setActiveView("teamlead")}
                 className={cn(
-                  "w-full text-left px-3 py-2 flex items-center gap-2.5 transition-colors",
-                  activeTab === rep.id ? "bg-accent" : "hover:bg-accent/30"
+                  "w-9 h-9 rounded-xl flex items-center justify-center transition-colors mb-1",
+                  activeView === "teamlead" ? "bg-teal-100" : "hover:bg-accent"
                 )}
               >
-                <div className="w-7 h-7 rounded-full bg-violet-500 flex items-center justify-center text-white text-[9px] font-bold shrink-0">
-                  {getInitials(rep.name)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[11px] font-medium text-foreground truncate">{rep.name}</p>
-                  <p className="text-[9px] text-muted-foreground truncate">Working</p>
-                </div>
+                <span className="text-[16px]">👔</span>
               </button>
-            ))}
+            </TooltipTrigger>
+            <TooltipContent side="right" className="text-[11px]">
+              <p className="font-semibold">Alex (Team Lead)</p>
+              <p className="text-muted-foreground">Manages your playbook & reps</p>
+            </TooltipContent>
+          </Tooltip>
 
-            {/* Add rep */}
-            <button
-              onClick={() => setHireDialogOpen(true)}
-              className="w-full text-left px-3 py-2 flex items-center gap-2.5 text-muted-foreground hover:bg-accent/30 transition-colors"
-            >
-              <div className="w-7 h-7 rounded-full border border-dashed border-border flex items-center justify-center">
-                <Plus className="w-3.5 h-3.5" />
-              </div>
-              <span className="text-[10px]">Hire Rep</span>
-            </button>
-          </div>
-        </ScrollArea>
+          {/* Separator */}
+          <div className="w-6 h-px bg-border my-2" />
+
+          {/* Rep — only if hired */}
+          {repName && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setActiveView("rep")}
+                  className={cn(
+                    "w-9 h-9 rounded-xl flex items-center justify-center transition-colors",
+                    activeView === "rep" ? "bg-violet-100" : "hover:bg-accent"
+                  )}
+                >
+                  <div className="w-7 h-7 rounded-full bg-violet-500 flex items-center justify-center text-white text-[9px] font-bold">
+                    {getInitials(repName)}
+                  </div>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="text-[11px]">
+                <p className="font-semibold">{repName}</p>
+                <p className="text-muted-foreground">L1 — WISMO Specialist · Working</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </TooltipProvider>
       </div>
 
-      {/* Main content area */}
+      {/* ── Main content ── */}
       <div className="flex-1 flex min-w-0">
-        {activeTab === "alex" && !setupDone ? (
-          <div className="flex-1">
-            <SetupTab onSetupComplete={handleSetupComplete} />
-          </div>
-        ) : activeTab === "alex" ? (
-          <div className="flex-1 flex flex-col">
-            {/* Alex header */}
-            <div className="flex items-center justify-between px-4 h-11 border-b border-border shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-6 h-6 rounded-full bg-teal-100 flex items-center justify-center">
-                  <span className="text-[11px]">&#x1F454;</span>
-                </div>
-                <div>
-                  <span className="text-[12px] font-semibold text-foreground">Alex</span>
-                  <span className="text-[10px] text-muted-foreground ml-1.5">Team Lead</span>
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-[10px]"
-                onClick={() => setShowTopics(!showTopics)}
+        {activeView === "teamlead" ? (
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Tab bar */}
+            <div className="flex items-center border-b border-border px-4 h-10 shrink-0">
+              <button
+                onClick={() => setTeamLeadTab("conversation")}
+                className={cn(
+                  "px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors mr-1",
+                  teamLeadTab === "conversation" ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground"
+                )}
               >
-                <List className="w-3 h-3 mr-1" /> Topics
-              </Button>
+                Conversation
+                {pendingCount > 0 && (
+                  <span className="ml-1.5 w-4 h-4 rounded-full bg-amber-400 text-white text-[8px] inline-flex items-center justify-center">
+                    {pendingCount}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setTeamLeadTab("setup")}
+                className={cn(
+                  "px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors",
+                  teamLeadTab === "setup" ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Onboarding
+              </button>
+              <div className="flex-1" />
+              <button
+                onClick={() => setShowTopics(!showTopics)}
+                className="p-1.5 rounded hover:bg-accent transition-colors"
+                title="All topics"
+              >
+                <List className="w-3.5 h-3.5 text-muted-foreground" />
+              </button>
             </div>
 
-            {/* Topics feed */}
-            <ScrollArea className="flex-1">
-              <div className="px-4 py-4 space-y-5">
-                {topicsByDate.map((group) => (
-                  <div key={group.date}>
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="h-px bg-border flex-1" />
-                      <span className="text-[9px] text-muted-foreground/60 font-medium">{group.date}</span>
-                      <div className="h-px bg-border flex-1" />
-                    </div>
-                    <div className="space-y-4">
-                      {group.topics.map((topic) => (
-                        <TopicCard
-                          key={topic.id}
-                          topic={topic}
-                          onOpenThread={(id) => { setOpenThread(id); setShowTopics(false); }}
-                          onAction={handleTopicAction}
-                        />
-                      ))}
-                    </div>
+            {teamLeadTab === "setup" ? (
+              <SetupTab onSetupComplete={() => setShowHireDialog(true)} />
+            ) : (
+              <div className="flex-1 flex flex-col min-w-0">
+                {/* Topics feed */}
+                <ScrollArea className="flex-1">
+                  <div className="px-4 py-4 space-y-5">
+                    {sortedTopics.map((topic) => (
+                      <TopicCard
+                        key={topic.id}
+                        topic={topic}
+                        onOpenThread={setThreadTopicId}
+                        onAction={handleTopicAction}
+                      />
+                    ))}
                   </div>
-                ))}
-              </div>
-            </ScrollArea>
+                </ScrollArea>
 
-            {/* Message input */}
-            <div className="px-3 py-2.5 border-t border-border">
-              <div className="flex items-end gap-2">
-                <Textarea
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Start a new topic..."
-                  className="min-h-[36px] max-h-[100px] text-[11.5px] resize-none"
-                  rows={1}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }
-                  }}
-                />
-                <Button
-                  size="sm"
-                  className="h-8 w-8 p-0 shrink-0"
-                  disabled={!newMessage.trim()}
-                  onClick={handleSendMessage}
-                >
-                  <Send className="w-3.5 h-3.5" />
-                </Button>
+                {/* Message input — initiate new topic */}
+                <div className="px-4 py-2.5 border-t border-border shrink-0">
+                  <div className="flex items-end gap-2">
+                    <Textarea
+                      value={newMsg}
+                      onChange={(e) => setNewMsg(e.target.value)}
+                      placeholder="Start a new topic with Alex..."
+                      className="min-h-[36px] max-h-[80px] text-[11px] resize-none"
+                      rows={1}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          if (newMsg.trim()) {
+                            toast.success("Message sent to Alex");
+                            setNewMsg("");
+                          }
+                        }
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      className="h-8 w-8 p-0 shrink-0"
+                      disabled={!newMsg.trim()}
+                      onClick={() => {
+                        if (newMsg.trim()) {
+                          toast.success("Message sent to Alex");
+                          setNewMsg("");
+                        }
+                      }}
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
-        ) : activeRep ? (
-          <div className="flex-1">
-            <RepView
-              repName={activeRep.name}
-              showProfile={showProfile}
-              onToggleProfile={() => setShowProfile(!showProfile)}
-            />
-          </div>
+        ) : repName ? (
+          <RepView
+            repName={repName}
+            showProfile={showProfile}
+            onToggleProfile={() => setShowProfile(!showProfile)}
+          />
         ) : null}
 
         {/* Side panels */}
-        {activeTab === "alex" && showTopics && !openThread && (
-          <TopicsPanel
-            topics={topics}
-            onSelectTopic={(id) => { setOpenThread(id); setShowTopics(false); }}
-            onClose={() => setShowTopics(false)}
-          />
-        )}
-        {activeTab === "alex" && threadTopic && (
+        {activeView === "teamlead" && threadTopic && (
           <FullThreadPanel
             topic={threadTopic}
-            onClose={() => setOpenThread(null)}
+            onClose={() => setThreadTopicId(null)}
             onAction={handleTopicAction}
           />
         )}
-        {activeRep && showProfile && (
-          <RepProfilePanel
-            repName={activeRep.name}
-            onClose={() => setShowProfile(false)}
+        {activeView === "teamlead" && showTopics && !threadTopic && (
+          <TopicsPanel
+            topics={topics}
+            onSelectTopic={(id) => { setThreadTopicId(id); setShowTopics(false); }}
+            onClose={() => setShowTopics(false)}
           />
+        )}
+        {activeView === "rep" && showProfile && repName && (
+          <RepProfilePanel repName={repName} onClose={() => setShowProfile(false)} />
         )}
       </div>
 
+      {/* Hire dialog */}
       <HireRepDialog
-        open={hireDialogOpen}
-        onOpenChange={setHireDialogOpen}
-        onHire={handleHire}
+        open={showHireDialog}
+        onOpenChange={setShowHireDialog}
+        onHire={(name) => {
+          setRepName(name);
+          setShowHireDialog(false);
+          setActiveView("rep");
+          toast.success(`${name} has been hired!`);
+        }}
       />
     </div>
   );
