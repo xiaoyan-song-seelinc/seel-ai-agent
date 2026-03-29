@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -41,7 +42,7 @@ import {
   AlertTriangle, ExternalLink, Pencil, Upload,
   FileText, Sparkles, CheckCircle2, Link2, Eye,
   Rocket, Power, HelpCircle, Settings, Zap, User,
-  AlertCircleIcon,
+  AlertCircleIcon, Globe, UserPlus, Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -281,82 +282,76 @@ function CollapsibleText({ text, maxLines = 4 }: { text: string; maxLines?: numb
   );
 }
 
-// ── Rule Change Card ────────────────────────────────────
-
-function RuleChangeCard({ change }: { change: RuleChange }) {
-  const [beforeExpanded, setBeforeExpanded] = useState(false);
-  const [afterExpanded, setAfterExpanded] = useState(false);
-  const MAX_CHARS = 140;
-
-  const renderRuleText = (text: string, expanded: boolean, toggle: () => void, isStrikethrough?: boolean) => {
-    const isLong = text.length > MAX_CHARS;
-    const display = !isLong || expanded ? text : text.slice(0, MAX_CHARS) + "...";
-    return (
-      <div>
-        <p className={cn(
-          "text-[12px] leading-relaxed",
-          isStrikethrough ? "text-muted-foreground line-through decoration-red-300/60" : "text-foreground"
-        )}>
-          {display}
-        </p>
-        {isLong && (
-          <button onClick={toggle} className="text-[10px] text-primary hover:underline mt-0.5">
-            {expanded ? "Show less" : "Show more"}
-          </button>
-        )}
-      </div>
-    );
-  };
-
-  return (
-    <div className="mt-2 rounded-lg border border-border/80 overflow-hidden bg-muted/20">
-      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/60 bg-muted/30">
-        {change.type === "new" ? (
-          <Plus className="w-3 h-3 text-emerald-600" />
-        ) : (
-          <ArrowRight className="w-3 h-3 text-blue-600" />
-        )}
-        <span className="text-[11px] font-semibold text-foreground">
-          {change.type === "new" ? "New Rule" : "Rule Update"}
-        </span>
-        <span className="text-[10px] text-muted-foreground">{change.ruleName}</span>
-      </div>
-
-      <div className="px-3 py-2 space-y-2">
-        {change.type === "update" && change.before && (
-          <div>
-            <span className="text-[9px] font-semibold uppercase tracking-wider text-red-400/80">Current</span>
-            {renderRuleText(change.before, beforeExpanded, () => setBeforeExpanded(!beforeExpanded), true)}
-          </div>
-        )}
-        <div>
-          <span className="text-[9px] font-semibold uppercase tracking-wider text-emerald-500">
-            {change.type === "update" ? "Proposed" : "Proposed Rule"}
-          </span>
-          {renderRuleText(change.after, afterExpanded, () => setAfterExpanded(!afterExpanded))}
-        </div>
-        {change.source && (
-          <p className="text-[10px] text-muted-foreground/70 italic">{change.source}</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Topic Label ─────────────────────────────────────────
+// ── Topic Label ────────────────────────────────────────
 
 function TopicLabel({ title, status }: { title: string; status: "waiting" | "done" }) {
   return (
     <div className="flex items-center gap-2 mb-1.5 mt-3">
-      <MessageCircle className="w-3 h-3 text-muted-foreground/50" />
-      <span className="text-[11px] font-medium text-muted-foreground truncate max-w-[400px]">{title}</span>
-      <span className={cn(
-        "text-[9px] px-1.5 py-0.5 rounded-full font-medium",
-        status === "done" ? "bg-muted text-muted-foreground" : "bg-amber-50 text-amber-700"
-      )}>
-        {status === "done" ? "Done" : "Waiting"}
-      </span>
-      <div className="flex-1 h-px bg-border/50" />
+      <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", status === "waiting" ? "bg-amber-400" : "bg-emerald-400")} />
+      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide truncate">{title}</span>
+    </div>
+  );
+}
+
+// ── Rule Change Card ────────────────────────────────────
+
+function RuleChangeCard({
+  change,
+  hasActions,
+  onAction,
+  topicId,
+}: {
+  change: RuleChange;
+  hasActions: boolean;
+  onAction?: (topicId: string, action: string) => void;
+  topicId: string;
+}) {
+  return (
+    <div className="mt-2 rounded-lg border border-border bg-white overflow-hidden">
+      <div className="px-3 py-2 bg-muted/30 border-b border-border/50 flex items-center gap-2">
+        <div className={cn("w-1.5 h-1.5 rounded-full", change.type === "new" ? "bg-emerald-400" : "bg-amber-400")} />
+        <span className="text-[11px] font-semibold text-foreground">{change.ruleName}</span>
+        <Badge variant="secondary" className="h-4 text-[8px] px-1.5 ml-auto">
+          {change.type === "new" ? "NEW" : "UPDATE"}
+        </Badge>
+      </div>
+      <div className="px-3 py-2 space-y-1.5">
+        {change.before && (
+          <div className="flex gap-2">
+            <span className="text-[10px] font-medium text-red-400 w-10 shrink-0 mt-0.5">Before</span>
+            <p className="text-[11px] text-muted-foreground line-through leading-relaxed">{change.before}</p>
+          </div>
+        )}
+        <div className="flex gap-2">
+          <span className="text-[10px] font-medium text-emerald-500 w-10 shrink-0 mt-0.5">{change.before ? "After" : "Rule"}</span>
+          <p className="text-[11px] text-foreground leading-relaxed">{change.after}</p>
+        </div>
+        {change.source && (
+          <p className="text-[9px] text-muted-foreground/60 mt-1">Source: {change.source}</p>
+        )}
+      </div>
+      {hasActions && onAction && (
+        <div className="px-3 py-2 border-t border-border/50 bg-muted/10 flex items-center gap-1.5">
+          <button
+            onClick={() => onAction(topicId, "accept")}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+          >
+            <Check className="w-3 h-3" /> Accept
+          </button>
+          <button
+            onClick={() => onAction(topicId, "modify_accept")}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+          >
+            <Pencil className="w-3 h-3" /> Modify & Accept
+          </button>
+          <button
+            onClick={() => onAction(topicId, "reject")}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium text-muted-foreground hover:bg-accent transition-colors ml-auto"
+          >
+            <X className="w-3 h-3" /> Reject
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -370,129 +365,89 @@ function MessageBubble({
   onReply,
 }: {
   msg: ChatMessage;
-  senderLabel?: string;
-  onAction: (topicId: string, action: string) => void;
-  onReply: (topicId: string) => void;
+  senderLabel: string;
+  onAction?: (topicId: string, action: string) => void;
+  onReply?: (topicId: string) => void;
 }) {
-  const isAi = msg.sender === "ai";
-
   return (
-    <div className={cn("flex gap-2.5", !isAi && "flex-row-reverse")}>
-      {isAi && (
-        <div className="w-6 h-6 rounded-full bg-primary/8 flex items-center justify-center shrink-0 mt-0.5">
-          <Bot className="w-3 h-3 text-primary" />
+    <div className={cn("flex gap-2.5 group", msg.sender === "manager" && "flex-row-reverse")}>
+      {msg.sender === "ai" && (
+        <div className="w-6 h-6 rounded-full bg-indigo-50 flex items-center justify-center shrink-0 mt-0.5">
+          <span className="text-[11px]">🎯</span>
         </div>
       )}
-
-      <div className={cn("max-w-[85%] min-w-0", !isAi && "text-right")}>
-        <div className={cn("flex items-center gap-1.5 mb-0.5", !isAi && "justify-end")}>
-          <span className="text-[10px] font-medium text-foreground">{isAi ? (senderLabel || "Team Lead") : "You"}</span>
-          <span className="text-[9px] text-muted-foreground">{formatTime(msg.timestamp)}</span>
+      <div className={cn("max-w-[85%] min-w-0", msg.sender === "manager" && "text-right")}>
+        <div className={cn("flex items-center gap-1.5 mb-0.5", msg.sender === "manager" && "justify-end")}>
+          <span className="text-[10px] font-medium text-foreground">{msg.sender === "ai" ? senderLabel : "You"}</span>
+          <span className="text-[9px] text-muted-foreground/50">{formatTime(msg.timestamp)}</span>
         </div>
-
         <div className={cn(
           "rounded-xl px-3 py-2 inline-block text-left",
-          isAi ? "bg-muted/40 text-foreground rounded-tl-sm" : "bg-primary/6 text-foreground rounded-tr-sm"
+          msg.sender === "ai" ? "bg-muted/40 text-foreground rounded-tl-sm" : "bg-primary/6 text-foreground rounded-tr-sm"
         )}>
-          <CollapsibleText text={msg.content} />
-          {msg.ruleChange && <RuleChangeCard change={msg.ruleChange} />}
+          {msg.content && <CollapsibleText text={msg.content} maxLines={6} />}
+          {msg.ruleChange && (
+            <RuleChangeCard
+              change={msg.ruleChange}
+              hasActions={!!msg.hasActions}
+              onAction={onAction}
+              topicId={msg.topicId}
+            />
+          )}
         </div>
-
-        {msg.hasActions && (
-          <div className="flex items-center gap-1.5 mt-1.5 ml-0.5">
-            <button
-              onClick={() => onAction(msg.topicId, "accept")}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
-            >
-              <Check className="w-3 h-3" /> Accept
-            </button>
-            <button
-              onClick={() => onAction(msg.topicId, "modify_accept")}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-            >
-              <Pencil className="w-3 h-3" /> Modify & Accept
-            </button>
-            <button
-              onClick={() => onAction(msg.topicId, "reject")}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-            >
-              <X className="w-3 h-3" /> Reject
-            </button>
-            <button
-              onClick={() => onReply(msg.topicId)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium text-muted-foreground hover:bg-accent transition-colors"
-            >
-              <Reply className="w-3 h-3" /> Reply
-            </button>
-          </div>
+        {msg.sender === "ai" && onReply && (
+          <button
+            onClick={() => onReply(msg.topicId)}
+            className="opacity-0 group-hover:opacity-100 mt-0.5 ml-0.5 text-[10px] text-muted-foreground hover:text-primary transition-all flex items-center gap-0.5"
+          >
+            <Reply className="w-3 h-3" /> Reply
+          </button>
         )}
       </div>
     </div>
   );
 }
 
-// ══════════════════════════════════════════════════════════
-// ── ESCALATION TICKET CARD (for Rep conversation) ───────
-// ══════════════════════════════════════════════════════════
-
-const statusConfig: Record<EscalationStatus, { label: string; color: string; dotColor: string }> = {
-  needs_attention: { label: "Needs attention", color: "bg-red-50 text-red-700", dotColor: "bg-red-500" },
-  in_progress: { label: "In progress", color: "bg-amber-50 text-amber-700", dotColor: "bg-amber-400" },
-  resolved: { label: "Resolved", color: "bg-emerald-50 text-emerald-700", dotColor: "bg-emerald-500" },
-};
+// ── Escalation Card ────────────────────────────────────
 
 function EscalationCard({
   ticket,
   onStatusChange,
 }: {
-  ticket: EscalationTicket;
+  ticket: EscalationTicket & { status: EscalationStatus };
   onStatusChange: (id: string, status: EscalationStatus) => void;
 }) {
-  const cfg = statusConfig[ticket.status];
-
   return (
     <div className={cn(
-      "rounded-lg border overflow-hidden transition-all",
-      ticket.status === "needs_attention" ? "border-red-200/80 bg-white" :
-      ticket.status === "in_progress" ? "border-amber-200/80 bg-white" :
-      "border-border/60 bg-muted/20"
+      "rounded-lg border bg-white p-3 transition-all",
+      ticket.status === "needs_attention" ? "border-red-200/60 shadow-sm" :
+      ticket.status === "in_progress" ? "border-amber-200/60" : "border-border/40 opacity-70"
     )}>
-      {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border/40">
-        <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", cfg.dotColor)} />
-        <span className={cn("text-[10px] font-medium px-1.5 py-0.5 rounded-full", cfg.color)}>
-          {cfg.label}
-        </span>
-        <span className="text-[10px] text-muted-foreground ml-auto">
-          #{ticket.zendeskTicketId} · {formatRelativeTime(ticket.createdAt)}
-        </span>
-      </div>
-
-      {/* Body */}
-      <div className="px-3 py-2.5 space-y-1.5">
-        <p className="text-[12.5px] font-medium text-foreground leading-snug">{ticket.subject}</p>
-        <p className="text-[11px] text-muted-foreground leading-relaxed">{ticket.summary}</p>
-
-        <div className="flex items-center gap-3 pt-1">
-          <span className="text-[10px] text-muted-foreground">{ticket.customerName}</span>
-          {ticket.orderValue && (
-            <span className="text-[10px] text-muted-foreground">${ticket.orderValue}</span>
-          )}
-          {ticket.sentiment === "frustrated" && (
-            <span className="text-[10px] text-red-500 font-medium">Frustrated</span>
-          )}
-          {ticket.sentiment === "urgent" && (
-            <span className="text-[10px] text-red-600 font-medium">Urgent</span>
-          )}
+      <div className="flex items-start gap-2.5">
+        <div className={cn(
+          "w-1.5 h-1.5 rounded-full mt-1.5 shrink-0",
+          ticket.status === "needs_attention" ? "bg-red-500" :
+          ticket.status === "in_progress" ? "bg-amber-400" : "bg-emerald-500"
+        )} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-[12px] font-medium text-foreground truncate">{ticket.subject}</p>
+            <span className="text-[9px] text-muted-foreground shrink-0">{formatRelativeTime(ticket.createdAt)}</span>
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{ticket.reason}</p>
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className="text-[10px] text-muted-foreground/60">#{ticket.zendeskTicketId}</span>
+            <span className="text-[10px] text-muted-foreground/60">·</span>
+            <span className="text-[10px] text-muted-foreground/60">{ticket.customerName}</span>
+          </div>
         </div>
       </div>
-
-      {/* Actions */}
-      <div className="px-3 py-2 border-t border-border/40 flex items-center gap-2">
+      <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-border/30">
         <a
           href={ticket.zendeskUrl}
-          onClick={(e) => { e.preventDefault(); window.open("/zendesk", "_blank"); }}
-          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-medium bg-muted text-foreground hover:bg-accent transition-colors"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-medium text-primary hover:bg-primary/8 transition-colors"
         >
           <ExternalLink className="w-3 h-3" /> Open in Zendesk
         </a>
@@ -681,8 +636,8 @@ function ThreadSidePanel({
           {replies.map((reply) => (
             <div key={reply.id} className={cn("flex gap-2", reply.sender === "manager" && "flex-row-reverse")}>
               {reply.sender === "ai" ? (
-                <div className="w-5 h-5 rounded-full bg-primary/8 flex items-center justify-center shrink-0 mt-0.5">
-                  <Bot className="w-2.5 h-2.5 text-primary" />
+                <div className="w-5 h-5 rounded-full bg-indigo-50 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-[9px]">🎯</span>
                 </div>
               ) : (
                 <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center shrink-0 mt-0.5">
@@ -766,7 +721,7 @@ function RepConfigPanel({
         <div className="flex items-center gap-1">
           <button
             onClick={() => { toast.success("Changes saved"); onClose(); }}
-            className="px-2.5 py-1 rounded-md text-[11px] font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
+            className="px-2.5 py-1 rounded-md text-[10px] font-medium bg-primary text-white hover:bg-primary/90 transition-colors"
           >
             Save
           </button>
@@ -777,13 +732,13 @@ function RepConfigPanel({
       </div>
 
       {/* Section tabs */}
-      <div className="flex border-b border-border px-2">
+      <div className="flex border-b border-border px-4">
         {(["mode", "identity", "actions"] as const).map((sec) => (
           <button
             key={sec}
             onClick={() => setActiveSection(sec)}
             className={cn(
-              "px-3 py-2 text-[11px] font-medium capitalize transition-colors relative",
+              "py-2 px-3 text-[11px] font-medium capitalize transition-colors relative",
               activeSection === sec ? "text-foreground" : "text-muted-foreground hover:text-foreground"
             )}
           >
@@ -793,7 +748,6 @@ function RepConfigPanel({
         ))}
       </div>
 
-      {/* Content */}
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-4">
           {activeSection === "mode" && (
@@ -801,46 +755,44 @@ function RepConfigPanel({
               {modeConfig.map(({ mode, icon: Icon, color, desc }) => (
                 <button
                   key={mode}
-                  onClick={() => { setAgentMode(mode); toast.success(`Mode → ${mode}`); }}
+                  onClick={() => setAgentMode(mode)}
                   className={cn(
-                    "w-full border rounded-md px-3 py-2.5 text-left transition-all",
+                    "w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left",
                     agentMode === mode
-                      ? "border-primary bg-primary/5 ring-1 ring-primary/20"
-                      : "border-border hover:border-primary/30"
+                      ? `border-${color}-300 bg-${color}-50/50 shadow-sm`
+                      : "border-border hover:bg-accent/50"
                   )}
                 >
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className={cn(
-                      "w-2 h-2 rounded-full",
-                      color === "emerald" && "bg-emerald-400",
-                      color === "amber" && "bg-amber-400",
-                      color === "zinc" && "bg-zinc-400"
-                    )} />
-                    <span className="text-[12px] font-medium capitalize">{mode}</span>
+                  <div className={cn(
+                    "w-8 h-8 rounded-lg flex items-center justify-center",
+                    agentMode === mode ? `bg-${color}-100` : "bg-muted/50"
+                  )}>
+                    <Icon className={cn("w-4 h-4", agentMode === mode ? `text-${color}-600` : "text-muted-foreground")} />
                   </div>
-                  <p className="text-[10.5px] text-muted-foreground leading-relaxed">{desc}</p>
+                  <div>
+                    <p className="text-[12px] font-medium capitalize">{mode}</p>
+                    <p className="text-[10px] text-muted-foreground">{desc}</p>
+                  </div>
+                  {agentMode === mode && <Check className={`w-4 h-4 text-${color}-500 ml-auto`} />}
                 </button>
               ))}
             </div>
           )}
 
           {activeSection === "identity" && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div>
-                <Label className="text-[11px] font-medium text-muted-foreground mb-1 block">Name</Label>
+                <Label className="text-[11px] font-medium">Name</Label>
                 <Input
                   value={identity.name}
                   onChange={(e) => setIdentity({ ...identity, name: e.target.value })}
-                  className="h-8 text-[12px]"
+                  className="mt-1 h-8 text-[12px]"
                 />
               </div>
               <div>
-                <Label className="text-[11px] font-medium text-muted-foreground mb-1 block">Tone</Label>
-                <Select
-                  value={identity.tone}
-                  onValueChange={(val: "professional" | "friendly" | "casual") => setIdentity({ ...identity, tone: val })}
-                >
-                  <SelectTrigger className="h-8 text-[12px]">
+                <Label className="text-[11px] font-medium">Tone</Label>
+                <Select value={identity.tone} onValueChange={(v) => setIdentity({ ...identity, tone: v as AgentIdentity["tone"] })}>
+                  <SelectTrigger className="mt-1 h-8 text-[12px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -850,30 +802,13 @@ function RepConfigPanel({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Label className="text-[11px] font-medium text-muted-foreground">Disclose AI</Label>
-                  <Tip text="If enabled, the rep will tell customers it's an AI when asked." />
-                </div>
-                <Switch
-                  checked={identity.transparentAboutAI}
-                  onCheckedChange={(checked) => setIdentity({ ...identity, transparentAboutAI: checked })}
-                />
-              </div>
               <div>
-                <Label className="text-[11px] font-medium text-muted-foreground mb-1 block">Greeting</Label>
-                <Input
+                <Label className="text-[11px] font-medium">Greeting</Label>
+                <Textarea
                   value={identity.greeting}
                   onChange={(e) => setIdentity({ ...identity, greeting: e.target.value })}
-                  className="h-8 text-[12px]"
-                />
-              </div>
-              <div>
-                <Label className="text-[11px] font-medium text-muted-foreground mb-1 block">Signature</Label>
-                <Input
-                  value={identity.signature}
-                  onChange={(e) => setIdentity({ ...identity, signature: e.target.value })}
-                  className="h-8 text-[12px]"
+                  className="mt-1 text-[12px] min-h-[60px]"
+                  rows={2}
                 />
               </div>
             </div>
@@ -881,33 +816,21 @@ function RepConfigPanel({
 
           {activeSection === "actions" && (
             <div className="space-y-3">
-              {Object.entries(
-                permissions.reduce<Record<string, ActionPermission[]>>(
-                  (acc, p) => { (acc[p.category] = acc[p.category] || []).push(p); return acc; },
-                  {}
-                )
-              ).map(([category, actions]) => (
-                <div key={category}>
-                  <p className="text-[10px] font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">{category}</p>
-                  <div className="space-y-0 divide-y divide-border/30">
-                    {actions.map((action) => {
-                      const isOn = action.permission !== "disabled";
-                      return (
-                        <div key={action.id} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
-                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                            <span className="text-[12px] font-medium text-foreground">{action.name}</span>
-                            <Tip text={action.description} />
-                          </div>
-                          <Switch
-                            checked={isOn}
-                            onCheckedChange={() => togglePermission(action.id)}
-                          />
-                        </div>
-                      );
-                    })}
+              {permissions.map((action) => {
+                const isOn = action.permission === "autonomous";
+                return (
+                  <div key={action.id} className="flex items-center justify-between py-2 border-b border-border/30 last:border-0">
+                    <div className="flex-1 min-w-0 mr-3">
+                      <p className="text-[12px] font-medium text-foreground">{action.name}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{action.description}</p>
+                    </div>
+                    <Switch
+                      checked={isOn}
+                      onCheckedChange={() => togglePermission(action.id)}
+                    />
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -920,7 +843,7 @@ function RepConfigPanel({
 // ── SETUP TAB (Onboarding — Team Lead conversation) ─────
 // ══════════════════════════════════════════════════════════
 
-type OBPhase = "welcome" | "upload_doc" | "importing" | "conflict" | "go_live" | "done";
+type OBPhase = "greeting" | "upload_doc" | "importing" | "processing_notice" | "conflict_1" | "conflict_2" | "conflict_3" | "playbook_done" | "done";
 
 interface OnboardingMsg {
   id: string;
@@ -931,16 +854,59 @@ interface OnboardingMsg {
   widgetData?: Record<string, unknown>;
 }
 
-function SetupTab() {
+interface ConflictItem {
+  id: number;
+  title: string;
+  description: string;
+  optionA: string;
+  optionB: string;
+  resolved: boolean;
+  choice?: string;
+  note?: string;
+}
+
+const DEMO_CONFLICTS: ConflictItem[] = [
+  {
+    id: 1,
+    title: "Return Window",
+    description: 'Your return policy says "30-day return window" but the FAQ page says "28 calendar days from delivery."',
+    optionA: "30 days from delivery",
+    optionB: "28 calendar days",
+    resolved: false,
+  },
+  {
+    id: 2,
+    title: "Refund Method",
+    description: 'Policy doc says "refund to original payment method only" but your FAQ mentions store credit as an option.',
+    optionA: "Original payment method only",
+    optionB: "Original method or store credit",
+    resolved: false,
+  },
+  {
+    id: 3,
+    title: "Return Shipping",
+    description: 'Policy says "free returns" but the terms page says "customer pays $8.95 for return shipping."',
+    optionA: "Free returns for all",
+    optionB: "Free for defective, $8.95 for others",
+    resolved: false,
+  },
+];
+
+function SetupTab({ onHireRep }: { onHireRep: () => void }) {
   const [, navigate] = useLocation();
-  const [phase, setPhase] = useState<OBPhase>("welcome");
+  const [phase, setPhase] = useState<OBPhase>("greeting");
   const [messages, setMessages] = useState<OnboardingMsg[]>([]);
   const [importProgress, setImportProgress] = useState(0);
+  const [urlInput, setUrlInput] = useState("");
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [conflicts, setConflicts] = useState<ConflictItem[]>(DEMO_CONFLICTS);
+  const [currentConflictIdx, setCurrentConflictIdx] = useState(0);
+  const [conflictNote, setConflictNote] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length]);
+  }, [messages.length, phase]);
 
   const makeObMsg = (
     sender: "ai" | "manager",
@@ -961,100 +927,163 @@ function SetupTab() {
     });
   }, []);
 
+  // ── Greeting: introduce system + Team Lead role ──
   useEffect(() => {
     if (messages.length === 0) {
       addAiMessages([
-        makeObMsg("ai", "Hi! I'm your Team Lead. I'll help you set up your Playbook — the rules and policies your AI Rep will follow."),
-        makeObMsg("ai", "Do you have a return policy, SOP doc, or guidelines you can share?", {
-          choices: [
-            { label: "Upload document", value: "upload", variant: "primary" },
-            { label: "Try demo (Sales Return Guideline)", value: "demo", variant: "outline" },
-          ],
+        makeObMsg("ai", "Hi! I'm **Sarah**, your Team Lead. I help you build and manage the **Playbook** — the set of rules, policies, and guidelines your AI Rep will follow when handling customer tickets."),
+        makeObMsg("ai", "Once your Playbook is ready, you can hire an AI Rep who'll start handling tickets based on these rules. The more precise your Playbook, the better your Rep performs."),
+        makeObMsg("ai", "Let's get started — share your return policy, SOP document, or any customer service guidelines, and I'll turn them into actionable rules.", {
+          widget: "upload_doc",
         }),
-      ]);
+      ], 500);
     }
   }, []);
 
+  const handleUpload = (isDemo: boolean) => {
+    setMessages((prev) => [
+      ...prev,
+      makeObMsg("manager", isDemo ? "Try with Seel Return Guidelines" : "Uploaded: Return_Policy_v2.pdf"),
+    ]);
+    setPhase("importing");
+    setImportProgress(0);
+    addAiMessages([
+      makeObMsg("ai", isDemo
+        ? "Great choice! Let me analyze the **Seel Return Guidelines** and extract the rules..."
+        : "Got it! Reading through your document now...",
+        { widget: "import_progress" }
+      ),
+    ]);
+  };
+
+  const handleUrlSubmit = () => {
+    if (!urlInput.trim()) return;
+    setMessages((prev) => [
+      ...prev,
+      makeObMsg("manager", `Shared link: ${urlInput.trim()}`),
+    ]);
+    setUrlInput("");
+    setShowUrlInput(false);
+    setPhase("importing");
+    setImportProgress(0);
+    addAiMessages([
+      makeObMsg("ai", "Got it! Fetching and analyzing the page content...", { widget: "import_progress" }),
+    ]);
+  };
+
+  // ── Import progress simulation ──
+  useEffect(() => {
+    if (phase !== "importing") return;
+    const interval = setInterval(() => {
+      setImportProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setTimeout(() => {
+            setPhase("processing_notice");
+            addAiMessages([
+              makeObMsg("ai", "I've extracted the following rules:", {
+                widget: "parse_result",
+                widgetData: {
+                  rules: [
+                    { category: "Return Window", count: 3, example: "30-day return window from delivery date" },
+                    { category: "Refund Method", count: 2, example: "Refund to original payment method only" },
+                    { category: "Condition Rules", count: 4, example: "Items must be unused with tags attached" },
+                    { category: "Exceptions", count: 2, example: "Final sale items are non-returnable" },
+                    { category: "Shipping", count: 2, example: "Customer pays return shipping unless defective" },
+                  ],
+                },
+              }),
+              makeObMsg("ai", `I found **${DEMO_CONFLICTS.length} conflicts** that need your input. Let me walk you through each one.`, {
+                widget: "conflict_queue",
+              }),
+            ], 600);
+          }, 500);
+          return 100;
+        }
+        return prev + Math.random() * 15;
+      });
+    }, 180);
+    return () => clearInterval(interval);
+  }, [phase]);
+
+  const handleConflictResolve = (conflictId: number, choice: string) => {
+    const updated = conflicts.map((c) =>
+      c.id === conflictId ? { ...c, resolved: true, choice, note: conflictNote || undefined } : c
+    );
+    setConflicts(updated);
+    setConflictNote("");
+
+    const choiceLabel = choice === "a"
+      ? conflicts.find((c) => c.id === conflictId)?.optionA
+      : conflicts.find((c) => c.id === conflictId)?.optionB;
+
+    setMessages((prev) => [
+      ...prev,
+      makeObMsg("manager", `${choiceLabel}${conflictNote ? ` — "${conflictNote}"` : ""}`),
+    ]);
+
+    const nextUnresolved = updated.findIndex((c) => !c.resolved);
+    if (nextUnresolved === -1) {
+      // All conflicts resolved
+      setPhase("playbook_done");
+      addAiMessages([
+        makeObMsg("ai", "All conflicts resolved! Your Playbook is ready."),
+        makeObMsg("ai", "You can review and edit rules anytime in the **Playbook** tab. When you're ready, hire your first AI Rep to start handling tickets.", {
+          choices: [
+            { label: "Hire a Rep", value: "hire_rep", variant: "primary" },
+          ],
+        }),
+      ]);
+    } else {
+      setCurrentConflictIdx(nextUnresolved);
+      addAiMessages([
+        makeObMsg("ai", `Got it — I'll use "${choiceLabel}". Next conflict:`),
+      ]);
+    }
+  };
+
+  const handleConflictDismiss = (conflictId: number) => {
+    const updated = conflicts.map((c) =>
+      c.id === conflictId ? { ...c, resolved: true, choice: "skipped" } : c
+    );
+    setConflicts(updated);
+    setConflictNote("");
+
+    setMessages((prev) => [
+      ...prev,
+      makeObMsg("manager", "Skipped — I'll decide later"),
+    ]);
+
+    const nextUnresolved = updated.findIndex((c) => !c.resolved);
+    if (nextUnresolved === -1) {
+      setPhase("playbook_done");
+      addAiMessages([
+        makeObMsg("ai", "Playbook is ready! You can revisit skipped conflicts in the **Playbook** tab anytime."),
+        makeObMsg("ai", "When you're ready, hire your first AI Rep to start handling tickets.", {
+          choices: [
+            { label: "Hire a Rep", value: "hire_rep", variant: "primary" },
+          ],
+        }),
+      ]);
+    } else {
+      setCurrentConflictIdx(nextUnresolved);
+      addAiMessages([
+        makeObMsg("ai", "No problem, you can resolve it later. Next conflict:"),
+      ]);
+    }
+  };
+
   const handleChoice = (value: string) => {
-    switch (phase) {
-      case "welcome":
-        if (value === "upload" || value === "demo") {
-          setMessages((prev) => [...prev, makeObMsg("manager", value === "upload" ? "I'll upload a document" : "Let me try the demo")]);
-          setPhase("upload_doc");
-          addAiMessages([
-            makeObMsg("ai", value === "demo"
-              ? "Great! Let me show you how it works with a **Sales Return Guideline** as an example."
-              : "Perfect! Upload your document and I'll extract the rules from it."
-            ),
-            makeObMsg("ai", "", { widget: "upload_doc" }),
-          ]);
-        }
-        break;
-
-      case "upload_doc":
-        setPhase("importing");
-        setImportProgress(0);
-        setMessages((prev) => [...prev, makeObMsg("manager", "Uploaded: Seel_Return_Policy_v2.pdf")]);
-        addAiMessages([
-          makeObMsg("ai", "Got it! Reading through your return policy now...", { widget: "import_progress" }),
-        ]);
-        {
-          const interval = setInterval(() => {
-            setImportProgress((prev) => {
-              if (prev >= 100) {
-                clearInterval(interval);
-                setTimeout(() => {
-                  setPhase("conflict");
-                  addAiMessages([
-                    makeObMsg("ai", "I've extracted the following rules:", {
-                      widget: "parse_result",
-                      widgetData: {
-                        rules: [
-                          { category: "Return Window", count: 3, example: "30-day return window from delivery date" },
-                          { category: "Refund Method", count: 2, example: "Refund to original payment method only" },
-                          { category: "Condition Rules", count: 4, example: "Items must be unused with tags attached" },
-                          { category: "Exceptions", count: 2, example: "Final sale items are non-returnable" },
-                          { category: "Shipping", count: 2, example: "Customer pays return shipping unless defective" },
-                        ],
-                      },
-                    }),
-                    makeObMsg("ai", "One conflict I need you to resolve:", { widget: "conflict" }),
-                  ], 600);
-                }, 500);
-                return 100;
-              }
-              return prev + Math.random() * 15;
-            });
-          }, 180);
-        }
-        break;
-
-      case "conflict": {
-        const choiceLabel = value === "30_days" ? "30 days from delivery" : "28 calendar days from delivery";
-        setMessages((prev) => [...prev, makeObMsg("manager", choiceLabel)]);
-        setPhase("go_live");
-        addAiMessages([
-          makeObMsg("ai", `Got it — I'll use "${choiceLabel}" as the rule.`),
-          makeObMsg("ai", "Playbook is set up! You can review and edit rules anytime in the **Playbook** tab."),
-          makeObMsg("ai", "When you're ready, hire a Rep from the left panel to start handling tickets. I recommend starting in **Training Mode**.", {
-            choices: [
-              { label: "Go to Playbook", value: "playbook", variant: "primary" },
-              { label: "Stay here", value: "stay", variant: "outline" },
-            ],
-          }),
-        ]);
-        break;
-      }
-
-      case "go_live":
-        if (value === "playbook") {
-          toast.success("Redirecting to Playbook...");
-          setTimeout(() => navigate("/playbook"), 600);
-        } else {
-          toast.success("Setup complete! You can hire a Rep when ready.");
-        }
-        setPhase("done");
-        break;
+    if (value === "hire_rep") {
+      onHireRep();
+      setPhase("done");
+      setMessages((prev) => [
+        ...prev,
+        makeObMsg("manager", "Let's hire a Rep!"),
+      ]);
+      addAiMessages([
+        makeObMsg("ai", "Great! I've set up your first AI Rep. You can find them in the left panel under **Reps**. Configure their name, tone, and actions, then switch them to Production mode when ready."),
+      ]);
     }
   };
 
@@ -1062,18 +1091,64 @@ function SetupTab() {
     switch (msg.widget) {
       case "upload_doc":
         return (
-          <div className="mt-2 p-3 rounded-lg border border-dashed border-border bg-white hover:border-primary/40 transition-colors">
-            <div className="text-center py-2">
-              <Upload className="w-5 h-5 text-muted-foreground/50 mx-auto mb-1.5" />
-              <p className="text-[12px] font-medium text-foreground">Drop your document here</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">PDF, DOCX, or TXT</p>
-            </div>
-            <button
-              onClick={() => handleChoice("uploaded")}
-              className="w-full mt-1.5 py-2 rounded-lg bg-primary text-white text-[12px] font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+          <div className="mt-2.5 space-y-2">
+            {/* File upload area */}
+            <div
+              onClick={() => handleUpload(false)}
+              className="p-4 rounded-lg border border-dashed border-border bg-white hover:border-primary/40 hover:bg-primary/[0.02] transition-all cursor-pointer"
             >
-              <FileText className="w-3.5 h-3.5" /> Upload Seel_Return_Policy_v2.pdf
-            </button>
+              <div className="text-center">
+                <Upload className="w-5 h-5 text-muted-foreground/40 mx-auto mb-1.5" />
+                <p className="text-[12px] font-medium text-foreground">Drop your document here, or click to browse</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">PDF, DOCX, TXT, or paste a URL below</p>
+              </div>
+            </div>
+
+            {/* URL paste option */}
+            {showUrlInput ? (
+              <div className="flex items-center gap-2">
+                <div className="flex-1 flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 focus-within:ring-1 focus-within:ring-primary/30">
+                  <Globe className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
+                  <input
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleUrlSubmit()}
+                    placeholder="https://your-store.com/return-policy"
+                    className="flex-1 text-[12px] bg-transparent outline-none placeholder:text-muted-foreground/40"
+                    autoFocus
+                  />
+                </div>
+                <button
+                  onClick={handleUrlSubmit}
+                  disabled={!urlInput.trim()}
+                  className="px-3 py-2 rounded-lg text-[11px] font-medium bg-primary text-white hover:bg-primary/90 transition-colors disabled:opacity-40"
+                >
+                  Import
+                </button>
+                <button
+                  onClick={() => { setShowUrlInput(false); setUrlInput(""); }}
+                  className="p-2 rounded-lg text-muted-foreground hover:bg-accent transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowUrlInput(true)}
+                  className="text-[11px] text-primary hover:underline flex items-center gap-1"
+                >
+                  <Link2 className="w-3 h-3" /> Or paste a webpage URL
+                </button>
+                <span className="text-muted-foreground/30">|</span>
+                <button
+                  onClick={() => handleUpload(true)}
+                  className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  No doc handy? <span className="text-primary hover:underline">Try with Seel Return Guidelines</span>
+                </button>
+              </div>
+            )}
           </div>
         );
 
@@ -1111,38 +1186,88 @@ function SetupTab() {
                 </div>
               ))}
             </div>
+            {/* Processing time notice */}
+            <div className="mt-3 p-2.5 rounded-md bg-blue-50/60 border border-blue-100/60">
+              <div className="flex items-start gap-2">
+                <Clock className="w-3.5 h-3.5 text-blue-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-[11px] text-blue-800 leading-relaxed">
+                    <strong>Note:</strong> In production, processing your full document takes about 30–60 minutes. You'll get a notification when it's ready — feel free to come back later.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         );
       }
 
-      case "conflict":
+      case "conflict_queue": {
+        const current = conflicts[currentConflictIdx];
+        if (!current || current.resolved) return null;
+        const resolvedCount = conflicts.filter((c) => c.resolved).length;
+
         return (
-          <div className="mt-2 p-3 rounded-lg border border-amber-200 bg-amber-50/50">
-            <div className="flex items-start gap-2 mb-2">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-[12px] font-medium text-amber-900">Conflict: Return Window</p>
-                <p className="text-[11px] text-amber-800/80 mt-0.5 leading-relaxed">
-                  Your return policy says "30-day return window" but the FAQ page says "28 calendar days from delivery." Which one should I follow?
-                </p>
+          <div className="mt-2.5 space-y-2">
+            {/* Progress indicator */}
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] text-muted-foreground">
+                Conflict {resolvedCount + 1} of {conflicts.length}
+              </span>
+              <div className="flex-1 h-1 bg-muted/40 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary/60 rounded-full transition-all"
+                  style={{ width: `${(resolvedCount / conflicts.length) * 100}%` }}
+                />
               </div>
             </div>
-            <div className="flex gap-2 mt-1">
-              <button
-                onClick={() => handleChoice("30_days")}
-                className="px-3 py-1.5 rounded-full text-[11px] font-medium border border-amber-300 text-amber-800 hover:bg-amber-100 transition-colors"
-              >
-                30 days from delivery
-              </button>
-              <button
-                onClick={() => handleChoice("28_days")}
-                className="px-3 py-1.5 rounded-full text-[11px] font-medium border border-amber-300 text-amber-800 hover:bg-amber-100 transition-colors"
-              >
-                28 calendar days
-              </button>
+
+            {/* Conflict card */}
+            <div className="rounded-lg border border-amber-100 bg-amber-50/30 overflow-hidden">
+              <div className="px-3.5 py-2.5 border-b border-amber-100/60">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <span className="text-[12px] font-medium text-foreground">{current.title}</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{current.description}</p>
+              </div>
+
+              <div className="px-3.5 py-2.5 space-y-2">
+                {/* Option buttons */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleConflictResolve(current.id, "a")}
+                    className="flex-1 px-3 py-2 rounded-lg text-[11px] font-medium border border-border text-foreground hover:bg-accent/50 hover:border-primary/30 transition-all text-left"
+                  >
+                    {current.optionA}
+                  </button>
+                  <button
+                    onClick={() => handleConflictResolve(current.id, "b")}
+                    className="flex-1 px-3 py-2 rounded-lg text-[11px] font-medium border border-border text-foreground hover:bg-accent/50 hover:border-primary/30 transition-all text-left"
+                  >
+                    {current.optionB}
+                  </button>
+                </div>
+
+                {/* Note input */}
+                <div className="flex items-center gap-2">
+                  <input
+                    value={conflictNote}
+                    onChange={(e) => setConflictNote(e.target.value)}
+                    placeholder="Add a note or clarification (optional)..."
+                    className="flex-1 text-[11px] bg-white border border-border/60 rounded-md px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-primary/20 placeholder:text-muted-foreground/40"
+                  />
+                  <button
+                    onClick={() => handleConflictDismiss(current.id)}
+                    className="text-[10px] text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap"
+                  >
+                    Skip
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         );
+      }
 
       default:
         return null;
@@ -1155,13 +1280,13 @@ function SetupTab() {
         {messages.map((msg) => (
           <div key={msg.id} className={cn("flex gap-2.5", msg.sender === "manager" && "flex-row-reverse")}>
             {msg.sender === "ai" && (
-              <div className="w-6 h-6 rounded-full bg-primary/8 flex items-center justify-center shrink-0 mt-0.5">
-                <Bot className="w-3 h-3 text-primary" />
+              <div className="w-6 h-6 rounded-full bg-indigo-50 flex items-center justify-center shrink-0 mt-0.5">
+                <span className="text-[11px]">🎯</span>
               </div>
             )}
             <div className={cn("max-w-[85%] min-w-0", msg.sender === "manager" && "text-right")}>
               <div className={cn("flex items-center gap-1.5 mb-0.5", msg.sender === "manager" && "justify-end")}>
-                <span className="text-[10px] font-medium text-foreground">{msg.sender === "ai" ? "Team Lead" : "You"}</span>
+                <span className="text-[10px] font-medium text-foreground">{msg.sender === "ai" ? "Sarah" : "You"}</span>
               </div>
               <div className={cn(
                 "rounded-xl px-3 py-2 inline-block text-left",
@@ -1222,7 +1347,7 @@ export default function CommunicationPage() {
   const [threadPanel, setThreadPanel] = useState<{ topicId: string; topicTitle: string; contextMsg: string } | null>(null);
 
   // Rep state
-  const [repHired, setRepHired] = useState(true); // MVP: rep already exists
+  const [repHired, setRepHired] = useState(false);
   const [showRepConfig, setShowRepConfig] = useState(false);
   const [escalationStatuses, setEscalationStatuses] = useState<Record<string, EscalationStatus>>(() => {
     const map: Record<string, EscalationStatus> = {};
@@ -1373,6 +1498,12 @@ export default function CommunicationPage() {
     setShowWelcome(false);
   };
 
+  const handleHireRep = () => {
+    setRepHired(true);
+    setSelected({ type: "rep", id: "rep-1", name: "Alex" });
+    toast.success("Your first AI Rep is ready! Configure them in the panel.");
+  };
+
   const shownTopics = new Set<string>();
 
   // Escalation tickets with current statuses
@@ -1410,17 +1541,11 @@ export default function CommunicationPage() {
 
         {/* ── Yellow Banner (Integration not set up) ── */}
         {!zendeskConnected && (
-          <div className="px-5 py-2 bg-amber-50 border-b border-amber-200/60 flex items-center gap-3">
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-            <p className="text-[12px] text-amber-800 flex-1">
-              <span className="font-medium">Zendesk not connected</span> — set up integration to let your Rep handle tickets.
+          <div className="px-5 py-2 bg-amber-50/80 border-b border-amber-100 flex items-center gap-3">
+            <div className="w-1 h-1 rounded-full bg-amber-400 shrink-0" />
+            <p className="text-[11.5px] text-amber-700 flex-1">
+              Zendesk not connected — <button onClick={() => navigate("/integrations")} className="font-medium underline underline-offset-2 hover:text-amber-900">set up integration</button> to go live.
             </p>
-            <button
-              onClick={() => navigate("/integrations")}
-              className="text-[11px] font-medium text-amber-700 hover:text-amber-900 underline underline-offset-2 shrink-0"
-            >
-              Go to Integrations
-            </button>
           </div>
         )}
 
@@ -1440,7 +1565,7 @@ export default function CommunicationPage() {
                       : "bg-indigo-50 hover:bg-indigo-100"
                   )}
                 >
-                  <Sparkles className="w-4 h-4 text-indigo-600" />
+                  <span className="text-[14px]">🎯</span>
                   {waitingCount > 0 && selected.type !== "team_lead" && (
                     <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-red-500 text-white text-[8px] flex items-center justify-center font-medium">
                       {waitingCount}
@@ -1449,8 +1574,8 @@ export default function CommunicationPage() {
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right" className="text-[11px]">
-                <p className="font-medium">Team Lead</p>
-                <p className="text-muted-foreground text-[10px]">Playbook & rules</p>
+                <p className="font-medium">Sarah — Team Lead</p>
+                <p className="text-muted-foreground text-[10px]">Manages your Playbook and rules</p>
               </TooltipContent>
             </Tooltip>
 
@@ -1471,7 +1596,7 @@ export default function CommunicationPage() {
                         : "bg-emerald-50 hover:bg-emerald-100"
                     )}
                   >
-                    <Bot className="w-4 h-4 text-emerald-600" />
+                    <span className="text-[14px]">💬</span>
                     {needsAttentionCount > 0 && (
                       <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-red-500 text-white text-[8px] flex items-center justify-center font-medium">
                         {needsAttentionCount}
@@ -1480,8 +1605,8 @@ export default function CommunicationPage() {
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="right" className="text-[11px]">
-                  <p className="font-medium">Alex</p>
-                  <p className="text-muted-foreground text-[10px]">Production</p>
+                  <p className="font-medium">Alex — AI Rep</p>
+                  <p className="text-muted-foreground text-[10px]">Working · Handling tickets</p>
                 </TooltipContent>
               </Tooltip>
             ) : (
@@ -1493,7 +1618,7 @@ export default function CommunicationPage() {
                 </TooltipTrigger>
                 <TooltipContent side="right" className="text-[11px]">
                   <p>No reps yet</p>
-                  <p className="text-muted-foreground text-[10px]">Complete setup to hire one</p>
+                  <p className="text-muted-foreground text-[10px]">Talk to Sarah to set up your Playbook first</p>
                 </TooltipContent>
               </Tooltip>
             )}
@@ -1506,33 +1631,39 @@ export default function CommunicationPage() {
             {selected.type === "team_lead" ? (
               /* ── Team Lead View ── */
               <>
-                {/* Header */}
+                {/* Header with Team Lead info */}
                 <div className="flex items-center justify-between px-5 h-10 border-b border-border shrink-0 bg-white">
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setActiveTab("conversations")}
-                      className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors",
-                        activeTab === "conversations"
-                          ? "bg-muted text-foreground"
-                          : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                      )}
-                    >
-                      <MessageCircle className="w-3.5 h-3.5" />
-                      Conversations
-                    </button>
-                    <button
-                      onClick={() => setActiveTab("setup")}
-                      className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors",
-                        activeTab === "setup"
-                          ? "bg-muted text-foreground"
-                          : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                      )}
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      Setup
-                    </button>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13px]">🎯</span>
+                      <span className="text-[13px] font-semibold text-foreground">Sarah</span>
+                      <span className="text-[11px] text-muted-foreground">Team Lead</span>
+                    </div>
+                    <div className="h-4 w-px bg-border" />
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setActiveTab("conversations")}
+                        className={cn(
+                          "px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors",
+                          activeTab === "conversations"
+                            ? "bg-muted text-foreground"
+                            : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                        )}
+                      >
+                        Conversations
+                      </button>
+                      <button
+                        onClick={() => setActiveTab("setup")}
+                        className={cn(
+                          "px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors",
+                          activeTab === "setup"
+                            ? "bg-muted text-foreground"
+                            : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                        )}
+                      >
+                        Setup
+                      </button>
+                    </div>
                   </div>
 
                   {activeTab === "conversations" && (
@@ -1581,7 +1712,7 @@ export default function CommunicationPage() {
                                       )}
                                       <MessageBubble
                                         msg={msg}
-                                        senderLabel="Team Lead"
+                                        senderLabel="Sarah"
                                         onAction={handleAction}
                                         onReply={handleReply}
                                       />
@@ -1603,7 +1734,7 @@ export default function CommunicationPage() {
                               value={inputValue}
                               onChange={(e) => setInputValue(e.target.value)}
                               onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
-                              placeholder="Message Team Lead..."
+                              placeholder="Message Sarah..."
                               className="flex-1 text-[12.5px] bg-transparent outline-none placeholder:text-muted-foreground/50"
                             />
                             <button
@@ -1637,9 +1768,30 @@ export default function CommunicationPage() {
                     )}
                   </div>
                 ) : (
-                  <SetupTab />
+                  <SetupTab onHireRep={handleHireRep} />
                 )}
               </>
+            ) : selected.type === "rep" && !repHired ? (
+              /* ── Rep not hired yet — guide to Team Lead ── */
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center max-w-[300px]">
+                  <div className="w-12 h-12 rounded-full bg-muted/40 flex items-center justify-center mx-auto mb-3">
+                    <UserPlus className="w-5 h-5 text-muted-foreground/40" />
+                  </div>
+                  <p className="text-[13px] font-medium text-foreground">No Rep hired yet</p>
+                  <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                    Talk to Sarah (your Team Lead) to set up your Playbook first, then hire your first AI Rep.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 h-7 text-[11px]"
+                    onClick={() => { setSelected({ type: "team_lead" }); setActiveTab("setup"); }}
+                  >
+                    <ArrowRight className="w-3 h-3 mr-1" /> Go to Setup
+                  </Button>
+                </div>
+              </div>
             ) : (
               /* ── Rep View ── */
               <div className="flex flex-1 min-h-0">
@@ -1647,11 +1799,9 @@ export default function CommunicationPage() {
                   {/* Rep header */}
                   <div className="flex items-center justify-between px-5 h-10 border-b border-border shrink-0 bg-white">
                     <div className="flex items-center gap-2">
-                      <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center">
-                        <Bot className="w-3 h-3 text-emerald-600" />
-                      </div>
+                      <span className="text-[14px]">💬</span>
                       <span className="text-[13px] font-semibold text-foreground">Alex</span>
-                      <Badge variant="secondary" className="h-4 text-[9px] px-1.5">Production</Badge>
+                      <Badge variant="secondary" className="h-4 text-[9px] px-1.5 bg-emerald-50 text-emerald-700 border-emerald-200">Working</Badge>
                     </div>
                     <button
                       onClick={() => setShowRepConfig(!showRepConfig)}
