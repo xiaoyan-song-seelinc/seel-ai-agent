@@ -12,8 +12,7 @@ export type MessageSender = "ai" | "manager";
 export type ApprovalStatus = "pending" | "approved" | "denied" | "expired";
 export type PermissionLevel = "autonomous" | "disabled";
 export type AgentMode = "training" | "production" | "off";
-export type OnboardingStep = "connect_zendesk" | "connect_shopify" | "import_rules" | "confirm_rules" | "set_permissions" | "capability_boundary" | "escalation_rules" | "agent_identity" | "readiness_audit" | "go_live";
-export type TicketSidebarState = "ai_handling" | "pending_approval" | "escalated" | "taken_over";
+export type TicketSidebarState = "ai_handling" | "escalated" | "taken_over";
 
 export interface Topic {
   id: string;
@@ -38,7 +37,7 @@ export interface Message {
 
 export interface MessageAction {
   label: string;
-  type: "accept" | "reject" | "link";
+  type: "accept" | "reject" | "modify_accept" | "link";
   targetUrl?: string;
 }
 
@@ -70,16 +69,28 @@ export interface ActionPermission {
   dependsOn?: string[];
 }
 
-export interface EscalationRule {
-  id: string;
-  label: string;
-  description: string;
-  enabled: boolean;
-  configurable: boolean;
-  value?: number;
-  routingTarget?: string;
-  routingType?: "zendesk_group" | "external_link" | "specific_agent";
+// ── SOP-level Rule (replaces old flat Skill) ──────────────
+
+export interface RuleEscalation {
+  trigger: string;
+  action: string;
 }
+
+export interface SOPRule {
+  id: string;
+  name: string;
+  intent: string;
+  policy: string;
+  exceptions: string[];
+  escalation: RuleEscalation;
+  lastUpdated: string;
+  updatedByTopicId?: string;
+  sourceDocId?: string;
+  tags?: string[];
+}
+
+// Keep Skill as alias for backward compat in legacy pages
+export type Skill = SOPRule;
 
 export interface AgentIdentity {
   name: string;
@@ -106,17 +117,6 @@ export interface KnowledgeDocument {
   extractedRules: number;
   status: "processed" | "processing" | "error";
   sourceUrl?: string;
-}
-
-export interface Skill {
-  id: string;
-  name: string;
-  intent: string;
-  ruleText: string;
-  lastUpdated: string;
-  updatedByTopicId?: string;
-  sourceDocId?: string;
-  tags?: string[];
 }
 
 export interface PerformanceMetric {
@@ -153,54 +153,11 @@ export interface ActionableItem {
   linkedTopicId?: string;
 }
 
-export interface ApprovalRequest {
-  id: string;
-  ticketId: string;
-  ticketSubject: string;
-  customerName: string;
-  actionType: string;
-  actionLabel: string;
-  parameters: Record<string, string | number>;
-  reasoning: string;
-  status: ApprovalStatus;
-  createdAt: string;
-  timeoutAt: string;
-  aiConfidence: number;
-  intentDetected: string;
-  actionsTaken: string[];
-}
-
 export interface BadCaseReport {
   id: string;
   ticketId: string;
   comment: string;
   createdAt: string;
-}
-
-export interface ParsedRule {
-  id: string;
-  text: string;
-  source: string;
-  category: "behavior" | "business_rule" | "action_mapping";
-  confidence: number;
-  status: "pending" | "confirmed" | "rejected" | "conflicted";
-  conflictGroupId?: string;
-  conflictAlternative?: string;
-}
-
-export interface OnboardingState {
-  currentStep: OnboardingStep;
-  completedSteps: OnboardingStep[];
-  integrations: Integration[];
-  parsedRules: ParsedRule[];
-  actionPermissions: ActionPermission[];
-  escalationRules: EscalationRule[];
-  identity: AgentIdentity;
-  capabilitySummary: {
-    canHandle: { scenario: string; percentage: number }[];
-    willEscalate: { scenario: string; reason: string }[];
-    estimatedCoverage: number;
-  };
 }
 
 // ── Mock Data ──────────────────────────────────────────────
@@ -332,16 +289,117 @@ export const ACTION_PERMISSIONS: ActionPermission[] = [
   },
 ];
 
-export const ESCALATION_RULES: EscalationRule[] = [
-  { id: "er-1", label: "Angry customer detected", description: "Escalate when customer sentiment is angry or frustrated (caps, exclamation marks, explicit complaints)", enabled: true, configurable: false },
-  { id: "er-2", label: "Legal/safety keywords", description: "Escalate when message contains legal threats, safety concerns, or regulatory keywords", enabled: true, configurable: false },
-  { id: "er-3", label: "Unresolved after N turns", description: "Escalate if the issue isn't resolved within a set number of conversation turns", enabled: true, configurable: true, value: 4 },
-  { id: "er-4", label: "Customer requests human", description: "Escalate immediately when customer explicitly asks for a human agent", enabled: true, configurable: false },
-  { id: "er-5", label: "High-value order (>$500)", description: "Escalate any issue involving orders above this threshold", enabled: true, configurable: true, value: 500, routingTarget: "CX Team A", routingType: "zendesk_group" },
-  { id: "er-6", label: "Repeat contact (3+ times)", description: "Escalate when customer has contacted about the same issue multiple times", enabled: true, configurable: true, value: 3, routingTarget: "CX Team A", routingType: "zendesk_group" },
-  { id: "er-7", label: "Insurance-related inquiry", description: "Route insurance claims and coverage questions to the dedicated insurance support team", enabled: true, configurable: false, routingTarget: "https://insurance-support.seel.com/zendesk", routingType: "external_link" },
-  { id: "er-8", label: "Technical/integration issue", description: "Route technical issues (tracking pixel, API errors) to engineering support", enabled: true, configurable: false, routingTarget: "Engineering Support", routingType: "zendesk_group" },
+// ── SOP Rules (replaces old flat SKILLS) ──────────────────
+
+export const RULES: SOPRule[] = [
+  {
+    id: "rule-1",
+    name: "Standard Return & Refund",
+    intent: "Returns / Refunds",
+    policy: "Process full refund for items returned within 30 days of delivery in original condition. Refund to original payment method only. For VIP customers (3+ completed orders), extend return window to 45 days.",
+    exceptions: [
+      "Final sale items are non-returnable.",
+      "Items without tags or showing signs of use are not eligible.",
+      "Spring Sale orders (Mar 15-31, 2026) have a 60-day return window.",
+    ],
+    escalation: {
+      trigger: "Customer requests refund to a different payment method, or order value exceeds $150.",
+      action: "Escalate to manager with order details and customer request.",
+    },
+    lastUpdated: "2026-03-20T09:00:00Z",
+    updatedByTopicId: "t-4",
+    sourceDocId: "doc-2",
+    tags: ["Returns", "Refunds", "VIP"],
+  },
+  {
+    id: "rule-2",
+    name: "Where Is My Order (WISMO)",
+    intent: "Order Tracking",
+    policy: "Look up order in Shopify, retrieve shipment tracking. If shipped, share tracking link and estimated delivery date. If delayed >3 days past estimate, apologize and offer to contact carrier on customer's behalf.",
+    exceptions: [
+      "Never promise a specific delivery date — use estimated ranges.",
+      "If tracking shows no movement for 7+ days, offer 10% discount on next order.",
+    ],
+    escalation: {
+      trigger: "Package shows delivered but customer says not received, or carrier reports package lost.",
+      action: "Escalate to manager for carrier claim initiation.",
+    },
+    lastUpdated: "2026-03-01T09:00:00Z",
+    sourceDocId: "doc-1",
+    tags: ["Shipping", "WISMO"],
+  },
+  {
+    id: "rule-3",
+    name: "Damaged / Wrong Item",
+    intent: "Product Issues",
+    policy: "For items under $80, process replacement or refund (customer's choice) without requiring photo evidence. For items $80+, request photo evidence before processing. Offer free return shipping for all defective/wrong items.",
+    exceptions: [
+      "If customer reports damage on a final-sale item, still process replacement (not refund).",
+      "For wrong-item cases, do not require return of the incorrect item if value is under $80.",
+    ],
+    escalation: {
+      trigger: "Customer claims damage on item over $200, or multiple damage claims from same customer within 30 days.",
+      action: "Escalate to manager for fraud review before processing.",
+    },
+    lastUpdated: "2026-03-12T14:00:00Z",
+    updatedByTopicId: "t-3",
+    sourceDocId: "doc-1",
+    tags: ["Product Issues", "Damage"],
+  },
+  {
+    id: "rule-4",
+    name: "Order Cancellation",
+    intent: "Cancellations",
+    policy: "Cancel unfulfilled orders immediately with full refund. For fulfilled/shipped orders, guide customer to the return process instead. Express sympathy for the inconvenience.",
+    exceptions: [
+      "Custom/personalized orders cannot be cancelled once production has started.",
+    ],
+    escalation: {
+      trigger: "Customer insists on cancelling a shipped order and refuses return process.",
+      action: "Escalate to manager with order status and customer sentiment.",
+    },
+    lastUpdated: "2026-03-01T09:00:00Z",
+    sourceDocId: "doc-1",
+    tags: ["Cancellations"],
+  },
+  {
+    id: "rule-5",
+    name: "Return Shipping Cost",
+    intent: "Returns",
+    policy: "Defective/wrong items: free return shipping (company pays). Change-of-mind returns: customer pays — provide prepaid label and deduct $8.95 from refund.",
+    exceptions: [
+      "VIP customers (3+ orders) get free return shipping on first change-of-mind return per year.",
+    ],
+    escalation: {
+      trigger: "Customer disputes the $8.95 fee or claims item is defective when evidence suggests otherwise.",
+      action: "Escalate to manager for judgment call.",
+    },
+    lastUpdated: "2026-03-20T09:00:00Z",
+    updatedByTopicId: "t-7",
+    sourceDocId: "doc-2",
+    tags: ["Returns", "Shipping"],
+  },
+  {
+    id: "rule-6",
+    name: "International Returns",
+    intent: "Returns",
+    policy: "Return shipping is customer's responsibility for international orders. Customs duties are non-refundable (outside our control). For VIP customers, offer store credit equal to the duties amount as a goodwill gesture.",
+    exceptions: [
+      "Defective/wrong items shipped internationally still qualify for free return shipping.",
+    ],
+    escalation: {
+      trigger: "Customer threatens chargeback over customs duties, or return involves items over $300.",
+      action: "Escalate to manager immediately.",
+    },
+    lastUpdated: "2026-03-25T16:00:00Z",
+    updatedByTopicId: "t-8",
+    sourceDocId: "doc-2",
+    tags: ["Returns", "International"],
+  },
 ];
+
+// Backward-compatible alias for legacy pages
+export const SKILLS = RULES;
 
 export const KNOWLEDGE_DOCUMENTS: KnowledgeDocument[] = [
   { id: "doc-1", name: "Coastal Living Co — Customer Service SOP v3.2.pdf", type: "pdf", uploadedAt: "2026-03-01T09:00:00Z", size: "2.4 MB", extractedRules: 12, status: "processed", sourceUrl: "/documents/sop-v3.2.pdf" },
@@ -350,16 +408,6 @@ export const KNOWLEDGE_DOCUMENTS: KnowledgeDocument[] = [
   { id: "doc-4", name: "VIP Customer Handling Guidelines.pdf", type: "pdf", uploadedAt: "2026-03-10T11:00:00Z", size: "540 KB", extractedRules: 4, status: "processed", sourceUrl: "/documents/vip-guidelines.pdf" },
   { id: "doc-5", name: "Product Warranty Terms — All Categories.csv", type: "csv", uploadedAt: "2026-03-15T16:00:00Z", size: "320 KB", extractedRules: 8, status: "processed", sourceUrl: "/documents/warranty-terms.csv" },
   { id: "doc-6", name: "Coastal Living Co FAQ Page", type: "url", uploadedAt: "2026-03-18T10:00:00Z", size: "—", extractedRules: 6, status: "processed", sourceUrl: "https://coastalliving.com/faq" },
-];
-
-export const SKILLS: Skill[] = [
-  { id: "sk-1", name: "Standard Refund Policy", intent: "Refunds", ruleText: "Process full refund for items returned within 30 days in original condition. For VIP customers (3+ orders), extend window to 45 days. Refund to original payment method only.", lastUpdated: "2026-03-15T10:00:00Z", updatedByTopicId: "t-4", sourceDocId: "doc-2", tags: ["Refunds", "VIP"] },
-  { id: "sk-2", name: "WISMO Response", intent: "Where Is My Order", ruleText: "Look up order in Shopify, check shipment tracking. If shipped, share tracking link and estimated delivery. If delayed >3 days past estimate, apologize and offer to contact carrier.", lastUpdated: "2026-03-01T09:00:00Z", sourceDocId: "doc-1", tags: ["Shipping", "WISMO"] },
-  { id: "sk-3", name: "Cancellation Policy", intent: "Cancellations", ruleText: "Cancel unfulfilled orders immediately with full refund. For fulfilled orders, guide customer to return process instead. Express sympathy for the inconvenience.", lastUpdated: "2026-03-01T09:00:00Z", sourceDocId: "doc-1", tags: ["Cancellations"] },
-  { id: "sk-4", name: "Damaged Item Handling", intent: "Product Issues", ruleText: "Ask for photo evidence. If damage is confirmed, offer replacement or full refund — customer's choice. Do not require return of damaged item for orders under $80.", lastUpdated: "2026-03-12T14:00:00Z", updatedByTopicId: "t-3", sourceDocId: "doc-1", tags: ["Product Issues", "Damage"] },
-  { id: "sk-5", name: "Shipping Delay Communication", intent: "Shipping", ruleText: "Acknowledge the delay, provide updated ETA if available. For delays >7 days, offer 10% discount on next order. Never blame the carrier directly.", lastUpdated: "2026-03-08T11:00:00Z", sourceDocId: "doc-3", tags: ["Shipping"] },
-  { id: "sk-6", name: "Product Recommendation", intent: "Pre-sale", ruleText: "When customer asks about product features or comparisons, reference product descriptions from Shopify. Suggest complementary items. Do not make claims not in the product listing.", lastUpdated: "2026-03-01T09:00:00Z", sourceDocId: "doc-6", tags: ["Pre-sale"] },
-  { id: "sk-7", name: "Return Shipping Cost", intent: "Returns", ruleText: "Free return shipping for defective/wrong items. Customer pays return shipping for change-of-mind returns. Provide prepaid label in both cases, deduct $8.95 from refund for change-of-mind.", lastUpdated: "2026-03-20T09:00:00Z", updatedByTopicId: "t-7", sourceDocId: "doc-2", tags: ["Returns", "Shipping"] },
 ];
 
 export const TOPICS: Topic[] = [
@@ -379,7 +427,7 @@ export const TOPICS: Topic[] = [
       status: "pending",
     },
     messages: [
-      { id: "m-1-1", sender: "ai", content: "I've noticed a pattern over the past 3 days: **8 customers** have requested refunds to a different payment method than the one they used for purchase.\n\nCurrently, I escalate these because I don't have a clear rule. Here's what I've observed:\n\n- 5 customers wanted refund to PayPal (paid by credit card)\n- 2 customers had expired cards\n- 1 customer wanted a bank transfer\n\nI'd like to propose a rule:", timestamp: "2026-03-26T08:00:00Z", actions: [{ label: "Accept Rule", type: "accept" }, { label: "Reject", type: "reject" }] },
+      { id: "m-1-1", sender: "ai", content: "I've noticed a pattern over the past 3 days: **8 customers** have requested refunds to a different payment method than the one they used for purchase.\n\nCurrently, I escalate these because I don't have a clear rule. Here's what I've observed:\n\n- 5 customers wanted refund to PayPal (paid by credit card)\n- 2 customers had expired cards\n- 1 customer wanted a bank transfer\n\nI'd like to propose a rule:", timestamp: "2026-03-26T08:00:00Z", actions: [{ label: "Accept Rule", type: "accept" }, { label: "Modify & Accept", type: "modify_accept" }, { label: "Reject", type: "reject" }] },
       { id: "m-1-2", sender: "ai", content: "**Proposed rule:** When customer requests refund to a different payment method, explain that refunds can only be processed to the original payment method due to payment processor restrictions. Offer store credit as an alternative.\n\nFor expired cards specifically, advise the customer to contact their bank — the refund will still process to the old card number and the bank will handle forwarding.\n\nShould I adopt this rule?", timestamp: "2026-03-26T08:00:30Z" },
     ],
   },
@@ -407,7 +455,7 @@ export const TOPICS: Topic[] = [
     messages: [
       { id: "m-3-1", sender: "ai", content: "I escalated **ticket #4412** because the customer reported a damaged ceramic vase but didn't provide a photo. My current rule requires photo evidence for all damage claims.\n\nI noticed you processed a replacement immediately without asking for a photo. The order was $34.99.\n\nI'd like to learn from this: should I skip photo requirements for low-value items? If so, what's the threshold?", timestamp: "2026-03-12T10:00:00Z" },
       { id: "m-3-2", sender: "manager", content: "Good catch. Yes — for items under $80, don't require photo evidence. It's not worth the customer friction. Just process the replacement or refund based on their preference.", timestamp: "2026-03-12T14:30:00Z" },
-      { id: "m-3-3", sender: "ai", content: "Got it! I've updated my **Damaged Item Handling** rule:\n\n> For damage claims on items under $80, process replacement or refund (customer's choice) without requiring photo evidence. For items $80+, still request photo before processing.\n\nThis should reduce escalations for low-value damage claims. I'll monitor the impact.", timestamp: "2026-03-12T14:31:00Z" },
+      { id: "m-3-3", sender: "ai", content: "Got it! I've updated my **Damaged / Wrong Item** rule:\n\n> For damage claims on items under $80, process replacement or refund (customer's choice) without requiring photo evidence. For items $80+, still request photo before processing.\n\nThis should reduce escalations for low-value damage claims. I'll monitor the impact.", timestamp: "2026-03-12T14:31:00Z" },
     ],
   },
   {
@@ -459,7 +507,7 @@ export const TOPICS: Topic[] = [
     updatedAt: "2026-03-20T09:00:00Z",
     preview: "A denied approval led me to discover the return shipping cost rule needs clarification...",
     messages: [
-      { id: "m-7-1", sender: "ai", content: "Yesterday you **denied** my approval request on ticket #4498. I wanted to charge the customer $8.95 return shipping for a defective item.\n\nAfter reviewing your handling, I realized I was applying the change-of-mind return shipping policy to a defective item case. These should be different:\n\n**Proposed update:**\n- Defective/wrong items → free return shipping (we pay)\n- Change of mind → customer pays ($8.95 deducted from refund)\n\nIs this correct?", timestamp: "2026-03-19T14:00:00Z", actions: [{ label: "Accept Rule", type: "accept" }, { label: "Reject", type: "reject" }] },
+      { id: "m-7-1", sender: "ai", content: "Yesterday you **denied** my approval request on ticket #4498. I wanted to charge the customer $8.95 return shipping for a defective item.\n\nAfter reviewing your handling, I realized I was applying the change-of-mind return shipping policy to a defective item case. These should be different:\n\n**Proposed update:**\n- Defective/wrong items → free return shipping (we pay)\n- Change of mind → customer pays ($8.95 deducted from refund)\n\nIs this correct?", timestamp: "2026-03-19T14:00:00Z", actions: [{ label: "Accept Rule", type: "accept" }, { label: "Modify & Accept", type: "modify_accept" }, { label: "Reject", type: "reject" }] },
       { id: "m-7-2", sender: "manager", content: "Yes, exactly right. Defective items should always be free return shipping. Good that you caught this from the denial.", timestamp: "2026-03-20T09:00:00Z" },
       { id: "m-7-3", sender: "ai", content: "Updated my **Return Shipping Cost** rule. This is a great example of the feedback loop working — your denial on one ticket improved my handling for all future return shipping decisions. Thanks!", timestamp: "2026-03-20T09:01:00Z" },
     ],
@@ -480,7 +528,7 @@ export const TOPICS: Topic[] = [
       status: "pending",
     },
     messages: [
-      { id: "m-8-1", sender: "ai", content: "I've been escalating all international return requests because I'm unsure about two things:\n\n1. **Return shipping for international orders** — who pays?\n2. **Customs duties** — are these refundable?\n\nThis week alone I escalated 5 tickets for this reason. Here's my proposed rule based on observing how your team handled them:\n\n> For international returns: return shipping is customer's responsibility. Customs duties are non-refundable (we can't control this). For VIP customers, offer store credit equal to the duties amount as goodwill.\n\nDoes this match your policy?", timestamp: "2026-03-25T16:00:00Z", actions: [{ label: "Accept Rule", type: "accept" }, { label: "Reject", type: "reject" }] },
+      { id: "m-8-1", sender: "ai", content: "I've been escalating all international return requests because I'm unsure about two things:\n\n1. **Return shipping for international orders** — who pays?\n2. **Customs duties** — are these refundable?\n\nThis week alone I escalated 5 tickets for this reason. Here's my proposed rule based on observing how your team handled them:\n\n> For international returns: return shipping is customer's responsibility. Customs duties are non-refundable (we can't control this). For VIP customers, offer store credit equal to the duties amount as goodwill.\n\nDoes this match your policy?", timestamp: "2026-03-25T16:00:00Z", actions: [{ label: "Accept Rule", type: "accept" }, { label: "Modify & Accept", type: "modify_accept" }, { label: "Reject", type: "reject" }] },
     ],
   },
 ];
@@ -527,136 +575,12 @@ export const ACTIONABLE_ITEMS: ActionableItem[] = [
   { id: "ai-3", title: "Tone adjustment for live chat", description: "3 customers rated CSAT low citing 'too formal' tone on live chat. Consider switching to 'friendly' tone for chat channel.", impact: "Could improve chat CSAT by 0.2-0.3 points" },
 ];
 
-// ── Zendesk Sidebar Mock Data ──────────────────────────────
-
-export const MOCK_TICKETS: ApprovalRequest[] = [
-  {
-    id: "apr-1",
-    ticketId: "4589",
-    ticketSubject: "I need a refund for my broken lamp",
-    customerName: "Sarah Mitchell",
-    actionType: "refund",
-    actionLabel: "Issue Refund",
-    parameters: { amount: 89.99, currency: "USD", method: "Original Visa ending 4242", orderId: "CLC-10234" },
-    reasoning: "Customer received a ceramic table lamp with a cracked base. Photo evidence confirms damage. Order is within 30-day return window. Recommending full refund to original payment method.",
-    status: "pending",
-    createdAt: "2026-03-26T09:15:00Z",
-    timeoutAt: "2026-03-26T09:45:00Z",
-    aiConfidence: 0.92,
-    intentDetected: "Product Issues — Damaged Item",
-    actionsTaken: ["Verified order #CLC-10234 in Shopify", "Confirmed item is within return window", "Reviewed photo evidence of damage"],
-  },
-  {
-    id: "apr-2",
-    ticketId: "4591",
-    ticketSubject: "Can I get a discount? I've been a loyal customer",
-    customerName: "David Park",
-    actionType: "discount",
-    actionLabel: "Apply Discount",
-    parameters: { percentage: 12, code: "LOYAL-DAVID-12", orderId: "CLC-10241", orderTotal: 234.50 },
-    reasoning: "Customer has 7 completed orders (VIP). Requesting loyalty discount on current cart. 12% is within the 15% max threshold. Customer has never received a discount before.",
-    status: "pending",
-    createdAt: "2026-03-26T09:30:00Z",
-    timeoutAt: "2026-03-26T10:00:00Z",
-    aiConfidence: 0.85,
-    intentDetected: "Pre-sale — Loyalty Discount Request",
-    actionsTaken: ["Verified customer has 7 completed orders", "Checked discount history — no prior discounts", "Generated unique code LOYAL-DAVID-12"],
-  },
-  {
-    id: "apr-3",
-    ticketId: "4585",
-    ticketSubject: "Wrong item received, need replacement ASAP",
-    customerName: "Emma Thompson",
-    actionType: "resend",
-    actionLabel: "Resend Order",
-    parameters: { orderId: "CLC-10228", itemName: "Coastal Breeze Candle Set", value: 45.00, shippingMethod: "Express (2-day)" },
-    reasoning: "Customer received a different candle set than ordered. Photo shows wrong SKU. Original order value $45 is under $80 threshold — no return needed. Recommending express reshipping.",
-    status: "pending",
-    createdAt: "2026-03-26T08:45:00Z",
-    timeoutAt: "2026-03-26T09:15:00Z",
-    aiConfidence: 0.95,
-    intentDetected: "Product Issues — Wrong Item",
-    actionsTaken: ["Verified order #CLC-10228", "Confirmed SKU mismatch from photo", "Item under $80 — no return required per policy"],
-  },
-];
-
-export const MOCK_ESCALATED_TICKET = {
-  ticketId: "4593",
-  ticketSubject: "URGENT: I want to speak to a manager NOW",
-  customerName: "Robert Chen",
-  reason: "Customer explicitly requested human agent. Sentiment: very frustrated. Issue involves a $450 furniture order with multiple delivery attempts.",
-  summary: "Customer ordered a coastal oak bookshelf ($450). Delivery attempted 3 times — customer was home each time but driver marked as 'not home'. Customer is understandably frustrated and demanding to speak with a manager.",
-  actionsTaken: ["Verified 3 failed delivery attempts in carrier system", "Confirmed customer was charged correctly", "Prepared full case summary for handoff"],
-  intentDetected: "Shipping — Delivery Failure",
-};
-
-export const MOCK_AI_HANDLING_TICKET = {
-  ticketId: "4595",
-  ticketSubject: "Where is my order? It's been 5 days",
-  customerName: "Lisa Wang",
-  confidence: 0.94,
-  intentDetected: "Where Is My Order",
-  currentStep: "Shared tracking link and updated ETA with customer",
-  actionsTaken: ["Looked up order #CLC-10250 in Shopify", "Retrieved tracking from carrier API", "Shared tracking link with customer", "Estimated delivery: March 28"],
-};
-
-export const MOCK_TAKEN_OVER_TICKET = {
-  ticketId: "4587",
-  ticketSubject: "Warranty claim for dining table",
-  customerName: "Michael Brown",
-  takenOverAt: "2026-03-26T08:30:00Z",
-  takenOverBy: "Jordan Chen",
-};
-
-// ── Onboarding Mock Data ────────────────────────────────────
-
-export const ONBOARDING_PARSED_RULES: ParsedRule[] = [
-  { id: "opr-1", text: "Process full refund for items returned within 30 days in original condition", source: "SOP Document, Section 3.1", category: "business_rule", confidence: 0.97, status: "confirmed" },
-  { id: "opr-2", text: "Always address customer by first name", source: "SOP Document, Section 1.2", category: "behavior", confidence: 0.95, status: "confirmed" },
-  { id: "opr-3", text: "Look up order status in Shopify when customer asks about delivery", source: "SOP Document, Section 4.1", category: "action_mapping", confidence: 0.93, status: "confirmed" },
-  { id: "opr-4", text: "Refund window is 30 days for all customers", source: "SOP Document, Section 3.1", category: "business_rule", confidence: 0.88, status: "conflicted", conflictGroupId: "cg-1", conflictAlternative: "23% of agents extend to 45 days for VIP customers (3+ orders)" },
-  { id: "opr-5", text: "Extend refund window to 45 days for VIP customers with 3+ orders", source: "Historical ticket analysis", category: "business_rule", confidence: 0.82, status: "conflicted", conflictGroupId: "cg-1", conflictAlternative: "SOP says 30 days for all customers" },
-  { id: "opr-6", text: "Never promise specific delivery dates — use estimated ranges", source: "SOP Document, Section 4.2", category: "behavior", confidence: 0.90, status: "confirmed" },
-  { id: "opr-7", text: "For damaged items, always request photo evidence before processing", source: "SOP Document, Section 5.2", category: "business_rule", confidence: 0.91, status: "pending" },
-  { id: "opr-8", text: "Offer free shipping on replacement orders for defective items", source: "Historical ticket analysis", category: "business_rule", confidence: 0.85, status: "pending" },
-  { id: "opr-9", text: "Use Shopify API to cancel unfulfilled orders", source: "SOP Document, Section 4.3", category: "action_mapping", confidence: 0.96, status: "confirmed" },
-  { id: "opr-10", text: "Respond within 4 hours during business hours (9am-6pm EST)", source: "SOP Document, Section 1.1", category: "behavior", confidence: 0.94, status: "confirmed" },
-];
-
-export const CAPABILITY_SUMMARY = {
-  canHandle: [
-    { scenario: "Order tracking and delivery updates (WISMO)", percentage: 89 },
-    { scenario: "Standard refund processing", percentage: 62 },
-    { scenario: "Order cancellation (unfulfilled)", percentage: 78 },
-    { scenario: "Return label generation", percentage: 70 },
-    { scenario: "Pre-sale product questions", percentage: 82 },
-    { scenario: "Shipping delay communication", percentage: 71 },
-  ],
-  willEscalate: [
-    { scenario: "Create discount coupons", reason: "No API integration available" },
-    { scenario: "Modify existing orders (add/remove items)", reason: "Shopify API limitation" },
-    { scenario: "Warranty claims beyond standard policy", reason: "Requires manager judgment" },
-    { scenario: "Billing disputes / chargeback handling", reason: "Legal sensitivity" },
-    { scenario: "Social media complaint escalations", reason: "Brand risk — requires human touch" },
-  ],
-  estimatedCoverage: 67,
-};
-
-// ── Zendesk Ticket Types for Sidebar Simulation ──────────────
+// ── Zendesk Sidebar Mock Data (simplified: handling / escalated only) ──
 
 export interface ZendeskTicketMessage {
   from: "customer" | "agent" | "internal";
   text: string;
   timestamp: string;
-}
-
-export interface ZendeskTicketApproval {
-  actionType: "refund" | "discount" | "replacement" | "resend";
-  reason: string;
-  status: ApprovalStatus;
-  details?: Record<string, string | number>;
-  timeoutMinutes?: number;
-  respondedAt?: string;
 }
 
 export interface ZendeskTicketActivity {
@@ -671,73 +595,30 @@ export interface ZendeskTicket {
   customerName: string;
   customerEmail: string;
   messages: ZendeskTicketMessage[];
-  approval?: ZendeskTicketApproval;
+  state: TicketSidebarState;
   takenOver: boolean;
   markedBadCase: boolean;
   badCaseNote?: string;
   aiActivity: ZendeskTicketActivity[];
+  // AI handling details
+  confidence?: number;
+  intentDetected?: string;
+  currentStep?: string;
+  // Escalation details
+  escalationReason?: string;
+  escalationSummary?: string;
 }
 
 export const ZENDESK_TICKETS: ZendeskTicket[] = [
-  {
-    id: "zd-4589",
-    subject: "I need a refund for my broken lamp",
-    customerName: "Sarah Mitchell",
-    customerEmail: "sarah.m@gmail.com",
-    messages: [
-      { from: "customer", text: "Hi, I received my ceramic table lamp yesterday and the base is completely cracked. I'd like a full refund please.", timestamp: "2026-03-26T09:00:00Z" },
-      { from: "agent", text: "Hi Sarah! I'm so sorry to hear about the damaged lamp. I can see your order #CLC-10234 and the ceramic table lamp ($89.99). Let me look into a refund for you right away.", timestamp: "2026-03-26T09:01:00Z" },
-      { from: "internal", text: "⏳ Requesting manager approval for refund of $89.99 — amount exceeds autonomous threshold.", timestamp: "2026-03-26T09:01:30Z" },
-    ],
-    approval: {
-      actionType: "refund",
-      reason: "Customer received a ceramic table lamp with a cracked base. Photo evidence confirms damage. Order is within 30-day return window. Recommending full refund to original payment method.",
-      status: "pending",
-      details: { amount: "$89.99", method: "Visa ending 4242", orderId: "CLC-10234", reason: "Damaged item" },
-      timeoutMinutes: 30,
-    },
-    takenOver: false,
-    markedBadCase: false,
-    aiActivity: [
-      { type: "classify", description: "Classified as Product Issues — Damaged Item", timestamp: "2026-03-26T09:00:05Z" },
-      { type: "action", description: "Verified order #CLC-10234 in Shopify", timestamp: "2026-03-26T09:00:10Z" },
-      { type: "action", description: "Confirmed item within 30-day return window", timestamp: "2026-03-26T09:00:12Z" },
-      { type: "respond", description: "Sent empathy response and refund confirmation", timestamp: "2026-03-26T09:01:00Z" },
-      { type: "action", description: "Requested approval for $89.99 refund (above $50 threshold)", timestamp: "2026-03-26T09:01:30Z" },
-    ],
-  },
-  {
-    id: "zd-4591",
-    subject: "Can I get a discount? I've been a loyal customer",
-    customerName: "David Park",
-    customerEmail: "david.park@outlook.com",
-    messages: [
-      { from: "customer", text: "Hey! I've been shopping with you guys for over a year now. Any chance I could get a loyalty discount on my current cart? It's $234.50.", timestamp: "2026-03-26T09:20:00Z" },
-      { from: "agent", text: "Hi David! Thank you so much for being a loyal customer — I can see you've placed 7 orders with us. Let me check what I can do for you.", timestamp: "2026-03-26T09:20:30Z" },
-      { from: "internal", text: "⏳ Requesting approval to apply 12% discount (code: LOYAL-DAVID-12) on order totaling $234.50.", timestamp: "2026-03-26T09:21:00Z" },
-    ],
-    approval: {
-      actionType: "discount",
-      reason: "Customer has 7 completed orders (VIP). Requesting loyalty discount on current cart. 12% is within the 15% max threshold. Customer has never received a discount before.",
-      status: "pending",
-      details: { discount: "12%", code: "LOYAL-DAVID-12", orderTotal: "$234.50", savings: "$28.14" },
-      timeoutMinutes: 30,
-    },
-    takenOver: false,
-    markedBadCase: false,
-    aiActivity: [
-      { type: "classify", description: "Classified as Pre-sale — Loyalty Discount Request", timestamp: "2026-03-26T09:20:05Z" },
-      { type: "action", description: "Verified customer has 7 completed orders (VIP)", timestamp: "2026-03-26T09:20:10Z" },
-      { type: "action", description: "Checked discount history — no prior discounts", timestamp: "2026-03-26T09:20:15Z" },
-      { type: "respond", description: "Acknowledged loyalty and checking options", timestamp: "2026-03-26T09:20:30Z" },
-      { type: "action", description: "Generated unique code LOYAL-DAVID-12, requesting approval", timestamp: "2026-03-26T09:21:00Z" },
-    ],
-  },
   {
     id: "zd-4595",
     subject: "Where is my order? It's been 5 days",
     customerName: "Lisa Wang",
     customerEmail: "lisa.wang@yahoo.com",
+    state: "ai_handling",
+    confidence: 0.94,
+    intentDetected: "Where Is My Order",
+    currentStep: "Shared tracking link and updated ETA with customer",
     messages: [
       { from: "customer", text: "I ordered a coastal breeze candle set 5 days ago and still haven't received it. The tracking hasn't updated in 3 days. What's going on?", timestamp: "2026-03-26T08:30:00Z" },
       { from: "agent", text: "Hi Lisa! Let me look into your order right away. I found your order #CLC-10250 — it shipped 4 days ago via USPS. The tracking shows it's currently in transit and the estimated delivery is March 28. Sometimes tracking can lag behind the actual package location. Would you like me to keep an eye on it and update you if there are any changes?", timestamp: "2026-03-26T08:30:45Z" },
@@ -755,10 +636,38 @@ export const ZENDESK_TICKETS: ZendeskTicket[] = [
     ],
   },
   {
+    id: "zd-4589",
+    subject: "I need a refund for my broken lamp",
+    customerName: "Sarah Mitchell",
+    customerEmail: "sarah.m@gmail.com",
+    state: "ai_handling",
+    confidence: 0.92,
+    intentDetected: "Product Issues — Damaged Item",
+    currentStep: "Processing refund of $89.99 to original payment method",
+    messages: [
+      { from: "customer", text: "Hi, I received my ceramic table lamp yesterday and the base is completely cracked. I'd like a full refund please.", timestamp: "2026-03-26T09:00:00Z" },
+      { from: "agent", text: "Hi Sarah! I'm so sorry to hear about the damaged lamp. I can see your order #CLC-10234 and the ceramic table lamp ($89.99). Since this is a damaged item, I'll process a full refund for you right away. You don't need to return the damaged item.", timestamp: "2026-03-26T09:01:00Z" },
+      { from: "agent", text: "Your refund of $89.99 has been initiated to your Visa ending in 4242. Please allow 3-5 business days for it to appear. Is there anything else I can help with?", timestamp: "2026-03-26T09:01:30Z" },
+    ],
+    takenOver: false,
+    markedBadCase: false,
+    aiActivity: [
+      { type: "classify", description: "Classified as Product Issues — Damaged Item", timestamp: "2026-03-26T09:00:05Z" },
+      { type: "action", description: "Verified order #CLC-10234 in Shopify", timestamp: "2026-03-26T09:00:10Z" },
+      { type: "action", description: "Item $89.99 > $80 threshold, but customer described clear damage", timestamp: "2026-03-26T09:00:12Z" },
+      { type: "respond", description: "Confirmed damage and initiated refund", timestamp: "2026-03-26T09:01:00Z" },
+      { type: "action", description: "Processed refund of $89.99 to Visa ending 4242", timestamp: "2026-03-26T09:01:30Z" },
+    ],
+  },
+  {
     id: "zd-4593",
     subject: "URGENT: I want to speak to a manager NOW",
     customerName: "Robert Chen",
     customerEmail: "robert.chen@gmail.com",
+    state: "escalated",
+    intentDetected: "Shipping — Delivery Failure",
+    escalationReason: "Customer explicitly requested human agent. Sentiment: very frustrated. High-value order ($450).",
+    escalationSummary: "Customer ordered a coastal oak bookshelf ($450). Delivery attempted 3 times — customer was home each time but driver marked as 'not home'. Customer is understandably frustrated and demanding to speak with a manager.",
     messages: [
       { from: "customer", text: "This is RIDICULOUS. I've had THREE delivery attempts and your driver keeps marking it as 'not home' when I'm literally standing at my door. I want to speak to a MANAGER right now. This $450 bookshelf better arrive or I'm disputing the charge.", timestamp: "2026-03-26T08:00:00Z" },
       { from: "internal", text: "🚨 Escalating to human agent — customer explicitly requested manager, sentiment: very frustrated, high-value order ($450).", timestamp: "2026-03-26T08:00:15Z" },
@@ -771,4 +680,32 @@ export const ZENDESK_TICKETS: ZendeskTicket[] = [
       { type: "escalate", description: "Escalated: customer requested human + angry sentiment + $450 order", timestamp: "2026-03-26T08:00:15Z" },
     ],
   },
+  {
+    id: "zd-4591",
+    subject: "Can I get a discount? I've been a loyal customer",
+    customerName: "David Park",
+    customerEmail: "david.park@outlook.com",
+    state: "ai_handling",
+    confidence: 0.85,
+    intentDetected: "Pre-sale — Loyalty Discount Request",
+    currentStep: "Applied 12% discount code LOYAL-DAVID-12",
+    messages: [
+      { from: "customer", text: "Hey! I've been shopping with you guys for over a year now. Any chance I could get a loyalty discount on my current cart? It's $234.50.", timestamp: "2026-03-26T09:20:00Z" },
+      { from: "agent", text: "Hi David! Thank you so much for being a loyal customer — I can see you've placed 7 orders with us. I'd love to offer you a 12% loyalty discount! I've generated a unique code for you: LOYAL-DAVID-12. That brings your total to $206.36, saving you $28.14.", timestamp: "2026-03-26T09:20:30Z" },
+      { from: "customer", text: "Awesome, thanks so much!", timestamp: "2026-03-26T09:22:00Z" },
+    ],
+    takenOver: false,
+    markedBadCase: false,
+    aiActivity: [
+      { type: "classify", description: "Classified as Pre-sale — Loyalty Discount Request", timestamp: "2026-03-26T09:20:05Z" },
+      { type: "action", description: "Verified customer has 7 completed orders (VIP)", timestamp: "2026-03-26T09:20:10Z" },
+      { type: "action", description: "Checked discount history — no prior discounts", timestamp: "2026-03-26T09:20:15Z" },
+      { type: "action", description: "Generated unique code LOYAL-DAVID-12 (12%)", timestamp: "2026-03-26T09:20:25Z" },
+      { type: "respond", description: "Applied discount and shared code with customer", timestamp: "2026-03-26T09:20:30Z" },
+    ],
+  },
 ];
+
+// Legacy Zendesk types for backward compat (used by unused pages)
+export type ApprovalRequest = { id: string; ticketId: string; ticketSubject: string; customerName: string; actionType: string; actionLabel: string; parameters: Record<string, string | number>; reasoning: string; status: ApprovalStatus; createdAt: string; timeoutAt: string; aiConfidence: number; intentDetected: string; actionsTaken: string[]; };
+export const MOCK_TICKETS: ApprovalRequest[] = [];

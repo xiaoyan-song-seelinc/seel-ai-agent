@@ -1,8 +1,8 @@
 /* ── Messages Page ────────────────────────────────────────────
    Two tabs: Conversations (DM-style + ticket actions) and Setup (onboarding).
-   Conversations: chat bubbles with topic labels, rule proposals, and
-   pending ticket actions from Zendesk.
-   Setup: embedded onboarding flow (Connect → Playbook → Hire Rep).
+   Conversations: chat bubbles with topic labels, rule proposals (with
+   Accept / Modify & Accept / Reject), and escalated ticket cards.
+   Setup: embedded 3-phase onboarding (Connect → Playbook → Hire Rep).
    ──────────────────────────────────────────────────────────── */
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
@@ -14,13 +14,13 @@ import {
   ArrowRight, ChevronDown, ChevronUp, MessageCircle,
   AlertTriangle, Copy, CheckCircle2, Link2, Upload,
   FileText, Sparkles, Eye, Rocket, Settings, BookOpen,
-  ExternalLink, Shield, Clock,
+  ExternalLink, Shield, Clock, Pencil,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { TOPICS, type Topic } from "@/lib/mock-data";
-import { ZENDESK_TICKETS, type ZendeskTicket, type SuggestedAction } from "@/lib/zendesk-data";
+import { ZENDESK_TICKETS, type ZendeskTicket } from "@/lib/zendesk-data";
 
 // ══════════════════════════════════════════════════════════
 // ── SHARED TYPES & HELPERS ──────────────────────────────
@@ -271,7 +271,7 @@ function RuleChangeCard({ change }: { change: RuleChange }) {
         {change.type === "new" ? (
           <Plus className="w-3 h-3 text-emerald-600" />
         ) : (
-          <ArrowRight className="w-3 h-3 text-amber-600" />
+          <ArrowRight className="w-3 h-3 text-blue-600" />
         )}
         <span className="text-[11px] font-semibold text-foreground">
           {change.type === "new" ? "New Rule" : "Rule Update"}
@@ -287,10 +287,7 @@ function RuleChangeCard({ change }: { change: RuleChange }) {
           </div>
         )}
         <div>
-          <span className={cn(
-            "text-[9px] font-semibold uppercase tracking-wider",
-            change.type === "update" ? "text-emerald-500" : "text-emerald-500"
-          )}>
+          <span className="text-[9px] font-semibold uppercase tracking-wider text-emerald-500">
             {change.type === "update" ? "Proposed" : "Proposed Rule"}
           </span>
           {renderRuleText(change.after, afterExpanded, () => setAfterExpanded(!afterExpanded))}
@@ -321,7 +318,7 @@ function TopicLabel({ title, status }: { title: string; status: "waiting" | "don
   );
 }
 
-// ── Message Bubble ──────────────────────────────────────
+// ── Message Bubble (with Accept / Modify & Accept / Reject) ──
 
 function MessageBubble({
   msg,
@@ -365,6 +362,12 @@ function MessageBubble({
               <Check className="w-3 h-3" /> Accept
             </button>
             <button
+              onClick={() => onAction(msg.topicId, "modify_accept")}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+            >
+              <Pencil className="w-3 h-3" /> Modify & Accept
+            </button>
+            <button
               onClick={() => onAction(msg.topicId, "reject")}
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
             >
@@ -383,43 +386,17 @@ function MessageBubble({
   );
 }
 
-// ── Ticket Action Card (Zendesk approve/notes in Messages) ──
+// ── Escalated Ticket Card (no approval — direct handoff only) ──
 
-function TicketActionCard({
+function EscalatedTicketCard({
   ticket,
-  onApprove,
-  onDeny,
   onInstruct,
 }: {
   ticket: ZendeskTicket;
-  onApprove: (id: string) => void;
-  onDeny: (id: string) => void;
   onInstruct: (id: string, note: string) => void;
 }) {
   const [instructInput, setInstructInput] = useState("");
   const [showInstruct, setShowInstruct] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [status, setStatus] = useState<"pending" | "approved" | "denied">(
-    ticket.approvalStatus || "pending"
-  );
-
-  const handleApprove = () => {
-    setStatus("approved");
-    onApprove(ticket.id);
-    toast.success(`Approved: ${ticket.suggestedAction?.label}`);
-  };
-
-  const handleDeny = () => {
-    setStatus("denied");
-    onDeny(ticket.id);
-    toast.success("Denied. Rep will re-evaluate.");
-  };
-
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const handleSendInstruct = () => {
     if (!instructInput.trim()) return;
@@ -428,9 +405,6 @@ function TicketActionCard({
     setInstructInput("");
     setShowInstruct(false);
   };
-
-  const isApproval = ticket.state === "approval";
-  const isEscalated = ticket.state === "escalated";
 
   return (
     <div className="flex gap-2.5">
@@ -448,19 +422,10 @@ function TicketActionCard({
         </div>
 
         <div className="rounded-xl bg-muted/40 text-foreground rounded-tl-sm overflow-hidden">
-          {/* Status bar */}
-          <div className={cn(
-            "flex items-center gap-2 px-3 py-1.5 border-b border-border/50",
-            isApproval ? "bg-amber-50/50" : "bg-red-50/50"
-          )}>
-            {isApproval ? (
-              <Clock className="w-3 h-3 text-amber-600" />
-            ) : (
-              <AlertTriangle className="w-3 h-3 text-red-500" />
-            )}
-            <span className="text-[10px] font-semibold">
-              {isApproval ? "Approval Request" : "Escalated to You"}
-            </span>
+          {/* Status bar — escalated */}
+          <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/50 bg-red-50/50">
+            <AlertTriangle className="w-3 h-3 text-red-500" />
+            <span className="text-[10px] font-semibold">Escalated to You</span>
             <span className="text-[10px] text-muted-foreground ml-auto">
               #{ticket.id.replace("zd-", "")} · {ticket.customerName}
             </span>
@@ -470,101 +435,36 @@ function TicketActionCard({
             {/* Ticket subject */}
             <p className="text-[12px] font-medium">{ticket.subject}</p>
 
-            {/* Rep's Note */}
+            {/* Rep's Handoff Note */}
             {ticket.internalNote && (
               <div className="rounded-md bg-white/60 border border-border/50 px-2.5 py-2">
-                <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/70 block mb-1">Rep's Note</span>
+                <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/70 block mb-1">Rep's Handoff Note</span>
                 <p className="text-[11.5px] leading-relaxed text-foreground/80">{ticket.internalNote}</p>
               </div>
             )}
 
-            {/* Suggested Action */}
-            {isApproval && ticket.suggestedAction && (
-              <div className="rounded-md bg-white/60 border border-primary/20 px-2.5 py-2">
-                <span className="text-[9px] font-semibold uppercase tracking-wider text-primary/70 block mb-1">Suggested Action</span>
-                {ticket.suggestedAction.type === "reply" && ticket.suggestedAction.draft ? (
-                  <div>
-                    <p className="text-[11.5px] leading-relaxed text-foreground/80 italic">
-                      "{ticket.suggestedAction.draft}"
-                    </p>
-                    <button
-                      onClick={() => handleCopy(ticket.suggestedAction!.draft!)}
-                      className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 transition-colors"
-                    >
-                      {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                      {copied ? "Copied" : "Copy draft"}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-3">
-                    <span className="text-[12px] font-medium text-foreground">{ticket.suggestedAction.label}</span>
-                    {ticket.suggestedAction.details && (
-                      <div className="flex gap-2">
-                        {Object.entries(ticket.suggestedAction.details).map(([k, v]) => (
-                          <span key={k} className="text-[10px] text-muted-foreground">
-                            {k}: <strong className="text-foreground">{v}</strong>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+            {/* Escalation reason */}
+            {ticket.escalationReason && (
+              <p className="text-[10px] text-muted-foreground/70 italic">{ticket.escalationReason}</p>
             )}
           </div>
 
           {/* Actions */}
           <div className="px-3 py-2 border-t border-border/50 bg-muted/10">
-            {status === "pending" ? (
-              <div className="flex items-center gap-2">
-                {isApproval && (
-                  <>
-                    <button
-                      onClick={handleApprove}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-[11px] font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
-                    >
-                      <Check className="w-3 h-3" /> Approve
-                    </button>
-                    <button
-                      onClick={handleDeny}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-[11px] font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-                    >
-                      <X className="w-3 h-3" /> Deny
-                    </button>
-                  </>
-                )}
-                {isEscalated && (
-                  <a
-                    href="#"
-                    onClick={(e) => { e.preventDefault(); toast.info("Opening ticket in Zendesk..."); }}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-[11px] font-medium bg-muted text-foreground hover:bg-accent transition-colors"
-                  >
-                    <ExternalLink className="w-3 h-3" /> Open in Zendesk
-                  </a>
-                )}
-                <button
-                  onClick={() => setShowInstruct(!showInstruct)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-[11px] font-medium text-muted-foreground hover:bg-accent transition-colors ml-auto"
-                >
-                  <Reply className="w-3 h-3" /> Notes to Rep
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className={cn(
-                  "text-[11px] font-medium",
-                  status === "approved" ? "text-emerald-600" : "text-red-500"
-                )}>
-                  {status === "approved" ? "✓ Approved" : "✗ Denied"}
-                </span>
-                <button
-                  onClick={() => setShowInstruct(!showInstruct)}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium text-muted-foreground hover:bg-accent transition-colors ml-auto"
-                >
-                  <Reply className="w-3 h-3" /> Notes to Rep
-                </button>
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              <a
+                href="/zendesk"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-[11px] font-medium bg-muted text-foreground hover:bg-accent transition-colors"
+              >
+                <ExternalLink className="w-3 h-3" /> Open in Zendesk
+              </a>
+              <button
+                onClick={() => setShowInstruct(!showInstruct)}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-[11px] font-medium text-muted-foreground hover:bg-accent transition-colors ml-auto"
+              >
+                <Reply className="w-3 h-3" /> Notes to Rep
+              </button>
+            </div>
 
             {showInstruct && (
               <div className="mt-2 flex items-center gap-2">
@@ -803,7 +703,7 @@ function ThreadSidePanel({
 }
 
 // ══════════════════════════════════════════════════════════
-// ── SETUP TAB (ONBOARDING) ──────────────────────────────
+// ── SETUP TAB (ONBOARDING — 3 PHASES) ──────────────────
 // ══════════════════════════════════════════════════════════
 
 type OnboardingPhase =
@@ -976,7 +876,7 @@ function SetupTab() {
         setMessages((prev) => [...prev, makeObMsg("manager", choiceLabel)]);
         setPhase("go_live");
         addAiMessages([
-          makeObMsg("ai", `Got it — I'll use "${choiceLabel}" as the rule. ✓`),
+          makeObMsg("ai", `Got it — I'll use "${choiceLabel}" as the rule.`),
           makeObMsg("ai", "That's the playbook set up! You can upload more documents and review extracted rules anytime in **Playbook**."),
           makeObMsg("ai", "Now let's hire your rep. I recommend starting in **Training Mode** — the rep will draft replies as Internal Notes in Zendesk, but won't send anything until you approve.", {
             choices: [
@@ -1308,9 +1208,9 @@ export default function MessagesPage() {
     return combined;
   }, [baseMessages, extraMessages]);
 
-  // Pending tickets (approval + escalated)
-  const pendingTickets = useMemo(() =>
-    ZENDESK_TICKETS.filter(t => t.state === "approval" || t.state === "escalated"),
+  // Escalated tickets only (no approval in MVP)
+  const escalatedTickets = useMemo(() =>
+    ZENDESK_TICKETS.filter(t => t.state === "escalated"),
     []
   );
 
@@ -1331,8 +1231,8 @@ export default function MessagesPage() {
       topicMap.get(msg.topicId)!.replyCount++;
       topicMap.get(msg.topicId)!.timestamp = msg.timestamp;
     }
-    // Add ticket topics
-    for (const t of pendingTickets) {
+    // Add escalated ticket topics
+    for (const t of escalatedTickets) {
       topicMap.set(`ticket-${t.id}`, {
         id: `ticket-${t.id}`,
         title: t.subject,
@@ -1343,7 +1243,7 @@ export default function MessagesPage() {
       });
     }
     return Array.from(topicMap.values());
-  }, [allMessages, pendingTickets, ticketActions]);
+  }, [allMessages, escalatedTickets, ticketActions]);
 
   const waitingCount = topicsList.filter((t) => t.status === "waiting" && t.hasActions).length;
 
@@ -1408,7 +1308,22 @@ export default function MessagesPage() {
   };
 
   const handleAction = (topicId: string, action: string) => {
-    toast.success(action === "accept" ? "Rule accepted" : "Rule rejected");
+    if (action === "modify_accept") {
+      // Open thread panel for modification
+      const msgs = allMessages.filter((m) => m.topicId === topicId);
+      const first = msgs[0];
+      if (first) {
+        setThreadPanel({
+          topicId,
+          topicTitle: first.topicTitle,
+          contextMsg: first.content,
+        });
+        setShowTopics(false);
+        toast.info("Edit the rule in the thread, then confirm.");
+      }
+    } else {
+      toast.success(action === "accept" ? "Rule accepted" : "Rule rejected");
+    }
   };
 
   const handleReply = (topicId: string) => {
@@ -1433,12 +1348,6 @@ export default function MessagesPage() {
     }
   };
 
-  const handleTicketApprove = (id: string) => {
-    setTicketActions(prev => ({ ...prev, [id]: "approved" }));
-  };
-  const handleTicketDeny = (id: string) => {
-    setTicketActions(prev => ({ ...prev, [id]: "denied" }));
-  };
   const handleTicketInstruct = (id: string, note: string) => {
     // Just toast for now
   };
@@ -1463,7 +1372,7 @@ export default function MessagesPage() {
             >
               <MessageCircle className="w-3.5 h-3.5" />
               Conversations
-              {pendingTickets.filter(t => !ticketActions[t.id]).length > 0 && activeTab !== "conversations" && (
+              {escalatedTickets.filter(t => !ticketActions[t.id]).length > 0 && activeTab !== "conversations" && (
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
               )}
             </button>
@@ -1510,7 +1419,9 @@ export default function MessagesPage() {
                   <div key={gi}>
                     <div className="flex items-center gap-3 my-4">
                       <div className="flex-1 h-px bg-border" />
-                      <span className="text-[10px] font-medium text-muted-foreground px-2">{formatDateGroup(group.date)}</span>
+                      <span className="text-[10px] font-medium text-muted-foreground px-2">
+                        {formatDateGroup(group.date)}
+                      </span>
                       <div className="flex-1 h-px bg-border" />
                     </div>
 
@@ -1532,8 +1443,8 @@ export default function MessagesPage() {
                   </div>
                 ))}
 
-                {/* Pending Ticket Actions */}
-                {pendingTickets.length > 0 && (
+                {/* Escalated Ticket Cards */}
+                {escalatedTickets.length > 0 && (
                   <>
                     <div className="flex items-center gap-3 my-4">
                       <div className="flex-1 h-px bg-border" />
@@ -1543,15 +1454,13 @@ export default function MessagesPage() {
                       <div className="flex-1 h-px bg-border" />
                     </div>
 
-                    <TopicLabel title="Pending ticket actions" status="waiting" />
+                    <TopicLabel title="Escalated tickets" status="waiting" />
 
                     <div className="space-y-3">
-                      {pendingTickets.map((ticket) => (
-                        <TicketActionCard
+                      {escalatedTickets.map((ticket) => (
+                        <EscalatedTicketCard
                           key={ticket.id}
                           ticket={ticket}
-                          onApprove={handleTicketApprove}
-                          onDeny={handleTicketDeny}
                           onInstruct={handleTicketInstruct}
                         />
                       ))}

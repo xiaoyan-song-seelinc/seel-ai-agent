@@ -1,22 +1,21 @@
 /* ── PlaybookPage ─────────────────────────────────────────
    Full-page Knowledge view: Documents tab + Rules tab.
-   Rules shown as flat list with tag filtering.
-   No Integrations, no Escalation Rules, no Guardrails here.
+   Rules shown as SOP-level cards with policy/exceptions/escalation.
    ──────────────────────────────────────────────────────────── */
 
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
 import {
-  SKILLS,
+  RULES,
   KNOWLEDGE_DOCUMENTS,
 } from "@/lib/mock-data";
+import type { SOPRule } from "@/lib/mock-data";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Upload,
   Trash2,
-  Save,
   User,
   Bot,
   X,
@@ -25,6 +24,10 @@ import {
   FileText,
   BookOpen,
   Search,
+  ChevronDown,
+  ChevronUp,
+  ShieldAlert,
+  ListChecks,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -44,8 +47,142 @@ const CONFLICTS = [
 /* ── Collect all unique tags from rules ── */
 function getAllTags() {
   const tagSet = new Set<string>();
-  SKILLS.forEach((s) => s.tags?.forEach((t) => tagSet.add(t)));
+  RULES.forEach((r) => r.tags?.forEach((t) => tagSet.add(t)));
   return Array.from(tagSet).sort();
+}
+
+/* ── Rule Card Component ── */
+function RuleCard({
+  rule,
+  idx,
+  onTagClick,
+  selectedTags,
+}: {
+  rule: SOPRule;
+  idx: number;
+  onTagClick: (tag: string) => void;
+  selectedTags: Set<string>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="px-5 py-3.5 hover:bg-muted/20 transition-colors">
+      {/* Header row */}
+      <div className="flex items-start gap-2">
+        <span className="text-[11px] text-muted-foreground font-mono mt-0.5 shrink-0 w-5 text-right">
+          {idx + 1}.
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[13px] font-medium text-foreground">
+              {rule.name}
+            </span>
+            <Badge
+              variant="secondary"
+              className="h-[16px] px-1.5 text-[9px] shrink-0"
+            >
+              {rule.intent}
+            </Badge>
+            {rule.tags?.map((tag) => (
+              <button
+                key={tag}
+                onClick={() => onTagClick(tag)}
+                className={cn(
+                  "px-1.5 py-0 rounded text-[9px] font-medium transition-colors",
+                  selectedTags.has(tag)
+                    ? "bg-primary/10 text-primary"
+                    : "bg-muted/50 text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+
+          {/* Policy (always visible) */}
+          <p className="text-[12px] text-muted-foreground leading-relaxed mt-1.5">
+            {rule.policy}
+          </p>
+
+          {/* Expand/collapse for exceptions + escalation */}
+          {(rule.exceptions.length > 0 || rule.escalation) && (
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="flex items-center gap-1 mt-1.5 text-[11px] text-primary/70 hover:text-primary transition-colors"
+            >
+              {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              {expanded ? "Collapse" : `Exceptions (${rule.exceptions.length}) & Escalation`}
+            </button>
+          )}
+
+          {expanded && (
+            <div className="mt-2 space-y-2.5 pl-0.5">
+              {/* Exceptions */}
+              {rule.exceptions.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <ListChecks className="w-3 h-3 text-amber-500" />
+                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Exceptions</span>
+                  </div>
+                  <ul className="space-y-0.5">
+                    {rule.exceptions.map((ex, i) => (
+                      <li key={i} className="text-[11.5px] text-muted-foreground leading-relaxed pl-4 relative before:content-['–'] before:absolute before:left-1 before:text-muted-foreground/40">
+                        {ex}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Escalation */}
+              {rule.escalation && (
+                <div className="p-2.5 rounded-md bg-red-50/50 border border-red-100">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <ShieldAlert className="w-3 h-3 text-red-400" />
+                    <span className="text-[10px] font-semibold text-red-500/80 uppercase tracking-wider">Escalation</span>
+                  </div>
+                  <p className="text-[11.5px] text-foreground/80 leading-relaxed">
+                    <span className="font-medium">When:</span> {rule.escalation.trigger}
+                  </p>
+                  <p className="text-[11.5px] text-foreground/80 leading-relaxed mt-0.5">
+                    <span className="font-medium">Then:</span> {rule.escalation.action}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Metadata row */}
+          <div className="flex items-center gap-3 mt-1.5">
+            <span className="text-[10px] text-muted-foreground/60">
+              Updated{" "}
+              {new Date(rule.lastUpdated).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+              })}
+            </span>
+            {rule.sourceDocId && (
+              <button
+                onClick={() => toast.info("Showing source document")}
+                className="text-[10px] text-primary hover:underline flex items-center gap-0.5"
+              >
+                <ExternalLink className="w-2.5 h-2.5" />
+                View Source Document
+              </button>
+            )}
+            {rule.updatedByTopicId && (
+              <a
+                href={`/messages?topic=${rule.updatedByTopicId}`}
+                className="text-[10px] text-primary hover:underline"
+              >
+                View conversation
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function PlaybookPage() {
@@ -68,19 +205,20 @@ export default function PlaybookPage() {
   };
 
   const filteredRules = useMemo(() => {
-    return SKILLS.filter((skill) => {
+    return RULES.filter((rule) => {
       // Tag filter
       if (selectedTags.size > 0) {
-        const hasTags = skill.tags?.some((t) => selectedTags.has(t));
+        const hasTags = rule.tags?.some((t) => selectedTags.has(t));
         if (!hasTags) return false;
       }
       // Search filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         return (
-          skill.name.toLowerCase().includes(q) ||
-          skill.ruleText.toLowerCase().includes(q) ||
-          skill.intent.toLowerCase().includes(q)
+          rule.name.toLowerCase().includes(q) ||
+          rule.policy.toLowerCase().includes(q) ||
+          rule.intent.toLowerCase().includes(q) ||
+          rule.exceptions.some((ex) => ex.toLowerCase().includes(q))
         );
       }
       return true;
@@ -108,7 +246,7 @@ export default function PlaybookPage() {
                 )}
               >
                 <BookOpen className="w-3.5 h-3.5" />
-                Rules ({SKILLS.length})
+                Rules ({RULES.length})
               </button>
               <button
                 onClick={() => setActiveTab("documents")}
@@ -259,7 +397,7 @@ export default function PlaybookPage() {
               </div>
             </div>
 
-            {/* Rules list — flat, one per row */}
+            {/* Rules list — SOP cards */}
             <div className="bg-white rounded-lg border border-border/60">
               {filteredRules.length === 0 ? (
                 <div className="p-8 text-center">
@@ -267,78 +405,14 @@ export default function PlaybookPage() {
                 </div>
               ) : (
                 <div className="divide-y divide-border/30">
-                  {filteredRules.map((skill, idx) => (
-                    <div key={skill.id} className="px-5 py-3.5 hover:bg-muted/20 transition-colors">
-                      {/* Row 1: number + name + tags */}
-                      <div className="flex items-start gap-3">
-                        <span className="text-[11px] text-muted-foreground font-mono mt-0.5 shrink-0 w-5 text-right">
-                          {idx + 1}.
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[13px] font-medium text-foreground">
-                              {skill.name}
-                            </span>
-                            <Badge
-                              variant="secondary"
-                              className="h-[16px] px-1.5 text-[9px] shrink-0"
-                            >
-                              {skill.intent}
-                            </Badge>
-                            {skill.tags?.map((tag) => (
-                              <button
-                                key={tag}
-                                onClick={() => {
-                                  setSelectedTags(new Set([tag]));
-                                }}
-                                className={cn(
-                                  "px-1.5 py-0 rounded text-[9px] font-medium transition-colors",
-                                  selectedTags.has(tag)
-                                    ? "bg-primary/10 text-primary"
-                                    : "bg-muted/50 text-muted-foreground hover:text-foreground"
-                                )}
-                              >
-                                {tag}
-                              </button>
-                            ))}
-                          </div>
-                          {/* Row 2: rule text */}
-                          <p className="text-[12px] text-muted-foreground leading-relaxed mt-1">
-                            {skill.ruleText}
-                          </p>
-                          {/* Row 3: metadata */}
-                          <div className="flex items-center gap-3 mt-1.5">
-                            <span className="text-[10px] text-muted-foreground/60">
-                              Updated{" "}
-                              {new Date(skill.lastUpdated).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                              })}
-                            </span>
-                            {skill.sourceDocId && (
-                              <button
-                                onClick={() => {
-                                  setActiveTab("documents");
-                                  toast.info("Showing source document");
-                                }}
-                                className="text-[10px] text-primary hover:underline flex items-center gap-0.5"
-                              >
-                                <ExternalLink className="w-2.5 h-2.5" />
-                                View Source Document
-                              </button>
-                            )}
-                            {skill.updatedByTopicId && (
-                              <a
-                                href={`/messages?topic=${skill.updatedByTopicId}`}
-                                className="text-[10px] text-primary hover:underline"
-                              >
-                                View conversation
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                  {filteredRules.map((rule, idx) => (
+                    <RuleCard
+                      key={rule.id}
+                      rule={rule}
+                      idx={idx}
+                      onTagClick={(tag) => setSelectedTags(new Set([tag]))}
+                      selectedTags={selectedTags}
+                    />
                   ))}
                 </div>
               )}

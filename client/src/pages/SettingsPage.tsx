@@ -1,21 +1,20 @@
 /* ── SettingsPage ─────────────────────────────────────────
-   Tabs: General | Actions | Escalation | Identity | Knowledge
+   Tabs: General | Actions | Identity | Knowledge
+   (Escalation tab removed — escalation is now embedded in each SOP Rule)
    ──────────────────────────────────────────────────────────── */
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   ACTION_PERMISSIONS,
-  ESCALATION_RULES,
   AGENT_IDENTITY,
   INTEGRATIONS,
-  SKILLS,
+  RULES,
   KNOWLEDGE_DOCUMENTS,
   AGENT_MODE,
   type ActionPermission,
   type PermissionLevel,
   type AgentMode,
-  type EscalationRule,
   type AgentIdentity,
 } from "@/lib/mock-data";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -32,32 +31,27 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import {
   Settings,
   Zap,
-  Shield,
   UserCircle,
   BookOpen,
   Power,
   Link2,
-  ChevronRight,
-  AlertCircle,
   CheckCircle2,
   Lock,
-  Unlock,
   HelpCircle,
   Save,
   FileText,
   Upload,
   Trash2,
   ExternalLink,
-  ArrowRight,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
-type SettingsTab = "general" | "actions" | "escalation" | "identity" | "knowledge";
+type SettingsTab = "general" | "actions" | "identity" | "knowledge";
 
 const TABS: { id: SettingsTab; label: string; icon: typeof Settings }[] = [
   { id: "general", label: "General", icon: Settings },
   { id: "actions", label: "Action Permissions", icon: Zap },
-  { id: "escalation", label: "Escalation Rules", icon: Shield },
   { id: "identity", label: "Agent Identity", icon: UserCircle },
   { id: "knowledge", label: "Knowledge Base", icon: BookOpen },
 ];
@@ -69,14 +63,14 @@ const PERMISSION_OPTIONS: { value: PermissionLevel; label: string; description: 
 
 /* ── Knowledge Sub-Tab Component ── */
 function KnowledgeTab() {
-  const [subTab, setSubTab] = useState<"documents" | "skills">("documents");
+  const [subTab, setSubTab] = useState<"documents" | "rules">("documents");
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-[15px] font-semibold text-foreground">Knowledge Base</h2>
         <p className="text-[13px] text-muted-foreground mt-1">
-          Manage source documents and view the rules the rep has learned.
+          Manage source documents and view the SOP rules the rep has learned.
         </p>
       </div>
 
@@ -93,14 +87,14 @@ function KnowledgeTab() {
           Documents ({KNOWLEDGE_DOCUMENTS.length})
         </button>
         <button
-          onClick={() => setSubTab("skills")}
+          onClick={() => setSubTab("rules")}
           className={cn(
             "px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors",
-            subTab === "skills" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            subTab === "rules" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
           )}
         >
           <BookOpen className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
-          Learned Rules ({SKILLS.length})
+          SOP Rules ({RULES.length})
         </button>
       </div>
 
@@ -158,39 +152,65 @@ function KnowledgeTab() {
         </div>
       )}
 
-      {/* Skills sub-tab */}
-      {subTab === "skills" && (
+      {/* Rules sub-tab — SOP Rule cards */}
+      {subTab === "rules" && (
         <div className="space-y-3">
-          {SKILLS.map((skill) => (
-            <Card key={skill.id} className="overflow-hidden">
+          {RULES.map((rule) => (
+            <Card key={rule.id} className="overflow-hidden">
               <CardContent className="pt-4 pb-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[13px] font-medium text-foreground">{skill.name}</span>
-                      <Badge variant="secondary" className="h-[18px] px-1.5 text-[10px]">
-                        {skill.intent}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-[13px] font-medium text-foreground">{rule.name}</span>
+                    <Badge variant="secondary" className="h-[18px] px-1.5 text-[10px]">
+                      {rule.intent}
+                    </Badge>
+                    {rule.tags?.map((tag) => (
+                      <Badge key={tag} variant="outline" className="h-[16px] px-1 text-[9px]">{tag}</Badge>
+                    ))}
+                  </div>
+
+                  {/* Policy */}
+                  <p className="text-[12px] text-foreground/80 leading-relaxed mb-2">{rule.policy}</p>
+
+                  {/* Exceptions */}
+                  {rule.exceptions.length > 0 && (
+                    <div className="mb-2">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-600/80">Exceptions</span>
+                      <ul className="mt-0.5 space-y-0.5">
+                        {rule.exceptions.map((ex, i) => (
+                          <li key={i} className="text-[11px] text-muted-foreground flex gap-1.5">
+                            <span className="text-amber-500 mt-0.5 shrink-0">·</span>
+                            {ex}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Escalation */}
+                  <div className="rounded-md bg-red-50/50 border border-red-100 px-2.5 py-1.5 mb-2">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <AlertTriangle className="w-3 h-3 text-red-400" />
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-red-500/80">Escalation</span>
+                    </div>
+                    <p className="text-[11px] text-red-800/70"><strong>Trigger:</strong> {rule.escalation.trigger}</p>
+                    <p className="text-[11px] text-red-800/70"><strong>Action:</strong> {rule.escalation.action}</p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <span className="text-[11px] text-muted-foreground/60">
+                      Updated {new Date(rule.lastUpdated).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    </span>
+                    {rule.updatedByTopicId && (
+                      <Badge variant="outline" className="h-[16px] px-1 text-[9px] text-primary/70 border-primary/20">
+                        Updated via Messages
                       </Badge>
-                      {skill.tags?.map((tag) => (
-                        <Badge key={tag} variant="outline" className="h-[16px] px-1 text-[9px]">{tag}</Badge>
-                      ))}
-                    </div>
-                    <p className="text-[12px] text-muted-foreground leading-relaxed">{skill.ruleText}</p>
-                    <div className="flex items-center gap-3 mt-2">
-                      <span className="text-[11px] text-muted-foreground/60">
-                        Updated {new Date(skill.lastUpdated).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                      </span>
-                      {skill.updatedByTopicId && (
-                        <Badge variant="outline" className="h-[16px] px-1 text-[9px] text-primary/70 border-primary/20">
-                          Updated via Messages
-                        </Badge>
-                      )}
-                      {skill.sourceDocId && (
-                        <a href="#" onClick={(e) => { e.preventDefault(); toast.info("View source document"); }} className="text-[10px] text-primary hover:underline">
-                          View Source
-                        </a>
-                      )}
-                    </div>
+                    )}
+                    {rule.sourceDocId && (
+                      <a href="#" onClick={(e) => { e.preventDefault(); toast.info("View source document"); }} className="text-[10px] text-primary hover:underline">
+                        View Source
+                      </a>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -213,7 +233,6 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
   const [agentMode, setAgentMode] = useState<AgentMode>(AGENT_MODE);
   const [permissions, setPermissions] = useState<ActionPermission[]>(ACTION_PERMISSIONS);
-  const [escalationRules, setEscalationRules] = useState<EscalationRule[]>(ESCALATION_RULES);
   const [identity, setIdentity] = useState<AgentIdentity>(AGENT_IDENTITY);
 
   return (
@@ -465,91 +484,6 @@ export default function SettingsPage() {
 
               <div className="flex justify-end">
                 <Button className="gap-1.5" onClick={() => toast.success("Permissions saved")}>
-                  <Save className="w-4 h-4" />
-                  Save Changes
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* ── Escalation Tab ── */}
-          {activeTab === "escalation" && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-[15px] font-semibold text-foreground">Escalation Rules</h2>
-                <p className="text-[13px] text-muted-foreground mt-1">
-                  Define when the rep should escalate a ticket to a human agent instead of handling it.
-                </p>
-              </div>
-
-              <Card>
-                <CardContent className="pt-6 space-y-0 divide-y divide-border/40">
-                  {escalationRules.map((rule) => (
-                    <div key={rule.id} className="py-4 first:pt-0 last:pb-0">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <Switch
-                              checked={rule.enabled}
-                              onCheckedChange={(checked) => {
-                                setEscalationRules((prev) =>
-                                  prev.map((r) => (r.id === rule.id ? { ...r, enabled: checked } : r))
-                                );
-                              }}
-                            />
-                            <span className="text-[13px] font-medium text-foreground">{rule.label}</span>
-                          </div>
-                          <p className="text-[12px] text-muted-foreground mt-1 ml-11">{rule.description}</p>
-                          {/* Routing target */}
-                          {rule.enabled && rule.routingTarget && (
-                            <div className="ml-11 mt-2 flex items-center gap-2">
-                              <ArrowRight className="w-3 h-3 text-muted-foreground" />
-                              <span className="text-[11px] text-muted-foreground">Route to:</span>
-                              {rule.routingType === "external_link" ? (
-                                <a href={rule.routingTarget} target="_blank" rel="noreferrer" className="text-[11px] text-primary flex items-center gap-1 hover:underline">
-                                  External Zendesk <ExternalLink className="w-3 h-3" />
-                                </a>
-                              ) : (
-                                <Badge variant="secondary" className="h-[18px] px-1.5 text-[10px]">
-                                  {rule.routingTarget}
-                                </Badge>
-                              )}
-                              <Button variant="ghost" size="sm" className="h-5 px-1.5 text-[10px] text-muted-foreground" onClick={() => toast.info("Routing configuration would open here")}>
-                                Edit
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                        {rule.configurable && rule.enabled && (
-                          <div className="flex items-center gap-2 shrink-0">
-                            <Label className="text-[11px] text-muted-foreground">Threshold:</Label>
-                            <Input
-                              type="number"
-                              value={rule.value}
-                              onChange={(e) => {
-                                const val = Number(e.target.value);
-                                setEscalationRules((prev) =>
-                                  prev.map((r) => (r.id === rule.id ? { ...r, value: val } : r))
-                                );
-                              }}
-                              className="w-20 h-7 text-[12px]"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              {/* Add new rule */}
-              <Button variant="outline" className="gap-1.5 text-[12px]" onClick={() => toast.info("Add escalation rule dialog would open here")}>
-                <AlertCircle className="w-3.5 h-3.5" />
-                Add Escalation Rule
-              </Button>
-
-              <div className="flex justify-end">
-                <Button className="gap-1.5" onClick={() => toast.success("Escalation rules saved")}>
                   <Save className="w-4 h-4" />
                   Save Changes
                 </Button>
