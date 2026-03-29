@@ -1,9 +1,8 @@
-# Team Lead Conversation Refactor — 7 items
+# PRD 修订任务
 
-- [ ] 1. Feishu-style topic grouping: each topic is a card, below shows reply previews (first few + last 3 if many)
-- [ ] 2. Opening a topic shows full conversation thread in a side panel (not partial info)
-- [ ] 3. Remove per-message topic titles from conversation flow
-- [ ] 4. Structured Rule Update card: "Proposed Rule Update" with Observation, Proposal reason, Rule Change content, Source — unified for New and Update
-- [ ] 5. Source shown in conversation area with links, not on the card
-- [ ] 6. No direct reply outside topics — guide users to reply within topic threads
-- [ ] 7. Actions: Accept, Reject, Reply (Reply encourages user to explain)
+- [ ] 重新阅读原 PRD v2.0 完整内容，记录其结构和章节
+- [ ] 重新阅读 AGENT_TECHNICAL_DOC.md 完整内容，提取所有 agent 交互设计
+- [ ] 审阅原型代码中的 UI 展示内容（字段以"展示什么"而非数据类型描述）
+- [ ] 基于 v2.0 结构修改 PRD，补充 agent 交互设计和用户故事流程
+- [ ] 字段描述改为"展示什么内容"的方式
+- [ ] 保存 checkpoint 并交付
