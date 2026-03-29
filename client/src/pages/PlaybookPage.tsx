@@ -5,7 +5,7 @@
 
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { useLocation } from "wouter";
+
 import {
   RULES,
   KNOWLEDGE_DOCUMENTS,
@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import {
   Upload,
   Trash2,
-  User,
+
   Bot,
   X,
   AlertTriangle,
@@ -186,7 +186,6 @@ function RuleCard({
 }
 
 export default function PlaybookPage() {
-  const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<"documents" | "rules">("rules");
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
@@ -262,16 +261,7 @@ export default function PlaybookPage() {
               </button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              className="gap-1.5 h-8 text-[12px]"
-              onClick={() => navigate("/agent")}
-            >
-              <User className="w-3.5 h-3.5" />
-              Agent
-            </Button>
-          </div>
+          <div />
         </div>
       </div>
 
@@ -282,14 +272,10 @@ export default function PlaybookPage() {
             <Bot className="w-4 h-4 text-primary shrink-0 mt-0.5" />
             <p className="text-[12px] text-foreground leading-relaxed flex-1">
               This is your knowledge base. Rules are learned from documents and conversations in{" "}
-              <a href="/messages" className="text-primary font-medium hover:underline">
-                Messages
+              <a href="/communication" className="text-primary font-medium hover:underline">
+                Communication
               </a>
-              . For agent identity, mode, and actions, go to{" "}
-              <a href="/agent" className="text-primary font-medium hover:underline">
-                Agent
-              </a>
-              .
+              . Agent identity, mode, and actions can be configured from the Rep panel in Communication.
             </p>
             <button
               onClick={() => setShowGuide(false)}
@@ -422,8 +408,8 @@ export default function PlaybookPage() {
             <div className="mt-3 text-center">
               <p className="text-[11px] text-muted-foreground">
                 Rules are updated through conversations in{" "}
-                <a href="/messages" className="text-primary hover:underline">
-                  Messages
+                <a href="/communication" className="text-primary hover:underline">
+                  Communication
                 </a>{" "}
                 or by uploading documents.
               </p>

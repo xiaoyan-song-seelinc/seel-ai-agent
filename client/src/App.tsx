@@ -7,34 +7,37 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import DashboardLayout from "./components/DashboardLayout";
 import Performance from "./pages/Performance";
 import PlaybookPage from "./pages/PlaybookPage";
-import AgentPage from "./pages/AgentPage";
-import OnboardingWrapper from "./pages/OnboardingWrapper";
 import ZendeskApp from "./pages/ZendeskApp";
-import MessagesPage from "./pages/ConversationPage";
+import CommunicationPage from "./pages/CommunicationPage";
+import IntegrationsPage from "./pages/IntegrationsPage";
 
 function Router() {
   return (
     <Switch>
-      {/* Main app routes */}
-      <Route path="/" component={MessagesPage} />
-      <Route path="/messages" component={MessagesPage} />
-      <Route path="/performance" component={Performance} />
+      {/* AI Support module — default landing is Communication */}
+      <Route path="/" component={CommunicationPage} />
+      <Route path="/communication" component={CommunicationPage} />
       <Route path="/playbook" component={PlaybookPage} />
-      <Route path="/agent" component={AgentPage} />
+      <Route path="/performance" component={Performance} />
 
-      {/* Legacy route redirects */}
-      <Route path="/conversation">
-        <Redirect to="/messages" />
+      {/* Global pages */}
+      <Route path="/integrations" component={IntegrationsPage} />
+
+      {/* Legacy redirects */}
+      <Route path="/messages">
+        <Redirect to="/communication" />
       </Route>
-      <Route path="/inbox">
-        <Redirect to="/messages" />
+      <Route path="/agent">
+        <Redirect to="/communication" />
       </Route>
       <Route path="/settings">
         <Redirect to="/playbook" />
       </Route>
+      <Route path="/onboarding">
+        <Redirect to="/" />
+      </Route>
 
-      {/* Full-width routes (bypass DashboardLayout shell) */}
-      <Route path="/onboarding" component={OnboardingWrapper} />
+      {/* Zendesk sidebar — standalone, bypasses DashboardLayout */}
       <Route path="/zendesk" component={ZendeskApp} />
 
       <Route component={NotFound} />

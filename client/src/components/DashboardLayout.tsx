@@ -1,250 +1,162 @@
 /* ── DashboardLayout ──────────────────────────────────────────
-   Light, modern sidebar + white content area
-   AOS-inspired: white sidebar, subtle borders, compact nav
+   Shopify-style global left nav + AI Support module content area
    ──────────────────────────────────────────────────────────── */
 
-import { type ReactNode, useState } from "react";
+import { type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import {
+  Home,
   BarChart3,
+  ShoppingCart,
+  AlertCircle,
+  ShieldCheck,
+  Puzzle,
+  Star,
   Bot,
-  ChevronLeft,
-  ChevronRight,
+  LayoutGrid,
+  Bell,
   ExternalLink,
   Sparkles,
-  BookOpen,
-  MessageSquare,
-  User,
-  Plug,
+  HelpCircle,
 } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { TOPICS, AGENT_MODE } from "@/lib/mock-data";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 
 interface NavItem {
   label: string;
   href: string;
-  icon: typeof BarChart3;
-  badge?: number;
-  matchPaths?: string[];
+  icon: typeof Home;
+  disabled?: boolean;
 }
 
-const unreadCount = TOPICS.filter((t) => t.status === "unread").length;
-
-const NAV_ITEMS: NavItem[] = [
-  {
-    label: "Messages",
-    href: "/messages",
-    icon: MessageSquare,
-    badge: unreadCount,
-    matchPaths: ["/messages", "/"],
-  },
-  {
-    label: "Performance",
-    href: "/performance",
-    icon: BarChart3,
-    matchPaths: ["/performance"],
-  },
-  {
-    label: "Playbook",
-    href: "/playbook",
-    icon: BookOpen,
-    matchPaths: ["/playbook"],
-  },
-  {
-    label: "Agent",
-    href: "/agent",
-    icon: User,
-    matchPaths: ["/agent"],
-  },
+const mainNav: NavItem[] = [
+  { label: "Home", href: "/home-placeholder", icon: Home, disabled: true },
+  { label: "Analytics", href: "/analytics-placeholder", icon: BarChart3, disabled: true },
+  { label: "Orders", href: "/orders-placeholder", icon: ShoppingCart, disabled: true },
+  { label: "Issues", href: "/issues-placeholder", icon: AlertCircle, disabled: true },
+  { label: "Protection", href: "/protection-placeholder", icon: ShieldCheck, disabled: true },
+  { label: "Integrations", href: "/integrations", icon: Puzzle },
+  { label: "Reviews", href: "/reviews-placeholder", icon: Star, disabled: true },
+  { label: "AI Support", href: "/", icon: Bot },
 ];
 
-function AgentStatusDot({ mode }: { mode: string }) {
-  const colors: Record<string, string> = {
-    production: "bg-emerald-400",
-    training: "bg-amber-400",
-    shadow: "bg-amber-400",
-    off: "bg-gray-300",
-  };
-  return <span className={cn("w-1.5 h-1.5 rounded-full inline-block", colors[mode] || "bg-gray-300")} />;
+const customizeNav: NavItem[] = [
+  { label: "Widgets", href: "/widgets-placeholder", icon: LayoutGrid, disabled: true },
+  { label: "Notifications", href: "/notifications-placeholder", icon: Bell, disabled: true },
+];
+
+function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
+  const Icon = item.icon;
+
+  if (item.disabled) {
+    return (
+      <div
+        onClick={() => toast.info(`${item.label} — not part of this prototype`)}
+        className="flex items-center gap-2.5 px-3 py-[5px] rounded-lg text-[13px] cursor-default text-muted-foreground/40"
+      >
+        <Icon className="w-[15px] h-[15px] shrink-0" />
+        <span>{item.label}</span>
+      </div>
+    );
+  }
+
+  return (
+    <Link href={item.href}>
+      <div
+        className={cn(
+          "flex items-center gap-2.5 px-3 py-[5px] rounded-lg text-[13px] transition-colors cursor-pointer",
+          isActive
+            ? "bg-primary/8 text-primary font-medium"
+            : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+        )}
+      >
+        <Icon className="w-[15px] h-[15px] shrink-0" />
+        <span>{item.label}</span>
+      </div>
+    </Link>
+  );
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
-  const [collapsed, setCollapsed] = useState(false);
-  const isOnboarding = location.startsWith("/onboarding");
-  const isZendesk = location.startsWith("/zendesk");
 
-  if (isOnboarding || isZendesk) {
+  // Zendesk sidebar is standalone — no layout
+  if (location.startsWith("/zendesk")) {
     return <>{children}</>;
   }
 
+  const isActive = (href: string) => {
+    if (href === "/") {
+      // AI Support is active for root + all AI Support sub-routes
+      return (
+        location === "/" ||
+        location.startsWith("/communication") ||
+        location.startsWith("/playbook") ||
+        location.startsWith("/performance")
+      );
+    }
+    return location.startsWith(href);
+  };
+
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          "flex flex-col h-full bg-white border-r border-border transition-all duration-200 ease-out",
-          collapsed ? "w-[56px]" : "w-[200px]"
-        )}
-      >
-        {/* Logo */}
-        <div className="flex items-center gap-2 px-3.5 h-11 border-b border-border shrink-0">
-          <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center shrink-0">
-            <Sparkles className="w-3 h-3 text-white" />
-          </div>
-          {!collapsed && (
-            <span className="text-[13px] font-semibold text-foreground">Seel AI</span>
-          )}
-        </div>
-
-        {/* Agent status */}
-        <div className={cn("px-3 py-2.5 border-b border-border", collapsed && "px-2")}>
-          {collapsed ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex justify-center py-0.5">
-                  <AgentStatusDot mode={AGENT_MODE} />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <span className="capitalize">Alex — {AGENT_MODE}</span>
-              </TooltipContent>
-            </Tooltip>
-          ) : (
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-primary/8 flex items-center justify-center shrink-0">
-                <Bot className="w-3 h-3 text-primary" />
-              </div>
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[12px] font-medium text-foreground">Alex</span>
-                  <AgentStatusDot mode={AGENT_MODE} />
-                </div>
-                <span className="text-[10px] text-muted-foreground capitalize">{AGENT_MODE}</span>
-              </div>
+      {/* Left sidebar — Shopify-style global nav */}
+      <aside className="w-[200px] shrink-0 border-r border-border bg-[#fafafa] flex flex-col">
+        {/* Store header */}
+        <div className="px-3 py-2.5 border-b border-border">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center shrink-0">
+              <span className="text-white text-[11px] font-bold">S</span>
             </div>
-          )}
+            <div className="min-w-0">
+              <p className="text-[12px] font-medium text-foreground truncate leading-tight">
+                seel-test-alexsong
+              </p>
+              <p className="text-[10px] text-muted-foreground truncate leading-tight">
+                .myshopify.com
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-1.5 px-1.5 space-y-0.5 overflow-y-auto">
-          {NAV_ITEMS.map((item) => {
-            const isActive = item.matchPaths?.some((p) =>
-              p === "/" ? location === "/" : location.startsWith(p)
-            );
-            const Icon = item.icon;
+        <ScrollArea className="flex-1 py-2">
+          <nav className="px-2 space-y-0.5">
+            {mainNav.map((item) => (
+              <NavLink key={item.href} item={item} isActive={isActive(item.href)} />
+            ))}
+          </nav>
 
-            return collapsed ? (
-              <Tooltip key={item.href}>
-                <TooltipTrigger asChild>
-                  <Link href={item.href}>
-                    <div
-                      className={cn(
-                        "flex items-center justify-center w-full h-8 rounded-md transition-all relative",
-                        isActive
-                          ? "bg-primary/8 text-primary"
-                          : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                      )}
-                    >
-                      <Icon className="w-4 h-4" />
-                      {item.badge && item.badge > 0 && (
-                        <span className="absolute top-0.5 right-2 w-1.5 h-1.5 rounded-full bg-red-400" />
-                      )}
-                    </div>
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  {item.label}
-                  {item.badge ? ` (${item.badge})` : ""}
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <Link key={item.href} href={item.href}>
-                <div
-                  className={cn(
-                    "flex items-center gap-2 px-2.5 h-8 rounded-md transition-all",
-                    isActive
-                      ? "bg-primary/8 text-primary"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                  )}
-                >
-                  <Icon className="w-4 h-4 shrink-0" />
-                  <span className="text-[12px] font-medium flex-1">{item.label}</span>
-                  {item.badge && item.badge > 0 && (
-                    <span className="relative flex items-center">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-                      <span className="ml-1 text-[10px] text-muted-foreground">{item.badge}</span>
-                    </span>
-                  )}
-                </div>
-              </Link>
-            );
-          })}
-        </nav>
+          <div className="px-2 mt-4">
+            <p className="px-3 py-1 text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider">
+              Customize
+            </p>
+            <nav className="space-y-0.5 mt-0.5">
+              {customizeNav.map((item) => (
+                <NavLink key={item.href} item={item} isActive={isActive(item.href)} />
+              ))}
+            </nav>
+          </div>
+        </ScrollArea>
 
-        {/* Integrations + Demo links */}
-        <div className="px-1.5 pb-1 space-y-0.5">
-          {collapsed ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => toast.info("Integrations settings would open here")}
-                  className="flex items-center justify-center w-full h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-all"
-                >
-                  <Plug className="w-3.5 h-3.5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Integrations</TooltipContent>
-            </Tooltip>
-          ) : (
-            <button
-              onClick={() => toast.info("Integrations settings would open here")}
-              className="flex items-center gap-2 px-2.5 h-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-all w-full"
-            >
-              <Plug className="w-4 h-4 shrink-0" />
-              <span className="text-[12px] font-medium">Integrations</span>
-            </button>
-          )}
-          <div className="border-t border-border/30 my-1" />
+        {/* Bottom: demo links */}
+        <div className="px-2 pb-2 space-y-0.5 border-t border-border pt-2">
           <Link href="/zendesk">
-            <div
-              className={cn(
-                "flex items-center gap-1.5 px-2.5 h-7 rounded-md text-muted-foreground/50 hover:text-muted-foreground hover:bg-accent transition-all",
-                collapsed && "justify-center px-0"
-              )}
-            >
-              <ExternalLink className="w-3 h-3 shrink-0" />
-              {!collapsed && <span className="text-[10px]">Zendesk Sidebar</span>}
+            <div className="flex items-center gap-2 px-3 py-[5px] rounded-lg text-[11px] text-muted-foreground/50 hover:text-muted-foreground hover:bg-accent/50 transition-colors cursor-pointer">
+              <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+              <span>Zendesk Sidebar</span>
             </div>
           </Link>
-          <Link href="/onboarding">
-            <div
-              className={cn(
-                "flex items-center gap-1.5 px-2.5 h-7 rounded-md text-muted-foreground/50 hover:text-muted-foreground hover:bg-accent transition-all",
-                collapsed && "justify-center px-0"
-              )}
-            >
-              <Sparkles className="w-3 h-3 shrink-0" />
-              {!collapsed && <span className="text-[10px]">Onboarding</span>}
-            </div>
-          </Link>
-        </div>
-
-        {/* Collapse toggle */}
-        <div className="px-1.5 pb-2 pt-0.5 border-t border-border">
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            className="flex items-center justify-center w-full h-7 rounded-md text-muted-foreground/40 hover:text-muted-foreground hover:bg-accent transition-all"
-          >
-            {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
-          </button>
+          <div className="flex items-center gap-2 px-3 py-[5px] rounded-lg text-[11px] text-muted-foreground/30">
+            <HelpCircle className="w-3.5 h-3.5 shrink-0" />
+            <span>Help</span>
+          </div>
         </div>
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {children}
       </main>
     </div>

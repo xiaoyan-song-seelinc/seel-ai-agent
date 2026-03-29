@@ -9,10 +9,10 @@
 export type TopicType = "knowledge_gap" | "performance_report" | "open_question" | "escalation_review" | "rule_update";
 export type TopicStatus = "unread" | "read" | "resolved";
 export type MessageSender = "ai" | "manager";
-export type ApprovalStatus = "pending" | "approved" | "denied" | "expired";
 export type PermissionLevel = "autonomous" | "disabled";
 export type AgentMode = "training" | "production" | "off";
 export type TicketSidebarState = "ai_handling" | "escalated" | "taken_over";
+export type EscalationStatus = "needs_attention" | "in_progress" | "resolved";
 
 export interface Topic {
   id: string;
@@ -69,7 +69,7 @@ export interface ActionPermission {
   dependsOn?: string[];
 }
 
-// ── SOP-level Rule (replaces old flat Skill) ──────────────
+// ── SOP-level Rule ──────────────────────────────────────────
 
 export interface RuleEscalation {
   trigger: string;
@@ -89,7 +89,6 @@ export interface SOPRule {
   tags?: string[];
 }
 
-// Keep Skill as alias for backward compat in legacy pages
 export type Skill = SOPRule;
 
 export interface AgentIdentity {
@@ -160,6 +159,24 @@ export interface BadCaseReport {
   createdAt: string;
 }
 
+// ── Escalation Ticket (for Rep conversation in Communication tab) ──
+
+export interface EscalationTicket {
+  id: string;
+  zendeskTicketId: string;
+  subject: string;
+  customerName: string;
+  customerEmail: string;
+  status: EscalationStatus;
+  reason: string;
+  summary: string;
+  sentiment: "frustrated" | "neutral" | "urgent";
+  orderValue?: number;
+  createdAt: string;
+  resolvedAt?: string;
+  zendeskUrl: string;
+}
+
 // ── Mock Data ──────────────────────────────────────────────
 
 export const AGENT_IDENTITY: AgentIdentity = {
@@ -175,10 +192,8 @@ export const AGENT_MODE: AgentMode = "production";
 export const INTEGRATIONS: Integration[] = [
   {
     platform: "zendesk",
-    connected: true,
-    connectedAt: "2026-02-25T10:30:00Z",
-    metadata: { subdomain: "coastalliving", plan: "Professional", activeAgents: 6, openTickets: 234 },
-    webhookStatus: "active",
+    connected: false,
+    metadata: {},
   },
   {
     platform: "shopify",
@@ -289,7 +304,7 @@ export const ACTION_PERMISSIONS: ActionPermission[] = [
   },
 ];
 
-// ── SOP Rules (replaces old flat SKILLS) ──────────────────
+// ── SOP Rules ──────────────────────────────────────────────
 
 export const RULES: SOPRule[] = [
   {
@@ -398,7 +413,6 @@ export const RULES: SOPRule[] = [
   },
 ];
 
-// Backward-compatible alias for legacy pages
 export const SKILLS = RULES;
 
 export const KNOWLEDGE_DOCUMENTS: KnowledgeDocument[] = [
@@ -409,6 +423,82 @@ export const KNOWLEDGE_DOCUMENTS: KnowledgeDocument[] = [
   { id: "doc-5", name: "Product Warranty Terms — All Categories.csv", type: "csv", uploadedAt: "2026-03-15T16:00:00Z", size: "320 KB", extractedRules: 8, status: "processed", sourceUrl: "/documents/warranty-terms.csv" },
   { id: "doc-6", name: "Coastal Living Co FAQ Page", type: "url", uploadedAt: "2026-03-18T10:00:00Z", size: "—", extractedRules: 6, status: "processed", sourceUrl: "https://coastalliving.com/faq" },
 ];
+
+// ── Escalation Tickets (Rep conversation) ──────────────────
+
+export const ESCALATION_TICKETS: EscalationTicket[] = [
+  {
+    id: "esc-1",
+    zendeskTicketId: "4593",
+    subject: "URGENT: Want to speak to a manager",
+    customerName: "Robert Chen",
+    customerEmail: "robert.chen@gmail.com",
+    status: "needs_attention",
+    reason: "Customer explicitly requested human agent",
+    summary: "Customer ordered coastal oak bookshelf ($450). 3 failed delivery attempts — driver marked 'not home' each time. Customer very frustrated, demanding manager.",
+    sentiment: "frustrated",
+    orderValue: 450,
+    createdAt: "2026-03-26T08:00:00Z",
+    zendeskUrl: "https://coastalliving.zendesk.com/agent/tickets/4593",
+  },
+  {
+    id: "esc-2",
+    zendeskTicketId: "4599",
+    subject: "Customs duties on my return",
+    customerName: "James Wilson",
+    customerEmail: "james.w@mail.co.uk",
+    status: "needs_attention",
+    reason: "No rule for international customs duties refund",
+    summary: "International return — customer paid £22 in customs. No policy for customs duties refund. 5th similar case this week.",
+    sentiment: "neutral",
+    createdAt: "2026-03-26T11:00:00Z",
+    zendeskUrl: "https://coastalliving.zendesk.com/agent/tickets/4599",
+  },
+  {
+    id: "esc-3",
+    zendeskTicketId: "4601",
+    subject: "Wrong color received — want exchange",
+    customerName: "Maria Santos",
+    customerEmail: "maria.s@gmail.com",
+    status: "in_progress",
+    reason: "Customer wants exchange (not in current action set)",
+    summary: "Received ocean blue throw pillow instead of sage green. Wants exchange, not refund. Exchange action not currently enabled.",
+    sentiment: "neutral",
+    createdAt: "2026-03-25T14:00:00Z",
+    zendeskUrl: "https://coastalliving.zendesk.com/agent/tickets/4601",
+  },
+  {
+    id: "esc-4",
+    zendeskTicketId: "4580",
+    subject: "Refund still not received after 2 weeks",
+    customerName: "Tom Bradley",
+    customerEmail: "tom.b@outlook.com",
+    status: "resolved",
+    reason: "Refund processing delay beyond normal timeframe",
+    summary: "Customer returned item 2 weeks ago, refund not yet received. Investigated — payment processor delay. Manually expedited.",
+    sentiment: "frustrated",
+    orderValue: 125,
+    createdAt: "2026-03-20T09:00:00Z",
+    resolvedAt: "2026-03-21T14:00:00Z",
+    zendeskUrl: "https://coastalliving.zendesk.com/agent/tickets/4580",
+  },
+  {
+    id: "esc-5",
+    zendeskTicketId: "4605",
+    subject: "Bulk order discount request",
+    customerName: "Jennifer Lee",
+    customerEmail: "jennifer.lee@designstudio.com",
+    status: "needs_attention",
+    reason: "Bulk/wholesale inquiry — outside standard rules",
+    summary: "Interior designer wants to order 25 coastal throw pillows for a hotel project. Asking for wholesale pricing. No rule for B2B/bulk orders.",
+    sentiment: "neutral",
+    orderValue: 1250,
+    createdAt: "2026-03-26T13:00:00Z",
+    zendeskUrl: "https://coastalliving.zendesk.com/agent/tickets/4605",
+  },
+];
+
+// ── Topics (Team Lead conversation) ────────────────────────
 
 export const TOPICS: Topic[] = [
   {
@@ -575,7 +665,7 @@ export const ACTIONABLE_ITEMS: ActionableItem[] = [
   { id: "ai-3", title: "Tone adjustment for live chat", description: "3 customers rated CSAT low citing 'too formal' tone on live chat. Consider switching to 'friendly' tone for chat channel.", impact: "Could improve chat CSAT by 0.2-0.3 points" },
 ];
 
-// ── Zendesk Sidebar Mock Data (simplified: handling / escalated only) ──
+// ── Zendesk Sidebar Mock Data ──────────────────────────────
 
 export interface ZendeskTicketMessage {
   from: "customer" | "agent" | "internal";
@@ -600,11 +690,9 @@ export interface ZendeskTicket {
   markedBadCase: boolean;
   badCaseNote?: string;
   aiActivity: ZendeskTicketActivity[];
-  // AI handling details
   confidence?: number;
   intentDetected?: string;
   currentStep?: string;
-  // Escalation details
   escalationReason?: string;
   escalationSummary?: string;
 }
@@ -670,7 +758,7 @@ export const ZENDESK_TICKETS: ZendeskTicket[] = [
     escalationSummary: "Customer ordered a coastal oak bookshelf ($450). Delivery attempted 3 times — customer was home each time but driver marked as 'not home'. Customer is understandably frustrated and demanding to speak with a manager.",
     messages: [
       { from: "customer", text: "This is RIDICULOUS. I've had THREE delivery attempts and your driver keeps marking it as 'not home' when I'm literally standing at my door. I want to speak to a MANAGER right now. This $450 bookshelf better arrive or I'm disputing the charge.", timestamp: "2026-03-26T08:00:00Z" },
-      { from: "internal", text: "🚨 Escalating to human agent — customer explicitly requested manager, sentiment: very frustrated, high-value order ($450).", timestamp: "2026-03-26T08:00:15Z" },
+      { from: "internal", text: "Escalating to human agent — customer explicitly requested manager, sentiment: very frustrated, high-value order ($450).", timestamp: "2026-03-26T08:00:15Z" },
     ],
     takenOver: true,
     markedBadCase: false,
@@ -706,6 +794,7 @@ export const ZENDESK_TICKETS: ZendeskTicket[] = [
   },
 ];
 
-// Legacy Zendesk types for backward compat (used by unused pages)
+// Legacy compat
+export type ApprovalStatus = "pending" | "approved" | "denied" | "expired";
 export type ApprovalRequest = { id: string; ticketId: string; ticketSubject: string; customerName: string; actionType: string; actionLabel: string; parameters: Record<string, string | number>; reasoning: string; status: ApprovalStatus; createdAt: string; timeoutAt: string; aiConfidence: number; intentDetected: string; actionsTaken: string[]; };
 export const MOCK_TICKETS: ApprovalRequest[] = [];
