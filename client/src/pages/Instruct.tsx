@@ -22,24 +22,24 @@ import { toast } from "sonner";
 
 /* ── Config ── */
 const TYPE_ICON: Record<TopicType, typeof Lightbulb> = {
-  knowledge_gap: Lightbulb, performance_report: BarChart3,
+  knowledge_gap: Lightbulb, performance_report: BarChart3, performance_summary: BarChart3,
   open_question: HelpCircle, escalation_review: AlertTriangle, rule_update: FileEdit,
 };
 const TYPE_COLOR: Record<TopicType, string> = {
-  knowledge_gap: "text-amber-500", performance_report: "text-blue-500",
+  knowledge_gap: "text-amber-500", performance_report: "text-blue-500", performance_summary: "text-blue-500",
   open_question: "text-slate-500", escalation_review: "text-orange-500", rule_update: "text-violet-500",
 };
 const TYPE_BG: Record<TopicType, string> = {
-  knowledge_gap: "bg-amber-50 text-amber-700", performance_report: "bg-blue-50 text-blue-700",
+  knowledge_gap: "bg-amber-50 text-amber-700", performance_report: "bg-blue-50 text-blue-700", performance_summary: "bg-blue-50 text-blue-700",
   open_question: "bg-slate-50 text-slate-600", escalation_review: "bg-orange-50 text-orange-700", rule_update: "bg-violet-50 text-violet-700",
 };
 const TYPE_LABEL: Record<TopicType, string> = {
-  knowledge_gap: "Knowledge Gap", performance_report: "Performance",
+  knowledge_gap: "Knowledge Gap", performance_report: "Performance", performance_summary: "Summary",
   open_question: "Question", escalation_review: "Escalation", rule_update: "Rule Update",
 };
 type FilterTab = "all" | "open" | "resolved";
 const PRIORITY: Record<TopicType, number> = {
-  knowledge_gap: 0, escalation_review: 1, open_question: 2, rule_update: 3, performance_report: 4,
+  knowledge_gap: 0, escalation_review: 1, open_question: 2, rule_update: 3, performance_report: 4, performance_summary: 5,
 };
 
 /* ── Onboarding Types ── */

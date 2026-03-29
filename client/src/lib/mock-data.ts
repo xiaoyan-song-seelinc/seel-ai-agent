@@ -6,13 +6,13 @@
 
 // ── Types ──────────────────────────────────────────────────
 
-export type TopicType = "knowledge_gap" | "performance_report" | "open_question" | "escalation_review" | "rule_update";
+export type TopicType = "knowledge_gap" | "performance_report" | "performance_summary" | "open_question" | "escalation_review" | "rule_update";
 export type TopicStatus = "unread" | "read" | "resolved";
 export type MessageSender = "ai" | "manager";
 export type PermissionLevel = "autonomous" | "disabled";
 export type AgentMode = "training" | "production" | "off";
 export type TicketSidebarState = "ai_handling" | "escalated" | "taken_over";
-export type EscalationStatus = "needs_attention" | "in_progress" | "resolved";
+export type EscalationStatus = "needs_attention" | "resolved";
 
 export interface Topic {
   id: string;
@@ -44,6 +44,11 @@ export interface MessageAction {
 export interface ProposedRule {
   id: string;
   text: string;
+  ruleName: string;
+  type: "new" | "update";
+  before?: string;
+  after: string;
+  source?: string;
   category: string;
   evidence: string[];
   status: "pending" | "accepted" | "rejected";
@@ -521,7 +526,7 @@ export const ESCALATION_TICKETS: EscalationTicket[] = [
     subject: "Wrong color received — want exchange",
     customerName: "Maria Santos",
     customerEmail: "maria.s@gmail.com",
-    status: "in_progress",
+    status: "needs_attention",
     reason: "Customer wants exchange (not in current action set)",
     summary: "Received ocean blue throw pillow instead of sage green. Wants exchange, not refund. Exchange action not currently enabled.",
     sentiment: "neutral",
@@ -573,6 +578,10 @@ export const TOPICS: Topic[] = [
     proposedRule: {
       id: "pr-1",
       text: "When customer requests refund to a different payment method, explain that refunds can only be processed to the original payment method due to payment processor restrictions. Offer store credit as an alternative.",
+      ruleName: "Refund Payment Method Policy",
+      type: "new",
+      after: "When customer requests refund to a different payment method, explain that refunds can only be processed to the original payment method due to payment processor restrictions. Offer store credit as an alternative.",
+      source: "Ticket #4521, #4533, #4540",
       category: "Refunds",
       evidence: ["Ticket #4521 — customer wanted refund to PayPal instead of credit card", "Ticket #4533 — customer's original card expired", "Ticket #4540 — customer wanted refund to bank account"],
       status: "pending",
@@ -674,6 +683,10 @@ export const TOPICS: Topic[] = [
     proposedRule: {
       id: "pr-2",
       text: "For international returns, inform customer that return shipping is their responsibility and customs duties are non-refundable. Offer store credit for the duties amount as a goodwill gesture for VIP customers.",
+      ruleName: "International Returns Policy",
+      type: "new",
+      after: "For international returns, inform customer that return shipping is their responsibility and customs duties are non-refundable. Offer store credit for the duties amount as a goodwill gesture for VIP customers.",
+      source: "Ticket #4560, #4567",
       category: "Returns",
       evidence: ["Ticket #4560 — UK customer confused about duties refund", "Ticket #4567 — Canadian customer expected free return shipping"],
       status: "pending",
