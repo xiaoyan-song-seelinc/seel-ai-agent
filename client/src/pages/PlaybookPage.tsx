@@ -1,79 +1,110 @@
 /* ── PlaybookPage ─────────────────────────────────────────
    Full-page Knowledge view: Documents tab + Rules tab.
-   Rules shown as SOP-level cards with policy/exceptions/escalation.
+   Rules: one-line preview, detail sheet with version history,
+   actions, invocation count. No conflicts/tags/source links.
+   Documents: In Use toggle, 3-dot menu, upload dialog.
    ──────────────────────────────────────────────────────────── */
 
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
-
 import {
   RULES,
   KNOWLEDGE_DOCUMENTS,
+  ACTION_PERMISSIONS,
 } from "@/lib/mock-data";
-import type { SOPRule } from "@/lib/mock-data";
+import type { SOPRule, KnowledgeDocument, RuleVersion } from "@/lib/mock-data";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  Upload,
-  Trash2,
-
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@/components/ui/tabs";
+import {
   Bot,
   X,
-  AlertTriangle,
-  ExternalLink,
   FileText,
   BookOpen,
   Search,
+  ChevronRight,
+  MoreHorizontal,
+  Upload,
+  Link2,
+  PenLine,
+  Eye,
+  Trash2,
+  History,
+  Zap,
+  MessageCircle,
+  ArrowRight,
   ChevronDown,
   ChevronUp,
   ShieldAlert,
   ListChecks,
+  Globe,
+  Plus,
 } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
-/* ── Conflict data ── */
-const CONFLICTS = [
-  {
-    id: "cf-1",
-    title: "Return window duration",
-    ruleA: "30 days from purchase date",
-    sourceA: "SOP Document (Section 2.1)",
-    ruleB: "28 days from delivery date",
-    sourceB: "Observed in 47 past tickets",
-  },
-];
-
-/* ── Collect all unique tags from rules ── */
-function getAllTags() {
-  const tagSet = new Set<string>();
-  RULES.forEach((r) => r.tags?.forEach((t) => tagSet.add(t)));
-  return Array.from(tagSet).sort();
+/* ── Helper: get action name by ID ── */
+function getActionName(actionId: string): string {
+  const action = ACTION_PERMISSIONS.find((a) => a.id === actionId);
+  return action?.name ?? actionId;
 }
 
-/* ── Rule Card Component ── */
+/* ── Rule Card (list item — simplified) ── */
 function RuleCard({
   rule,
   idx,
-  onTagClick,
-  selectedTags,
+  onSelect,
 }: {
   rule: SOPRule;
   idx: number;
-  onTagClick: (tag: string) => void;
-  selectedTags: Set<string>;
+  onSelect: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  // One-line preview: first ~120 chars of policy
+  const preview =
+    rule.policy.length > 120
+      ? rule.policy.slice(0, 120) + "..."
+      : rule.policy;
 
   return (
-    <div className="px-5 py-3.5 hover:bg-muted/20 transition-colors">
-      {/* Header row */}
+    <button
+      onClick={onSelect}
+      className="w-full text-left px-5 py-3 hover:bg-muted/30 transition-colors group"
+    >
       <div className="flex items-start gap-2">
         <span className="text-[11px] text-muted-foreground font-mono mt-0.5 shrink-0 w-5 text-right">
           {idx + 1}.
         </span>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
             <span className="text-[13px] font-medium text-foreground">
               {rule.name}
             </span>
@@ -83,50 +114,116 @@ function RuleCard({
             >
               {rule.intent}
             </Badge>
-            {rule.tags?.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => onTagClick(tag)}
-                className={cn(
-                  "px-1.5 py-0 rounded text-[9px] font-medium transition-colors",
-                  selectedTags.has(tag)
-                    ? "bg-primary/10 text-primary"
-                    : "bg-muted/50 text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {tag}
-              </button>
-            ))}
+            <span className="text-[10px] text-muted-foreground/50 ml-auto shrink-0">
+              {rule.invocationCount} uses
+            </span>
+            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors shrink-0" />
           </div>
-
-          {/* Policy (always visible) */}
-          <p className="text-[12px] text-muted-foreground leading-relaxed mt-1.5">
-            {rule.policy}
+          <p className="text-[12px] text-muted-foreground leading-relaxed mt-1 line-clamp-1">
+            {preview}
           </p>
+          <span className="text-[10px] text-muted-foreground/50 mt-1 inline-block">
+            Updated{" "}
+            {new Date(rule.lastUpdated).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+            })}
+          </span>
+        </div>
+      </div>
+    </button>
+  );
+}
 
-          {/* Expand/collapse for exceptions + escalation */}
-          {(rule.exceptions.length > 0 || rule.escalation) && (
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="flex items-center gap-1 mt-1.5 text-[11px] text-primary/70 hover:text-primary transition-colors"
-            >
-              {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              {expanded ? "Collapse" : `Exceptions (${rule.exceptions.length}) & Escalation`}
-            </button>
-          )}
+/* ── Rule Detail Sheet ── */
+function RuleDetailSheet({
+  rule,
+  open,
+  onClose,
+}: {
+  rule: SOPRule | null;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [showVersions, setShowVersions] = useState(false);
 
-          {expanded && (
-            <div className="mt-2 space-y-2.5 pl-0.5">
+  if (!rule) return null;
+
+  const actionNames = (rule.actions ?? []).map(getActionName);
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent side="right" className="w-full sm:max-w-[520px] p-0 overflow-hidden">
+        <div className="h-full flex flex-col">
+          {/* Header */}
+          <SheetHeader className="px-6 pt-6 pb-4 border-b border-border/40">
+            <div className="flex items-center gap-2 mb-1">
+              <Badge variant="secondary" className="text-[10px] px-1.5 h-[18px]">
+                {rule.intent}
+              </Badge>
+              <span className="text-[10px] text-muted-foreground/60">
+                Updated{" "}
+                {new Date(rule.lastUpdated).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </span>
+            </div>
+            <SheetTitle className="text-[16px]">{rule.name}</SheetTitle>
+            <SheetDescription className="sr-only">Rule details</SheetDescription>
+          </SheetHeader>
+
+          {/* Content */}
+          <ScrollArea className="flex-1">
+            <div className="px-6 py-5 space-y-5">
+              {/* Stats row */}
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted/40">
+                  <Zap className="w-3 h-3 text-primary" />
+                  <span className="text-[11px] font-medium text-foreground">
+                    {rule.invocationCount}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    invocations
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted/40">
+                  <History className="w-3 h-3 text-muted-foreground" />
+                  <span className="text-[11px] font-medium text-foreground">
+                    {rule.versions.length}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    version{rule.versions.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+              </div>
+
+              {/* Policy (full text) */}
+              <div>
+                <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                  Guidance
+                </h4>
+                <p className="text-[12.5px] text-foreground leading-relaxed">
+                  {rule.policy}
+                </p>
+              </div>
+
               {/* Exceptions */}
               {rule.exceptions.length > 0 && (
                 <div>
-                  <div className="flex items-center gap-1.5 mb-1">
+                  <div className="flex items-center gap-1.5 mb-2">
                     <ListChecks className="w-3 h-3 text-amber-500" />
-                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Exceptions</span>
+                    <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                      Exceptions
+                    </h4>
                   </div>
-                  <ul className="space-y-0.5">
+                  <ul className="space-y-1">
                     {rule.exceptions.map((ex, i) => (
-                      <li key={i} className="text-[11.5px] text-muted-foreground leading-relaxed pl-4 relative before:content-['–'] before:absolute before:left-1 before:text-muted-foreground/40">
+                      <li
+                        key={i}
+                        className="text-[12px] text-muted-foreground leading-relaxed pl-4 relative before:content-['–'] before:absolute before:left-1 before:text-muted-foreground/40"
+                      >
                         {ex}
                       </li>
                     ))}
@@ -136,93 +233,437 @@ function RuleCard({
 
               {/* Escalation */}
               {rule.escalation && (
-                <div className="p-2.5 rounded-md bg-red-50/50 border border-red-100">
-                  <div className="flex items-center gap-1.5 mb-1">
+                <div className="p-3 rounded-md bg-red-50/40 border border-red-100/60">
+                  <div className="flex items-center gap-1.5 mb-1.5">
                     <ShieldAlert className="w-3 h-3 text-red-400" />
-                    <span className="text-[10px] font-semibold text-red-500/80 uppercase tracking-wider">Escalation</span>
+                    <h4 className="text-[11px] font-semibold text-red-500/80 uppercase tracking-wider">
+                      Escalation
+                    </h4>
                   </div>
-                  <p className="text-[11.5px] text-foreground/80 leading-relaxed">
-                    <span className="font-medium">When:</span> {rule.escalation.trigger}
+                  <p className="text-[12px] text-foreground/80 leading-relaxed">
+                    <span className="font-medium">When:</span>{" "}
+                    {rule.escalation.trigger}
                   </p>
-                  <p className="text-[11.5px] text-foreground/80 leading-relaxed mt-0.5">
-                    <span className="font-medium">Then:</span> {rule.escalation.action}
+                  <p className="text-[12px] text-foreground/80 leading-relaxed mt-0.5">
+                    <span className="font-medium">Then:</span>{" "}
+                    {rule.escalation.action}
                   </p>
                 </div>
               )}
-            </div>
-          )}
 
-          {/* Metadata row */}
-          <div className="flex items-center gap-3 mt-1.5">
-            <span className="text-[10px] text-muted-foreground/60">
-              Updated{" "}
-              {new Date(rule.lastUpdated).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-              })}
-            </span>
-            {rule.sourceDocId && (
-              <button
-                onClick={() => toast.info("Showing source document")}
-                className="text-[10px] text-primary hover:underline flex items-center gap-0.5"
-              >
-                <ExternalLink className="w-2.5 h-2.5" />
-                View Source Document
-              </button>
-            )}
-            {rule.updatedByTopicId && (
-              <a
-                href={`/messages?topic=${rule.updatedByTopicId}`}
-                className="text-[10px] text-primary hover:underline"
-              >
-                View conversation
-              </a>
-            )}
-          </div>
+              {/* Actions */}
+              {actionNames.length > 0 && (
+                <div>
+                  <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                    Actions
+                  </h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {actionNames.map((name) => (
+                      <span
+                        key={name}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/5 border border-primary/10 text-[11px] text-primary font-medium"
+                      >
+                        <Zap className="w-2.5 h-2.5" />
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Version History */}
+              <div>
+                <button
+                  onClick={() => setShowVersions(!showVersions)}
+                  className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+                >
+                  <History className="w-3 h-3" />
+                  Version History ({rule.versions.length})
+                  {showVersions ? (
+                    <ChevronUp className="w-3 h-3" />
+                  ) : (
+                    <ChevronDown className="w-3 h-3" />
+                  )}
+                </button>
+
+                {showVersions && (
+                  <div className="mt-3 space-y-0 relative">
+                    {/* Timeline line */}
+                    <div className="absolute left-[7px] top-2 bottom-2 w-px bg-border/60" />
+
+                    {rule.versions.map((v, i) => (
+                      <VersionItem key={v.version} version={v} isLatest={i === 0} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </ScrollArea>
         </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+/* ── Version History Item ── */
+function VersionItem({
+  version,
+  isLatest,
+}: {
+  version: RuleVersion;
+  isLatest: boolean;
+}) {
+  return (
+    <div className="relative pl-6 pb-4">
+      {/* Timeline dot */}
+      <div
+        className={cn(
+          "absolute left-0 top-1.5 w-[14px] h-[14px] rounded-full border-2 z-10",
+          isLatest
+            ? "bg-primary border-primary"
+            : "bg-background border-border"
+        )}
+      />
+
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <span
+            className={cn(
+              "text-[11px] font-semibold",
+              isLatest ? "text-primary" : "text-muted-foreground"
+            )}
+          >
+            v{version.version}
+            {isLatest && " (current)"}
+          </span>
+          <span className="text-[10px] text-muted-foreground/60">
+            {new Date(version.changedAt).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })}
+          </span>
+        </div>
+
+        <p className="text-[11.5px] text-foreground/80">
+          {version.changeDescription}
+        </p>
+
+        {version.conversationId && (
+          <a
+            href={`/communication?topic=${version.conversationId}`}
+            className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline mt-0.5"
+          >
+            <MessageCircle className="w-2.5 h-2.5" />
+            {version.conversationTitle ?? "View conversation"}
+          </a>
+        )}
       </div>
     </div>
   );
 }
 
-export default function PlaybookPage() {
-  const [activeTab, setActiveTab] = useState<"documents" | "rules">("rules");
-  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showGuide, setShowGuide] = useState(true);
-  const [conflictsDismissed, setConflictsDismissed] = useState(false);
+/* ── Document Row ── */
+function DocumentRow({
+  doc,
+  onToggleInUse,
+}: {
+  doc: KnowledgeDocument;
+  onToggleInUse: (id: string) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between px-5 py-3 hover:bg-muted/20 transition-colors">
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div
+          className={cn(
+            "w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold uppercase shrink-0",
+            doc.type === "pdf" && "bg-red-50 text-red-500",
+            doc.type === "doc" && "bg-blue-50 text-blue-500",
+            doc.type === "csv" && "bg-emerald-50 text-emerald-500",
+            doc.type === "url" && "bg-purple-50 text-purple-500"
+          )}
+        >
+          {doc.type}
+        </div>
+        <div className="min-w-0">
+          <p className="text-[13px] font-medium text-foreground truncate">
+            {doc.name}
+          </p>
+          <div className="flex items-center gap-3 mt-0.5">
+            {doc.size !== "—" && (
+              <span className="text-[11px] text-muted-foreground">{doc.size}</span>
+            )}
+            <span className="text-[11px] text-muted-foreground">
+              Uploaded{" "}
+              {new Date(doc.uploadedAt).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+              })}
+            </span>
+            {doc.status === "processed" && (
+              <span className="text-[10px] text-emerald-600">Processed</span>
+            )}
+            {doc.status === "processing" && (
+              <span className="text-[10px] text-amber-600">Processing...</span>
+            )}
+          </div>
+        </div>
+      </div>
 
-  const allTags = useMemo(() => getAllTags(), []);
+      <div className="flex items-center gap-3 shrink-0">
+        {/* In Use toggle */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-muted-foreground">
+            {doc.inUse ? "In use" : "Disabled"}
+          </span>
+          <Switch
+            checked={doc.inUse}
+            onCheckedChange={() => onToggleInUse(doc.id)}
+            className="scale-[0.8]"
+          />
+        </div>
 
-  const toggleTag = (tag: string) => {
-    setSelectedTags((prev) => {
-      const next = new Set(prev);
-      if (next.has(tag)) next.delete(tag);
-      else next.add(tag);
-      return next;
-    });
+        {/* 3-dot menu */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+            >
+              <MoreHorizontal className="w-3.5 h-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-[160px]">
+            <DropdownMenuItem
+              onClick={() => toast.info("Viewing document")}
+              className="text-[12px]"
+            >
+              <Eye className="w-3.5 h-3.5 mr-2" />
+              View
+            </DropdownMenuItem>
+            {doc.type === "url" && doc.sourceUrl && (
+              <DropdownMenuItem
+                onClick={() => window.open(doc.sourceUrl, "_blank")}
+                className="text-[12px]"
+              >
+                <Globe className="w-3.5 h-3.5 mr-2" />
+                Open URL
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => toast.info("Document removed")}
+              className="text-[12px] text-destructive focus:text-destructive"
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-2" />
+              Remove
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+}
+
+/* ── Upload Document Dialog ── */
+function UploadDocumentDialog({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [activeMethod, setActiveMethod] = useState<
+    "upload" | "url" | "manual"
+  >("upload");
+  const [urlValue, setUrlValue] = useState("");
+  const [manualTitle, setManualTitle] = useState("");
+  const [manualContent, setManualContent] = useState("");
+
+  const handleSubmit = () => {
+    if (activeMethod === "upload") {
+      toast.success(
+        "Document uploaded. Processing will take 30-60 minutes — Sarah will notify you when rules are ready."
+      );
+    } else if (activeMethod === "url") {
+      if (!urlValue.trim()) {
+        toast.error("Please enter a URL");
+        return;
+      }
+      toast.success(
+        "URL imported. Processing will take 30-60 minutes — Sarah will notify you when rules are ready."
+      );
+    } else {
+      if (!manualTitle.trim() || !manualContent.trim()) {
+        toast.error("Please fill in both title and content");
+        return;
+      }
+      toast.success(
+        "Content saved. Processing will take 30-60 minutes — Sarah will notify you when rules are ready."
+      );
+    }
+    onClose();
+    setUrlValue("");
+    setManualTitle("");
+    setManualContent("");
   };
 
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-[520px]">
+        <DialogHeader>
+          <DialogTitle className="text-[15px]">Add Document</DialogTitle>
+          <DialogDescription className="text-[12px]">
+            Upload a file, paste a URL, or write content manually. Rules will be
+            extracted automatically.
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Method tabs */}
+        <Tabs
+          value={activeMethod}
+          onValueChange={(v) => setActiveMethod(v as typeof activeMethod)}
+        >
+          <TabsList className="w-full h-8">
+            <TabsTrigger value="upload" className="flex-1 text-[11px] gap-1.5">
+              <Upload className="w-3 h-3" />
+              Upload File
+            </TabsTrigger>
+            <TabsTrigger value="url" className="flex-1 text-[11px] gap-1.5">
+              <Link2 className="w-3 h-3" />
+              Add URL
+            </TabsTrigger>
+            <TabsTrigger value="manual" className="flex-1 text-[11px] gap-1.5">
+              <PenLine className="w-3 h-3" />
+              Manual Input
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="upload" className="mt-4">
+            <div className="border-2 border-dashed border-border/60 rounded-lg p-8 text-center hover:border-primary/40 transition-colors cursor-pointer">
+              <Upload className="w-6 h-6 mx-auto text-muted-foreground/40 mb-2" />
+              <p className="text-[13px] font-medium text-foreground">
+                Drop file here or click to browse
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                PDF, DOC, DOCX, CSV, TXT — max 10 MB
+              </p>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="url" className="mt-4 space-y-3">
+            <div>
+              <label className="text-[11px] font-medium text-foreground mb-1.5 block">
+                Web Page URL
+              </label>
+              <Input
+                placeholder="https://example.com/policy-page"
+                value={urlValue}
+                onChange={(e) => setUrlValue(e.target.value)}
+                className="h-9 text-[12px]"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1.5">
+                We'll crawl the page and extract relevant content automatically.
+              </p>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="manual" className="mt-4 space-y-3">
+            <div>
+              <label className="text-[11px] font-medium text-foreground mb-1.5 block">
+                Title
+              </label>
+              <Input
+                placeholder="e.g., Holiday Return Policy Extension"
+                value={manualTitle}
+                onChange={(e) => setManualTitle(e.target.value)}
+                className="h-9 text-[12px]"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-foreground mb-1.5 block">
+                Content
+              </label>
+              <Textarea
+                placeholder="Paste or type your policy content here..."
+                value={manualContent}
+                onChange={(e) => setManualContent(e.target.value)}
+                className="min-h-[140px] text-[12px]"
+              />
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {/* Processing notice */}
+        <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted/40 mt-1">
+          <Bot className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            After importing, Sarah (Team Lead) will process the content and
+            extract rules. This typically takes 30-60 minutes. You'll be
+            notified when it's ready for review.
+          </p>
+        </div>
+
+        {/* Actions */}
+        <div className="flex justify-end gap-2 mt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onClose}
+            className="h-8 text-[12px]"
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleSubmit}
+            className="h-8 text-[12px]"
+          >
+            {activeMethod === "upload"
+              ? "Upload & Process"
+              : activeMethod === "url"
+              ? "Import & Process"
+              : "Save & Process"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
+   ── MAIN PAGE ──
+   ══════════════════════════════════════════════════════════ */
+
+export default function PlaybookPage() {
+  const [activeTab, setActiveTab] = useState<"documents" | "rules">("rules");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showGuide, setShowGuide] = useState(true);
+  const [selectedRule, setSelectedRule] = useState<SOPRule | null>(null);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [documents, setDocuments] = useState(KNOWLEDGE_DOCUMENTS);
+
   const filteredRules = useMemo(() => {
-    return RULES.filter((rule) => {
-      // Tag filter
-      if (selectedTags.size > 0) {
-        const hasTags = rule.tags?.some((t) => selectedTags.has(t));
-        if (!hasTags) return false;
-      }
-      // Search filter
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        return (
-          rule.name.toLowerCase().includes(q) ||
-          rule.policy.toLowerCase().includes(q) ||
-          rule.intent.toLowerCase().includes(q) ||
-          rule.exceptions.some((ex) => ex.toLowerCase().includes(q))
-        );
-      }
-      return true;
-    });
-  }, [selectedTags, searchQuery]);
+    if (!searchQuery.trim()) return RULES;
+    const q = searchQuery.toLowerCase();
+    return RULES.filter(
+      (rule) =>
+        rule.name.toLowerCase().includes(q) ||
+        rule.policy.toLowerCase().includes(q) ||
+        rule.intent.toLowerCase().includes(q)
+    );
+  }, [searchQuery]);
+
+  const toggleDocInUse = (docId: string) => {
+    setDocuments((prev) =>
+      prev.map((d) => (d.id === docId ? { ...d, inUse: !d.inUse } : d))
+    );
+    const doc = documents.find((d) => d.id === docId);
+    if (doc) {
+      toast.info(doc.inUse ? `"${doc.name}" disabled` : `"${doc.name}" enabled`);
+    }
+  };
 
   return (
     <div className="min-h-full bg-background">
@@ -233,7 +674,7 @@ export default function PlaybookPage() {
             <h1 className="text-[18px] font-semibold text-foreground tracking-tight">
               Playbook
             </h1>
-            {/* Tab toggle in header */}
+            {/* Tab toggle */}
             <div className="flex gap-1 p-0.5 bg-muted/50 rounded-lg">
               <button
                 onClick={() => setActiveTab("rules")}
@@ -257,11 +698,22 @@ export default function PlaybookPage() {
                 )}
               >
                 <FileText className="w-3.5 h-3.5" />
-                Documents ({KNOWLEDGE_DOCUMENTS.length})
+                Documents ({documents.length})
               </button>
             </div>
           </div>
-          <div />
+
+          {/* Header actions */}
+          {activeTab === "documents" && (
+            <Button
+              size="sm"
+              onClick={() => setUploadDialogOpen(true)}
+              className="h-8 text-[12px] gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Document
+            </Button>
+          )}
         </div>
       </div>
 
@@ -271,11 +723,16 @@ export default function PlaybookPage() {
           <div className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/10">
             <Bot className="w-4 h-4 text-primary shrink-0 mt-0.5" />
             <p className="text-[12px] text-foreground leading-relaxed flex-1">
-              This is your knowledge base. Rules are learned from documents and conversations in{" "}
-              <a href="/communication" className="text-primary font-medium hover:underline">
-                Communication
+              Your Playbook contains all the rules your AI Rep follows. Rules are
+              learned from uploaded documents and conversations with your{" "}
+              <a
+                href="/communication"
+                className="text-primary font-medium hover:underline"
+              >
+                Team Lead
               </a>
-              . Agent identity, mode, and actions can be configured from the Rep panel in Communication.
+              . Click any rule to see full details, version history, and linked
+              actions.
             </p>
             <button
               onClick={() => setShowGuide(false)}
@@ -289,64 +746,10 @@ export default function PlaybookPage() {
 
       {/* Content */}
       <div className="max-w-[920px] mx-auto px-6 py-4">
-
         {/* ═══ Rules Tab ═══ */}
         {activeTab === "rules" && (
           <div>
-            {/* Conflicts alert */}
-            {!conflictsDismissed && CONFLICTS.length > 0 && (
-              <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200/60">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-[13px] font-medium text-amber-800">
-                      {CONFLICTS.length} unresolved conflict{CONFLICTS.length !== 1 ? "s" : ""}
-                    </p>
-                    {CONFLICTS.map((c) => (
-                      <div key={c.id} className="mt-2 p-2.5 bg-white rounded border border-amber-200/40">
-                        <p className="text-[12px] font-medium text-foreground mb-1.5">{c.title}</p>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <p className="text-[11px] text-muted-foreground mb-0.5">{c.sourceA}</p>
-                            <p className="text-[12px] text-foreground">{c.ruleA}</p>
-                          </div>
-                          <div>
-                            <p className="text-[11px] text-muted-foreground mb-0.5">{c.sourceB}</p>
-                            <p className="text-[12px] text-foreground">{c.ruleB}</p>
-                          </div>
-                        </div>
-                        <div className="flex gap-2 mt-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-6 text-[11px] px-2.5 rounded-full"
-                            onClick={() => toast.success("Applied: " + c.ruleA)}
-                          >
-                            Use A
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-6 text-[11px] px-2.5 rounded-full"
-                            onClick={() => toast.success("Applied: " + c.ruleB)}
-                          >
-                            Use B
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    onClick={() => setConflictsDismissed(true)}
-                    className="text-amber-400 hover:text-amber-600 transition-colors"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Search + Tag filter bar */}
+            {/* Search bar only */}
             <div className="flex items-center gap-3 mb-4">
               <div className="relative flex-1 max-w-[280px]">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
@@ -357,37 +760,15 @@ export default function PlaybookPage() {
                   className="h-8 text-[12px] pl-8"
                 />
               </div>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {allTags.map((tag) => (
-                  <button
-                    key={tag}
-                    onClick={() => toggleTag(tag)}
-                    className={cn(
-                      "px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors border",
-                      selectedTags.has(tag)
-                        ? "bg-primary/10 text-primary border-primary/20"
-                        : "bg-muted/30 text-muted-foreground border-transparent hover:bg-muted/50"
-                    )}
-                  >
-                    {tag}
-                  </button>
-                ))}
-                {selectedTags.size > 0 && (
-                  <button
-                    onClick={() => setSelectedTags(new Set())}
-                    className="text-[11px] text-muted-foreground hover:text-foreground ml-1"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
             </div>
 
-            {/* Rules list — SOP cards */}
+            {/* Rules list */}
             <div className="bg-white rounded-lg border border-border/60">
               {filteredRules.length === 0 ? (
                 <div className="p-8 text-center">
-                  <p className="text-[13px] text-muted-foreground">No rules match your filter.</p>
+                  <p className="text-[13px] text-muted-foreground">
+                    No rules match your search.
+                  </p>
                 </div>
               ) : (
                 <div className="divide-y divide-border/30">
@@ -396,19 +777,21 @@ export default function PlaybookPage() {
                       key={rule.id}
                       rule={rule}
                       idx={idx}
-                      onTagClick={(tag) => setSelectedTags(new Set([tag]))}
-                      selectedTags={selectedTags}
+                      onSelect={() => setSelectedRule(rule)}
                     />
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Bottom help text */}
+            {/* Bottom help */}
             <div className="mt-3 text-center">
               <p className="text-[11px] text-muted-foreground">
                 Rules are updated through conversations in{" "}
-                <a href="/communication" className="text-primary hover:underline">
+                <a
+                  href="/communication"
+                  className="text-primary hover:underline"
+                >
                   Communication
                 </a>{" "}
                 or by uploading documents.
@@ -421,85 +804,43 @@ export default function PlaybookPage() {
         {activeTab === "documents" && (
           <div>
             <div className="bg-white rounded-lg border border-border/60">
-              <div className="divide-y divide-border/30">
-                {KNOWLEDGE_DOCUMENTS.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="flex items-center justify-between px-5 py-3.5 hover:bg-muted/20 transition-colors"
-                  >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div
-                        className={cn(
-                          "w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold uppercase shrink-0",
-                          doc.type === "pdf" && "bg-red-50 text-red-500",
-                          doc.type === "doc" && "bg-blue-50 text-blue-500",
-                          doc.type === "csv" && "bg-emerald-50 text-emerald-500",
-                          doc.type === "url" && "bg-purple-50 text-purple-500"
-                        )}
-                      >
-                        {doc.type}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[13px] font-medium text-foreground truncate">
-                          {doc.name}
-                        </p>
-                        <div className="flex items-center gap-3 mt-0.5">
-                          <span className="text-[11px] text-muted-foreground">{doc.size}</span>
-                          <span className="text-[11px] text-muted-foreground">
-                            Uploaded{" "}
-                            {new Date(doc.uploadedAt).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                            })}
-                          </span>
-                          <Badge variant="secondary" className="h-[16px] px-1.5 text-[10px]">
-                            {doc.extractedRules} rules extracted
-                          </Badge>
-                          {doc.status === "processed" && (
-                            <span className="text-[10px] text-emerald-600">Processed</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-[11px] text-muted-foreground hover:text-foreground"
-                        onClick={() => toast.info("View document")}
-                      >
-                        View
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {documents.length === 0 ? (
+                <div className="p-8 text-center">
+                  <p className="text-[13px] text-muted-foreground">
+                    No documents yet. Add your first document to get started.
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border/30">
+                  {documents.map((doc) => (
+                    <DocumentRow
+                      key={doc.id}
+                      doc={doc}
+                      onToggleInUse={toggleDocInUse}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
-
-            {/* Upload area */}
-            <button
-              onClick={() => toast.info("File upload dialog would open here")}
-              className="w-full border-2 border-dashed border-border/60 rounded-lg p-6 text-center hover:border-primary/40 transition-colors mt-4"
-            >
-              <Upload className="w-5 h-5 mx-auto text-muted-foreground/50 mb-1.5" />
-              <p className="text-[13px] font-medium text-foreground">Upload Document</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                PDF, DOC, CSV — rules will be extracted automatically
-              </p>
-            </button>
           </div>
         )}
 
         {/* Bottom spacer */}
         <div className="h-8" />
       </div>
+
+      {/* Rule Detail Sheet */}
+      <RuleDetailSheet
+        rule={selectedRule}
+        open={!!selectedRule}
+        onClose={() => setSelectedRule(null)}
+      />
+
+      {/* Upload Document Dialog */}
+      <UploadDocumentDialog
+        open={uploadDialogOpen}
+        onClose={() => setUploadDialogOpen(false)}
+      />
     </div>
   );
 }

@@ -76,6 +76,15 @@ export interface RuleEscalation {
   action: string;
 }
 
+export interface RuleVersion {
+  version: number;
+  text: string;
+  changedAt: string;
+  conversationId?: string;
+  conversationTitle?: string;
+  changeDescription: string;
+}
+
 export interface SOPRule {
   id: string;
   name: string;
@@ -87,6 +96,9 @@ export interface SOPRule {
   updatedByTopicId?: string;
   sourceDocId?: string;
   tags?: string[];
+  actions?: string[];        // action IDs this rule can invoke
+  invocationCount: number;   // how many times this rule was matched
+  versions: RuleVersion[];   // version history
 }
 
 export type Skill = SOPRule;
@@ -116,6 +128,7 @@ export interface KnowledgeDocument {
   extractedRules: number;
   status: "processed" | "processing" | "error";
   sourceUrl?: string;
+  inUse: boolean;
 }
 
 export interface PerformanceMetric {
@@ -311,7 +324,7 @@ export const RULES: SOPRule[] = [
     id: "rule-1",
     name: "Standard Return & Refund",
     intent: "Returns / Refunds",
-    policy: "Process full refund for items returned within 30 days of delivery in original condition. Refund to original payment method only. For VIP customers (3+ completed orders), extend return window to 45 days.",
+    policy: "Process full refund for items returned within 30 days of delivery in original condition. Refund to original payment method only. For VIP customers (3+ completed orders), extend return window to 45 days. Verify order date and customer tier before processing. If the item is eligible, initiate refund through the payment gateway and send confirmation email.",
     exceptions: [
       "Final sale items are non-returnable.",
       "Items without tags or showing signs of use are not eligible.",
@@ -325,12 +338,19 @@ export const RULES: SOPRule[] = [
     updatedByTopicId: "t-4",
     sourceDocId: "doc-2",
     tags: ["Returns", "Refunds", "VIP"],
+    actions: ["ap-1", "ap-3"],
+    invocationCount: 156,
+    versions: [
+      { version: 3, text: "Process full refund for items returned within 30 days of delivery in original condition. Refund to original payment method only. For VIP customers (3+ completed orders), extend return window to 45 days.", changedAt: "2026-03-20T09:00:00Z", conversationId: "t-4", conversationTitle: "VIP customer refund window extension", changeDescription: "Added VIP 45-day return window" },
+      { version: 2, text: "Process full refund for items returned within 30 days of delivery in original condition. Refund to original payment method only.", changedAt: "2026-03-10T14:00:00Z", conversationId: "t-6", conversationTitle: "Holiday return policy extension", changeDescription: "Added Spring Sale 60-day exception" },
+      { version: 1, text: "Process full refund for items returned within 30 days of purchase.", changedAt: "2026-03-01T09:00:00Z", changeDescription: "Initial rule extracted from Return Policy document" },
+    ],
   },
   {
     id: "rule-2",
     name: "Where Is My Order (WISMO)",
     intent: "Order Tracking",
-    policy: "Look up order in Shopify, retrieve shipment tracking. If shipped, share tracking link and estimated delivery date. If delayed >3 days past estimate, apologize and offer to contact carrier on customer's behalf.",
+    policy: "Look up order in Shopify, retrieve shipment tracking. If shipped, share tracking link and estimated delivery date. If delayed >3 days past estimate, apologize and offer to contact carrier on customer's behalf. Always provide the tracking number and carrier name in the response.",
     exceptions: [
       "Never promise a specific delivery date — use estimated ranges.",
       "If tracking shows no movement for 7+ days, offer 10% discount on next order.",
@@ -342,12 +362,17 @@ export const RULES: SOPRule[] = [
     lastUpdated: "2026-03-01T09:00:00Z",
     sourceDocId: "doc-1",
     tags: ["Shipping", "WISMO"],
+    actions: ["ap-4"],
+    invocationCount: 243,
+    versions: [
+      { version: 1, text: "Look up order in Shopify, retrieve shipment tracking. If shipped, share tracking link and estimated delivery date.", changedAt: "2026-03-01T09:00:00Z", changeDescription: "Initial rule extracted from Customer Service SOP" },
+    ],
   },
   {
     id: "rule-3",
     name: "Damaged / Wrong Item",
     intent: "Product Issues",
-    policy: "For items under $80, process replacement or refund (customer's choice) without requiring photo evidence. For items $80+, request photo evidence before processing. Offer free return shipping for all defective/wrong items.",
+    policy: "For items under $80, process replacement or refund (customer's choice) without requiring photo evidence. For items $80+, request photo evidence before processing. Offer free return shipping for all defective/wrong items. Acknowledge the inconvenience and express empathy before offering resolution options.",
     exceptions: [
       "If customer reports damage on a final-sale item, still process replacement (not refund).",
       "For wrong-item cases, do not require return of the incorrect item if value is under $80.",
@@ -360,12 +385,18 @@ export const RULES: SOPRule[] = [
     updatedByTopicId: "t-3",
     sourceDocId: "doc-1",
     tags: ["Product Issues", "Damage"],
+    actions: ["ap-1", "ap-3", "ap-7"],
+    invocationCount: 89,
+    versions: [
+      { version: 2, text: "For items under $80, process replacement or refund without requiring photo evidence. For items $80+, request photo evidence before processing.", changedAt: "2026-03-12T14:00:00Z", conversationId: "t-3", conversationTitle: "Learned: Damaged item photo not always needed", changeDescription: "Added $80 threshold — low-value items skip photo" },
+      { version: 1, text: "For all damage claims, request photo evidence before processing replacement or refund.", changedAt: "2026-03-01T09:00:00Z", changeDescription: "Initial rule extracted from Customer Service SOP" },
+    ],
   },
   {
     id: "rule-4",
     name: "Order Cancellation",
     intent: "Cancellations",
-    policy: "Cancel unfulfilled orders immediately with full refund. For fulfilled/shipped orders, guide customer to the return process instead. Express sympathy for the inconvenience.",
+    policy: "Cancel unfulfilled orders immediately with full refund. For fulfilled/shipped orders, guide customer to the return process instead. Express sympathy for the inconvenience. Confirm the cancellation with an email notification to the customer.",
     exceptions: [
       "Custom/personalized orders cannot be cancelled once production has started.",
     ],
@@ -376,12 +407,17 @@ export const RULES: SOPRule[] = [
     lastUpdated: "2026-03-01T09:00:00Z",
     sourceDocId: "doc-1",
     tags: ["Cancellations"],
+    actions: ["ap-2", "ap-1"],
+    invocationCount: 67,
+    versions: [
+      { version: 1, text: "Cancel unfulfilled orders immediately with full refund. For fulfilled/shipped orders, guide customer to the return process instead.", changedAt: "2026-03-01T09:00:00Z", changeDescription: "Initial rule extracted from Customer Service SOP" },
+    ],
   },
   {
     id: "rule-5",
     name: "Return Shipping Cost",
     intent: "Returns",
-    policy: "Defective/wrong items: free return shipping (company pays). Change-of-mind returns: customer pays — provide prepaid label and deduct $8.95 from refund.",
+    policy: "Defective/wrong items: free return shipping (company pays). Change-of-mind returns: customer pays — provide prepaid label and deduct $8.95 from refund. Clearly explain the shipping cost policy to the customer before generating the return label.",
     exceptions: [
       "VIP customers (3+ orders) get free return shipping on first change-of-mind return per year.",
     ],
@@ -393,12 +429,18 @@ export const RULES: SOPRule[] = [
     updatedByTopicId: "t-7",
     sourceDocId: "doc-2",
     tags: ["Returns", "Shipping"],
+    actions: ["ap-3"],
+    invocationCount: 42,
+    versions: [
+      { version: 2, text: "Defective/wrong items: free return shipping. Change-of-mind returns: customer pays $8.95.", changedAt: "2026-03-20T09:00:00Z", conversationId: "t-7", conversationTitle: "Return shipping cost for defective items", changeDescription: "Clarified defective vs change-of-mind shipping cost" },
+      { version: 1, text: "Return shipping costs $8.95 for all returns.", changedAt: "2026-03-01T09:00:00Z", changeDescription: "Initial rule extracted from Return Policy document" },
+    ],
   },
   {
     id: "rule-6",
     name: "International Returns",
     intent: "Returns",
-    policy: "Return shipping is customer's responsibility for international orders. Customs duties are non-refundable (outside our control). For VIP customers, offer store credit equal to the duties amount as a goodwill gesture.",
+    policy: "Return shipping is customer's responsibility for international orders. Customs duties are non-refundable (outside our control). For VIP customers, offer store credit equal to the duties amount as a goodwill gesture. Provide clear instructions on how to ship the item back internationally.",
     exceptions: [
       "Defective/wrong items shipped internationally still qualify for free return shipping.",
     ],
@@ -410,18 +452,23 @@ export const RULES: SOPRule[] = [
     updatedByTopicId: "t-8",
     sourceDocId: "doc-2",
     tags: ["Returns", "International"],
+    actions: ["ap-3", "ap-1"],
+    invocationCount: 18,
+    versions: [
+      { version: 1, text: "Return shipping is customer's responsibility for international orders. Customs duties are non-refundable.", changedAt: "2026-03-25T16:00:00Z", conversationId: "t-8", conversationTitle: "International order return complications", changeDescription: "New rule created from Team Lead conversation" },
+    ],
   },
 ];
 
 export const SKILLS = RULES;
 
 export const KNOWLEDGE_DOCUMENTS: KnowledgeDocument[] = [
-  { id: "doc-1", name: "Coastal Living Co — Customer Service SOP v3.2.pdf", type: "pdf", uploadedAt: "2026-03-01T09:00:00Z", size: "2.4 MB", extractedRules: 12, status: "processed", sourceUrl: "/documents/sop-v3.2.pdf" },
-  { id: "doc-2", name: "Return & Refund Policy — March 2026.pdf", type: "pdf", uploadedAt: "2026-03-01T09:00:00Z", size: "890 KB", extractedRules: 5, status: "processed", sourceUrl: "/documents/return-policy.pdf" },
-  { id: "doc-3", name: "Shipping Partner SLA & Escalation Guide.doc", type: "doc", uploadedAt: "2026-03-05T14:00:00Z", size: "1.1 MB", extractedRules: 3, status: "processed", sourceUrl: "/documents/shipping-sla.doc" },
-  { id: "doc-4", name: "VIP Customer Handling Guidelines.pdf", type: "pdf", uploadedAt: "2026-03-10T11:00:00Z", size: "540 KB", extractedRules: 4, status: "processed", sourceUrl: "/documents/vip-guidelines.pdf" },
-  { id: "doc-5", name: "Product Warranty Terms — All Categories.csv", type: "csv", uploadedAt: "2026-03-15T16:00:00Z", size: "320 KB", extractedRules: 8, status: "processed", sourceUrl: "/documents/warranty-terms.csv" },
-  { id: "doc-6", name: "Coastal Living Co FAQ Page", type: "url", uploadedAt: "2026-03-18T10:00:00Z", size: "—", extractedRules: 6, status: "processed", sourceUrl: "https://coastalliving.com/faq" },
+  { id: "doc-1", name: "Coastal Living Co — Customer Service SOP v3.2.pdf", type: "pdf", uploadedAt: "2026-03-01T09:00:00Z", size: "2.4 MB", extractedRules: 12, status: "processed", sourceUrl: "/documents/sop-v3.2.pdf", inUse: true },
+  { id: "doc-2", name: "Return & Refund Policy — March 2026.pdf", type: "pdf", uploadedAt: "2026-03-01T09:00:00Z", size: "890 KB", extractedRules: 5, status: "processed", sourceUrl: "/documents/return-policy.pdf", inUse: true },
+  { id: "doc-3", name: "Shipping Partner SLA & Escalation Guide.doc", type: "doc", uploadedAt: "2026-03-05T14:00:00Z", size: "1.1 MB", extractedRules: 3, status: "processed", sourceUrl: "/documents/shipping-sla.doc", inUse: true },
+  { id: "doc-4", name: "VIP Customer Handling Guidelines.pdf", type: "pdf", uploadedAt: "2026-03-10T11:00:00Z", size: "540 KB", extractedRules: 4, status: "processed", sourceUrl: "/documents/vip-guidelines.pdf", inUse: true },
+  { id: "doc-5", name: "Product Warranty Terms — All Categories.csv", type: "csv", uploadedAt: "2026-03-15T16:00:00Z", size: "320 KB", extractedRules: 8, status: "processed", sourceUrl: "/documents/warranty-terms.csv", inUse: false },
+  { id: "doc-6", name: "Coastal Living Co FAQ Page", type: "url", uploadedAt: "2026-03-18T10:00:00Z", size: "—", extractedRules: 6, status: "processed", sourceUrl: "https://coastalliving.com/faq", inUse: true },
 ];
 
 // ── Escalation Tickets (Rep conversation) ──────────────────

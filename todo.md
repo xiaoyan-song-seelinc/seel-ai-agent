@@ -1,41 +1,14 @@
-# Prototype Restructure TODO
+# Playbook Page Refactor — 12 Adjustments
 
-## Data Layer (mock-data.ts)
-- [ ] Add escalation ticket data for Rep (ticket title, reason, status badge, zendesk link)
-- [ ] Add Rep config model (mode, identity, actions — moved from SettingsPage)
-- [ ] Keep existing SOP Rules, Topics, Actions, Performance data
-
-## Navigation & Routing (App.tsx + DashboardLayout)
-- [ ] Left sidebar: Shopify-style global nav
-- [ ] AI Support internal tabs: Communication / Playbook / Performance
-- [ ] Remove /agent, /settings routes; Add /integrations route
-- [ ] Keep /zendesk route for testing
-
-## Communication Page (replaces ConversationPage)
-- [ ] Left panel: Team Lead (top) + "Reps" section with Rep1
-- [ ] Team Lead: existing topic-based conversation
-- [ ] Rep1: escalation cards (title + reason + status + Open in Zendesk)
-- [ ] Rep1 badge: red dot with count of needs_attention items
-- [ ] Statuses: needs_attention / in_progress / resolved (silent)
-- [ ] Rep header: Configure button → right panel switches to config
-- [ ] Yellow banner (top, non-dismissible): integration setup needed
-- [ ] Welcome dialog (first visit): brief intro + Get Started
-- [ ] Team Lead first msg: Playbook (upload doc / try demo with sales return)
-- [ ] NO "type manually" or "skip" options
-
-## Rep Config Panel
-- [ ] Mode / Identity / Actions+Guardrails
-- [ ] Triggered by Configure button on Rep header
-
-## Integrations Page
-- [ ] Zendesk card: Seel Sidebar App (Connected) + AI Support Access (Setup needed)
-- [ ] AI Support Access: checklist with help doc links
-- [ ] Other platforms: Coming Soon + Talk to us
-
-## Playbook Page
-- [ ] Keep: SOP Rules + Knowledge + Conflicts only
-
-## Cleanup
-- [ ] Delete SettingsPage.tsx, AgentPage.tsx
-- [ ] Remove obsolete routes
-- [ ] 0 TS errors
+- [ ] 1. Remove conflict display from Rules section (handled in Team Lead only)
+- [ ] 2. Remove tag search and tag display from Rules
+- [ ] 3. Remove Source/Document link from Rules (rules can span multiple docs)
+- [ ] 4. Add Rule detail view with version history (each version links to Conversation source only)
+- [ ] 5. Remove Exception and Escalation from list preview
+- [ ] 6. Rule preview: one-line summary only (first part of long rule text)
+- [ ] 7. Documents: remove "Rules extracted" count, decouple from Rules
+- [ ] 8. Documents: add "In Use" toggle per document
+- [ ] 9. Documents: collapse actions into 3-dot menu
+- [ ] 10. Upload Document: button → dialog with 3 methods (Upload, URL, Manual Input)
+- [ ] 11. After doc processing: notify Team Lead with rule update count + confirmation flow
+- [ ] 12. Rule detail: show invocation count, included Actions, align with Data Model structure
