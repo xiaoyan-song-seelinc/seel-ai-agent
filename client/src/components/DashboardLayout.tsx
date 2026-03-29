@@ -1,5 +1,5 @@
 /* ── DashboardLayout ──────────────────────────────────────────
-   Shopify-style global left nav + AI Support module content area
+   Shopify-style global left nav + AI Support module with internal tabs
    ──────────────────────────────────────────────────────────── */
 
 import { type ReactNode } from "react";
@@ -17,7 +17,6 @@ import {
   LayoutGrid,
   Bell,
   ExternalLink,
-  Sparkles,
   HelpCircle,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -44,6 +43,13 @@ const mainNav: NavItem[] = [
 const customizeNav: NavItem[] = [
   { label: "Widgets", href: "/widgets-placeholder", icon: LayoutGrid, disabled: true },
   { label: "Notifications", href: "/notifications-placeholder", icon: Bell, disabled: true },
+];
+
+/* AI Support internal tabs */
+const aiTabs = [
+  { label: "Communication", href: "/communication" },
+  { label: "Playbook", href: "/playbook" },
+  { label: "Performance", href: "/performance" },
 ];
 
 function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
@@ -88,7 +94,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   const isActive = (href: string) => {
     if (href === "/") {
-      // AI Support is active for root + all AI Support sub-routes
       return (
         location === "/" ||
         location.startsWith("/communication") ||
@@ -98,6 +103,20 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
     return location.startsWith(href);
   };
+
+  // Determine if we're inside the AI Support module
+  const isAISupport =
+    location === "/" ||
+    location.startsWith("/communication") ||
+    location.startsWith("/playbook") ||
+    location.startsWith("/performance");
+
+  // Which AI tab is active?
+  const activeAITab = (() => {
+    if (location.startsWith("/playbook")) return "/playbook";
+    if (location.startsWith("/performance")) return "/performance";
+    return "/communication"; // default (includes "/" and "/communication")
+  })();
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -157,7 +176,39 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
       {/* Main content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {children}
+        {/* AI Support module header with internal tabs */}
+        {isAISupport && (
+          <div className="shrink-0 bg-white border-b border-border">
+            <div className="px-6 pt-4 pb-0">
+              <h1 className="text-[18px] font-bold text-foreground leading-tight">AI Support</h1>
+              {/* Tab bar */}
+              <div className="flex items-center gap-1 mt-3 -mb-px">
+                {aiTabs.map((tab) => (
+                  <Link key={tab.href} href={tab.href}>
+                    <button
+                      className={cn(
+                        "px-3 pb-2.5 text-[13px] font-medium transition-colors relative",
+                        activeAITab === tab.href
+                          ? "text-primary"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {tab.label}
+                      {activeAITab === tab.href && (
+                        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary rounded-full" />
+                      )}
+                    </button>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Page content */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {children}
+        </div>
       </main>
     </div>
   );

@@ -1426,68 +1426,77 @@ export default function CommunicationPage() {
 
         {/* ── Main content area ── */}
         <div className="flex flex-1 min-h-0">
-          {/* ── Left Panel: Team Lead + Reps ── */}
-          <div className="w-[200px] shrink-0 border-r border-border bg-[#fafbfc] flex flex-col">
+          {/* ── Left Panel: Narrow avatar bar ── */}
+          <div className="w-[56px] shrink-0 border-r border-border bg-[#fafbfc] flex flex-col items-center py-3 gap-1">
             {/* Team Lead */}
-            <div className="px-3 pt-3 pb-1">
-              <button
-                onClick={() => { setSelected({ type: "team_lead" }); setShowRepConfig(false); }}
-                className={cn(
-                  "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors",
-                  selected.type === "team_lead"
-                    ? "bg-primary/8 text-foreground"
-                    : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-                )}
-              >
-                <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                </div>
-                <div className="text-left min-w-0">
-                  <p className="text-[12px] font-medium leading-tight truncate">Team Lead</p>
-                  <p className="text-[10px] text-muted-foreground leading-tight">Playbook & rules</p>
-                </div>
-                {waitingCount > 0 && selected.type !== "team_lead" && (
-                  <span className="ml-auto w-4 h-4 rounded-full bg-red-500 text-white text-[9px] flex items-center justify-center font-medium shrink-0">
-                    {waitingCount}
-                  </span>
-                )}
-              </button>
-            </div>
-
-            {/* Reps section */}
-            <div className="px-3 pt-2 pb-1">
-              <p className="px-2.5 text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider mb-1">Reps</p>
-
-              {repHired ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <button
-                  onClick={() => { setSelected({ type: "rep", id: "rep-1", name: "Alex" }); setShowRepConfig(false); }}
+                  onClick={() => { setSelected({ type: "team_lead" }); setShowRepConfig(false); }}
                   className={cn(
-                    "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-colors",
-                    selected.type === "rep"
-                      ? "bg-primary/8 text-foreground"
-                      : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                    "w-9 h-9 rounded-full flex items-center justify-center transition-all relative",
+                    selected.type === "team_lead"
+                      ? "bg-indigo-100 ring-2 ring-indigo-400 ring-offset-1"
+                      : "bg-indigo-50 hover:bg-indigo-100"
                   )}
                 >
-                  <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 relative">
-                    <Bot className="w-3.5 h-3.5 text-emerald-600" />
+                  <Sparkles className="w-4 h-4 text-indigo-600" />
+                  {waitingCount > 0 && selected.type !== "team_lead" && (
+                    <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-red-500 text-white text-[8px] flex items-center justify-center font-medium">
+                      {waitingCount}
+                    </span>
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="text-[11px]">
+                <p className="font-medium">Team Lead</p>
+                <p className="text-muted-foreground text-[10px]">Playbook & rules</p>
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Divider + Reps label */}
+            <div className="w-6 h-px bg-border my-1" />
+            <p className="text-[8px] font-semibold text-muted-foreground/40 uppercase tracking-widest">Reps</p>
+
+            {/* Rep */}
+            {repHired ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => { setSelected({ type: "rep", id: "rep-1", name: "Alex" }); setShowRepConfig(false); }}
+                    className={cn(
+                      "w-9 h-9 rounded-full flex items-center justify-center transition-all relative",
+                      selected.type === "rep"
+                        ? "bg-emerald-100 ring-2 ring-emerald-400 ring-offset-1"
+                        : "bg-emerald-50 hover:bg-emerald-100"
+                    )}
+                  >
+                    <Bot className="w-4 h-4 text-emerald-600" />
                     {needsAttentionCount > 0 && (
                       <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-red-500 text-white text-[8px] flex items-center justify-center font-medium">
                         {needsAttentionCount}
                       </span>
                     )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="text-[11px]">
+                  <p className="font-medium">Alex</p>
+                  <p className="text-muted-foreground text-[10px]">Production</p>
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="w-9 h-9 rounded-full border-2 border-dashed border-muted-foreground/20 flex items-center justify-center">
+                    <Plus className="w-3.5 h-3.5 text-muted-foreground/30" />
                   </div>
-                  <div className="text-left min-w-0">
-                    <p className="text-[12px] font-medium leading-tight truncate">Alex</p>
-                    <p className="text-[10px] text-muted-foreground leading-tight">Production</p>
-                  </div>
-                </button>
-              ) : (
-                <div className="px-2.5 py-3 text-center">
-                  <p className="text-[11px] text-muted-foreground/50">No reps yet</p>
-                  <p className="text-[10px] text-muted-foreground/40 mt-0.5">Complete setup to hire one</p>
-                </div>
-              )}
-            </div>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="text-[11px]">
+                  <p>No reps yet</p>
+                  <p className="text-muted-foreground text-[10px]">Complete setup to hire one</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
 
             <div className="flex-1" />
           </div>
