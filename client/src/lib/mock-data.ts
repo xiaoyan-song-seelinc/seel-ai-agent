@@ -25,6 +25,13 @@ export interface Topic {
   messages: Message[];
   sourceTicketId?: string;
   proposedRule?: ProposedRule;
+  weeklySummary?: {
+    periodLabel: string;
+    kpis: { label: string; value: string; delta: string; positive: boolean }[];
+    topIntent: { name: string; resolution: string; volume: number };
+    worstIntent: { name: string; resolution: string; volume: number; ruleName: string; ruleLink: string };
+    recommendations: { text: string; linkLabel: string; linkPath: string }[];
+  };
 }
 
 export interface Message {
@@ -571,15 +578,32 @@ export const TOPICS: Topic[] = [
   },
   {
     id: "t-2",
-    type: "performance_report",
-    title: "Weekly Performance Summary (Mar 19-25)",
+    type: "performance_summary",
+    title: "Weekly Performance Summary (Mar 24–30)",
     status: "unread",
-    createdAt: "2026-03-26T06:00:00Z",
-    updatedAt: "2026-03-26T06:00:00Z",
-    preview: "This week I handled 412 tickets with a 68% auto-resolution rate. CSAT improved to 4.3...",
+    createdAt: "2026-03-30T06:00:00Z",
+    updatedAt: "2026-03-30T06:00:00Z",
+    preview: "This week Ava handled 156 tickets with a 78.5% auto-resolution rate...",
     messages: [
-      { id: "m-2-1", sender: "ai", content: "Here's my weekly summary for **March 19-25**:\n\n**Key Metrics:**\n- Tickets handled: **412** (up 8% from last week)\n- Auto-resolution rate: **68%** (up from 64%)\n- CSAT: **4.3/5** (up from 4.1)\n- Escalation rate: **24%** (down from 28%)\n- Avg first response: **45 seconds**\n\n**Highlights:**\n- WISMO tickets are my strongest category — 89% auto-resolved\n- Refund CSAT improved after you updated the VIP refund window rule last week\n\n**Areas of concern:**\n- Product damage claims: escalation rate is still 42%. I'm not confident about when to offer replacement vs refund\n- 3 customers complained about my tone being \"too formal\" on live chat\n\nWould you like me to create action items for these concerns?", timestamp: "2026-03-26T06:00:00Z", actions: [{ label: "Create Action Items", type: "accept" }] },
+      { id: "m-2-1", sender: "ai", content: "Here's the weekly performance summary. See the structured breakdown below.", timestamp: "2026-03-30T06:00:00Z" },
     ],
+    weeklySummary: {
+      periodLabel: "Mar 24–30, 2026",
+      kpis: [
+        { label: "Tickets Handled", value: "156", delta: "+12%", positive: true },
+        { label: "Auto-Resolution", value: "78.5%", delta: "+3.2%", positive: true },
+        { label: "CSAT", value: "4.6/5", delta: "+0.2", positive: true },
+        { label: "First Response", value: "42s", delta: "-8s", positive: true },
+        { label: "Full Resolution", value: "11m 20s", delta: "-2m 10s", positive: true },
+      ],
+      topIntent: { name: "WISMO", resolution: "92%", volume: 64 },
+      worstIntent: { name: "Return & Refund", resolution: "54%", volume: 38, ruleName: "Return & Refund Handling", ruleLink: "/playbook" },
+      recommendations: [
+        { text: "Return & Refund escalations increased 15% this week. Most escalations involve orders over $200 where the refund exceeds the guardrail limit. Consider raising the guardrail or adding a rule for high-value returns.", linkLabel: "Edit guardrail for Process Refund", linkPath: "/config" },
+        { text: "WISMO resolution rate is at 92%, the highest across all intents. Consider documenting this rule pattern as a template for other intents.", linkLabel: "View WISMO rule", linkPath: "/playbook" },
+        { text: "3 customers rated CSAT low citing overly formal tone on live chat. Consider switching to friendly tone for the chat channel.", linkLabel: "Edit Rep tone settings", linkPath: "/config" },
+      ],
+    },
   },
   {
     id: "t-3",

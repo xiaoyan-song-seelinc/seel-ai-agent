@@ -53,6 +53,12 @@ const aiTabs = [
   { label: "Performance", href: "/performance" },
 ];
 
+/* Performance sub-tabs (second-level nav) */
+const perfSubTabs = [
+  { label: "Dashboard", href: "/performance" },
+  { label: "Conversations", href: "/performance/conversations" },
+];
+
 function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
   const Icon = item.icon;
 
@@ -117,6 +123,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     if (location.startsWith("/playbook")) return "/playbook";
     if (location.startsWith("/performance")) return "/performance";
     return "/communication"; // default (includes "/" and "/communication")
+  })();
+
+  const isPerformance = location.startsWith("/performance");
+  const activePerfTab = (() => {
+    if (location === "/performance/conversations") return "/performance/conversations";
+    return "/performance";
   })();
 
   return (
@@ -190,31 +202,58 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* AI Support module header with internal tabs */}
         {isAISupport && (
-          <div className="shrink-0 bg-white border-b border-border">
-            <div className="px-6 pt-4 pb-0">
-              <h1 className="text-[18px] font-bold text-foreground leading-tight">AI Support</h1>
-              {/* Tab bar */}
-              <div className="flex items-center gap-1 mt-3 -mb-px">
-                {aiTabs.map((tab) => (
-                  <Link key={tab.href} href={tab.href}>
-                    <button
-                      className={cn(
-                        "px-3 pb-2.5 text-[13px] font-medium transition-colors relative",
-                        activeAITab === tab.href
-                          ? "text-primary"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      {tab.label}
-                      {activeAITab === tab.href && (
-                        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary rounded-full" />
-                      )}
-                    </button>
-                  </Link>
-                ))}
+          <>
+            <div className="shrink-0 bg-white border-b border-border">
+              <div className="px-6 pt-4 pb-0">
+                <h1 className="text-[18px] font-bold text-foreground leading-tight">AI Support</h1>
+                {/* Tab bar */}
+                <div className="flex items-center gap-1 mt-3 -mb-px">
+                  {aiTabs.map((tab) => (
+                    <Link key={tab.href} href={tab.href}>
+                      <button
+                        className={cn(
+                          "px-3 pb-2.5 text-[13px] font-medium transition-colors relative",
+                          activeAITab === tab.href
+                            ? "text-primary"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {tab.label}
+                        {activeAITab === tab.href && (
+                          <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary rounded-full" />
+                        )}
+                      </button>
+                    </Link>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
+
+            {/* Performance second-level nav */}
+            {isPerformance && (
+              <div className="shrink-0 bg-white border-b border-border">
+                <div className="px-6 flex items-center gap-1 -mb-px">
+                  {perfSubTabs.map((tab) => (
+                    <Link key={tab.href} href={tab.href}>
+                      <button
+                        className={cn(
+                          "px-3 py-2 text-[12px] font-medium transition-colors relative",
+                          activePerfTab === tab.href
+                            ? "text-foreground"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {tab.label}
+                        {activePerfTab === tab.href && (
+                          <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-foreground rounded-full" />
+                        )}
+                      </button>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Page content */}

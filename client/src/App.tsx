@@ -20,6 +20,7 @@ function Router() {
       <Route path="/communication" component={CommunicationPage} />
       <Route path="/playbook" component={PlaybookPage} />
       <Route path="/performance" component={Performance} />
+      <Route path="/performance/conversations" component={Performance} />
 
       {/* Unified Agent Config page */}
       <Route path="/config" component={AgentPage} />

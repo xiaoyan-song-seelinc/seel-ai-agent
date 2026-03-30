@@ -4,17 +4,19 @@
    Conversation Log as horizontal table with turn-based reasoning detail
    ──────────────────────────────────────────────────────────── */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import {
   PERFORMANCE_SUMMARY,
   DAILY_METRICS,
   INTENT_METRICS,
-  WEEKLY_SUMMARY,
   CONVERSATION_LOGS,
   type ConversationLog,
   type ReasoningTurn,
 } from "@/lib/mock-data";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -63,9 +65,7 @@ function formatDuration(s: number) {
   return sec > 0 ? `${m}m ${sec}s` : `${m}m`;
 }
 
-function renderTemplate(tpl: string, vars: Record<string, unknown>) {
-  return tpl.replace(/\{\{(\w+)\}\}/g, (_, key) => String(vars[key] ?? `{{${key}}}`));
-}
+
 
 function sentimentColor(s: string): string {
   const map: Record<string, string> = {
@@ -375,7 +375,8 @@ function LogDetailSheet({ log, open, onClose }: { log: ConversationLog | null; o
 export default function Performance() {
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
   const [modeFilter, setModeFilter] = useState<ModeFilter>("production");
-  const [subTab, setSubTab] = useState<SubTab>("dashboard");
+  const [location] = useLocation();
+  const subTab: SubTab = location === "/performance/conversations" ? "conversations" : "dashboard";
   const [outcomeFilter, setOutcomeFilter] = useState<OutcomeFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<SortField>("time");
@@ -383,6 +384,7 @@ export default function Performance() {
   const [selectedLog, setSelectedLog] = useState<ConversationLog | null>(null);
   const [csatDismissed, setCsatDismissed] = useState(false);
   const [, navigate] = useLocation();
+  // No longer need local subTab state — derived from URL
 
   const csatAvailable = true; // toggle to false to demo CSAT warning
 
@@ -456,7 +458,6 @@ export default function Performance() {
   };
 
   const maxVolume = Math.max(...INTENT_METRICS.map((m) => m.volume));
-  const summaryVars = WEEKLY_SUMMARY.variables;
 
   return (
     <ScrollArea className="h-full">
@@ -464,36 +465,33 @@ export default function Performance() {
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h1 className="text-[16px] font-semibold text-foreground">Performance</h1>
-            <p className="text-[12px] text-muted-foreground mt-0.5">Monitor your AI Rep's performance and review conversations.</p>
+            <h1 className="text-[16px] font-semibold text-foreground">{subTab === "dashboard" ? "Dashboard" : "Conversations"}</h1>
+            <p className="text-[12px] text-muted-foreground mt-0.5">{subTab === "dashboard" ? "Monitor your AI Rep's performance metrics." : "Review all AI-handled conversations."}</p>
           </div>
           <div className="flex items-center gap-3">
-            {/* Mode filter */}
-            <div className="flex gap-1 bg-muted/50 rounded-lg p-0.5">
-              {(["production", "training", "all"] as ModeFilter[]).map((m) => (
-                <button key={m} onClick={() => setModeFilter(m)} className={cn("px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors capitalize", modeFilter === m ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
-                  {m === "all" ? "All" : m}
-                </button>
-              ))}
-            </div>
-            {/* Time range */}
-            <div className="flex gap-1 bg-muted/50 rounded-lg p-0.5">
-              {(["7d", "14d", "30d"] as TimeRange[]).map((range) => (
-                <button key={range} onClick={() => setTimeRange(range)} className={cn("px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors", timeRange === range ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
-                  {range}
-                </button>
-              ))}
-            </div>
+            {/* Mode filter — dropdown */}
+            <Select value={modeFilter} onValueChange={(v) => setModeFilter(v as ModeFilter)}>
+              <SelectTrigger className="h-8 w-[130px] text-[11px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="production">Production</SelectItem>
+                <SelectItem value="training">Training</SelectItem>
+                <SelectItem value="all">All Modes</SelectItem>
+              </SelectContent>
+            </Select>
+            {/* Time range — dropdown */}
+            <Select value={timeRange} onValueChange={(v) => setTimeRange(v as TimeRange)}>
+              <SelectTrigger className="h-8 w-[110px] text-[11px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7d">Last 7 days</SelectItem>
+                <SelectItem value="14d">Last 14 days</SelectItem>
+                <SelectItem value="30d">Last 30 days</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        </div>
-
-        {/* Sub-tabs */}
-        <div className="flex gap-1 bg-muted/50 rounded-lg p-0.5 w-fit mb-5">
-          {(["dashboard", "conversations"] as SubTab[]).map((t) => (
-            <button key={t} onClick={() => setSubTab(t)} className={cn("px-4 py-1.5 rounded-md text-[12px] font-medium transition-colors capitalize", subTab === t ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
-              {t}
-            </button>
-          ))}
         </div>
 
         {/* ═══ Dashboard ═══ */}
@@ -657,46 +655,6 @@ export default function Performance() {
               </CardContent>
             </Card>
 
-            {/* Weekly Summary */}
-            <Card className="mb-6">
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-[13px]">Weekly Summary & Recommendations</CardTitle>
-                  <Badge variant="outline" className="text-[10px] font-normal">{WEEKLY_SUMMARY.weekLabel}</Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-muted/40 rounded-lg p-4 mb-4 font-mono text-[11px] leading-relaxed text-foreground whitespace-pre-wrap">
-                  {renderTemplate(WEEKLY_SUMMARY.summaryTemplate, summaryVars as unknown as Record<string, unknown>)}
-                </div>
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
-                    <p className="text-[10px] font-medium text-emerald-700 uppercase tracking-wider mb-1">Top Performing Intent</p>
-                    <p className="text-[13px] font-semibold text-emerald-800">{summaryVars.top_intent}</p>
-                    <p className="text-[11px] text-emerald-600 mt-0.5">{summaryVars.top_intent_volume} tickets, {summaryVars.top_intent_resolution} resolution rate</p>
-                  </div>
-                  <div className="rounded-lg border border-red-200 bg-red-50/50 p-3">
-                    <p className="text-[10px] font-medium text-red-700 uppercase tracking-wider mb-1">Needs Attention</p>
-                    <p className="text-[13px] font-semibold text-red-800">{summaryVars.worst_intent}</p>
-                    <p className="text-[11px] text-red-600 mt-0.5">{summaryVars.worst_intent_volume} tickets, only {summaryVars.worst_intent_resolution} resolution</p>
-                  </div>
-                </div>
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Recommendations</p>
-                <div className="space-y-2">
-                  {WEEKLY_SUMMARY.recommendations.map((rec) => (
-                    <div key={rec.id} className="flex items-start gap-3 rounded-lg border border-border/50 p-3 hover:bg-muted/20 transition-colors">
-                      <ChevronRight className="w-3.5 h-3.5 text-blue-500 mt-0.5 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[12px] text-foreground leading-relaxed">{rec.text}</p>
-                        <button onClick={() => navigate(rec.linkPath)} className="text-[11px] text-primary hover:underline mt-1 flex items-center gap-0.5">
-                          {rec.linkLabel} <ExternalLink className="w-2.5 h-2.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
           </>
         )}
 

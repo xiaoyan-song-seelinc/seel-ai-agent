@@ -144,11 +144,64 @@ function TopicCard({
           )}
         </div>
 
-        {isPerfSummary && firstMsg && (
-          <div className="rounded-xl rounded-tl-sm bg-muted/40 px-3.5 py-2.5 mb-1.5">
-            <p className="text-[14px] font-bold text-foreground mb-2">Weekly Performance Summary</p>
-            <div className="text-[12px] leading-relaxed text-foreground whitespace-pre-wrap">
-              {renderMd(firstMsg.content)}
+        {isPerfSummary && topic.weeklySummary && (
+          <div className="rounded-xl rounded-tl-sm border border-border bg-white overflow-hidden mb-1.5 shadow-sm">
+            {/* Header */}
+            <div className="px-4 py-3 bg-gradient-to-r from-slate-50 to-blue-50/30 border-b border-border/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-blue-600" />
+                  <span className="text-[13px] font-bold text-foreground">Weekly Performance Summary</span>
+                </div>
+                <span className="text-[10px] text-muted-foreground bg-white/80 px-2 py-0.5 rounded-full border border-border/50">{topic.weeklySummary.periodLabel}</span>
+              </div>
+            </div>
+            {/* KPI Grid */}
+            <div className="px-4 py-3 border-b border-border/30">
+              <div className="grid grid-cols-5 gap-2">
+                {topic.weeklySummary.kpis.map((kpi) => (
+                  <div key={kpi.label} className="text-center p-2 rounded-lg bg-muted/30">
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-0.5">{kpi.label}</p>
+                    <p className="text-[15px] font-bold text-foreground">{kpi.value}</p>
+                    <p className={cn("text-[10px] font-medium", kpi.positive ? "text-emerald-600" : "text-red-500")}>{kpi.delta}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Intent Highlights */}
+            <div className="px-4 py-3 border-b border-border/30">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-2.5">
+                  <p className="text-[9px] font-semibold text-emerald-700 uppercase tracking-wider mb-0.5">Top Intent</p>
+                  <p className="text-[12px] font-semibold text-emerald-800">{topic.weeklySummary.topIntent.name}</p>
+                  <p className="text-[10px] text-emerald-600">{topic.weeklySummary.topIntent.volume} tickets · {topic.weeklySummary.topIntent.resolution} resolution</p>
+                </div>
+                <div className="rounded-lg border border-red-200 bg-red-50/50 p-2.5">
+                  <p className="text-[9px] font-semibold text-red-700 uppercase tracking-wider mb-0.5">Needs Attention</p>
+                  <p className="text-[12px] font-semibold text-red-800">{topic.weeklySummary.worstIntent.name}</p>
+                  <p className="text-[10px] text-red-600">{topic.weeklySummary.worstIntent.volume} tickets · {topic.weeklySummary.worstIntent.resolution} resolution</p>
+                </div>
+              </div>
+            </div>
+            {/* Recommendations */}
+            <div className="px-4 py-3">
+              <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Recommendations</p>
+              <div className="space-y-2">
+                {topic.weeklySummary.recommendations.map((rec, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <ChevronRight className="w-3 h-3 text-blue-500 mt-0.5 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] text-foreground leading-relaxed">{rec.text}</p>
+                      <button onClick={() => onAction(topic.id, `navigate:${rec.linkPath}`)} className="text-[10px] text-primary hover:underline mt-0.5 flex items-center gap-0.5">
+                        {rec.linkLabel} <ExternalLink className="w-2.5 h-2.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => onAction(topic.id, "navigate:/performance")} className="mt-3 w-full text-center text-[11px] text-primary hover:underline py-1.5 rounded-lg hover:bg-blue-50/50 transition-colors">
+                View full performance dashboard →
+              </button>
             </div>
           </div>
         )}
@@ -1905,6 +1958,11 @@ export default function CommunicationPage() {
   );
 
   const handleTopicAction = useCallback((topicId: string, action: string) => {
+    if (action.startsWith("navigate:")) {
+      const path = action.replace("navigate:", "");
+      navigate(path);
+      return;
+    }
     if (action === "reply") {
       setThreadTopicId(topicId);
       return;
