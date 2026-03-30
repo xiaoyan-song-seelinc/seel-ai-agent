@@ -152,7 +152,7 @@ export interface DailyMetric {
   date: string;
   autoResolutionRate: number;
   csat: number;
-  escalationRate: number;
+  intentChangedRate: number;
   responseTime: number;
   volume: number;
 }
@@ -162,8 +162,7 @@ export interface IntentMetric {
   volume: number;
   resolutionRate: number;
   csat: number;
-  avgTurns: number;
-  escalationRate: number;
+  intentChangedRate: number;
 }
 
 export interface ActionableItem {
@@ -681,7 +680,7 @@ export const TOPICS: Topic[] = [
 export const PERFORMANCE_SUMMARY: PerformanceMetric[] = [
   { label: "Auto-Resolution Rate", value: 68, unit: "%", trend: 4, trendLabel: "vs last week" },
   { label: "CSAT Score", value: 4.3, unit: "/5", trend: 0.2, trendLabel: "vs last week" },
-  { label: "Escalation Rate", value: 24, unit: "%", trend: -4, trendLabel: "vs last week" },
+  { label: "Intent Changed", value: 12, unit: "%", trend: -3, trendLabel: "vs last week" },
   { label: "First Response Time", value: 45, unit: "sec", trend: -12, trendLabel: "vs last week" },
 ];
 
@@ -695,27 +694,237 @@ export const DAILY_METRICS: DailyMetric[] = Array.from({ length: 30 }, (_, i) =>
     date: date.toISOString().split("T")[0],
     autoResolutionRate: Math.min(75, 55 + i * 0.5 + (Math.random() * 6 - 3)),
     csat: Math.min(4.8, 3.9 + i * 0.015 + (Math.random() * 0.3 - 0.15)),
-    escalationRate: Math.max(18, 35 - i * 0.5 + (Math.random() * 6 - 3)),
+    intentChangedRate: Math.max(5, 20 - i * 0.3 + (Math.random() * 4 - 2)),
     responseTime: Math.max(30, 90 - i * 1.5 + (Math.random() * 15 - 7)),
     volume: Math.round(baseVolume * growthFactor + (Math.random() * 10 - 5)),
   };
 });
 
 export const INTENT_METRICS: IntentMetric[] = [
-  { intent: "Where Is My Order", volume: 156, resolutionRate: 89, csat: 4.5, avgTurns: 2.1, escalationRate: 8 },
-  { intent: "Refunds", volume: 98, resolutionRate: 62, csat: 4.0, avgTurns: 3.4, escalationRate: 32 },
-  { intent: "Cancellations", volume: 67, resolutionRate: 78, csat: 4.2, avgTurns: 2.8, escalationRate: 15 },
-  { intent: "Product Issues", volume: 52, resolutionRate: 55, csat: 3.8, avgTurns: 4.1, escalationRate: 42 },
-  { intent: "Shipping", volume: 45, resolutionRate: 71, csat: 4.1, avgTurns: 2.5, escalationRate: 22 },
-  { intent: "Returns", volume: 38, resolutionRate: 58, csat: 3.9, avgTurns: 3.8, escalationRate: 35 },
-  { intent: "Pre-sale Questions", volume: 31, resolutionRate: 82, csat: 4.4, avgTurns: 2.2, escalationRate: 12 },
-  { intent: "Account Issues", volume: 18, resolutionRate: 44, csat: 3.6, avgTurns: 4.5, escalationRate: 48 },
+  { intent: "Where Is My Order", volume: 156, resolutionRate: 89, csat: 4.5, intentChangedRate: 5 },
+  { intent: "Refunds", volume: 98, resolutionRate: 62, csat: 4.0, intentChangedRate: 18 },
+  { intent: "Cancellations", volume: 67, resolutionRate: 78, csat: 4.2, intentChangedRate: 12 },
+  { intent: "Product Issues", volume: 52, resolutionRate: 55, csat: 3.8, intentChangedRate: 22 },
+  { intent: "Shipping", volume: 45, resolutionRate: 71, csat: 4.1, intentChangedRate: 9 },
+  { intent: "Returns", volume: 38, resolutionRate: 58, csat: 3.9, intentChangedRate: 15 },
+  { intent: "Pre-sale Questions", volume: 31, resolutionRate: 82, csat: 4.4, intentChangedRate: 7 },
+  { intent: "Account Issues", volume: 18, resolutionRate: 44, csat: 3.6, intentChangedRate: 28 },
 ];
 
 export const ACTIONABLE_ITEMS: ActionableItem[] = [
-  { id: "ai-1", title: "High escalation rate on Product Issues", description: "Product damage claims have a 42% escalation rate. Main gap: unclear rules on when to offer replacement vs refund for items near the $80 threshold.", impact: "Reducing to 25% would auto-resolve ~9 more tickets/week", linkedTopicId: "t-3" },
-  { id: "ai-2", title: "International returns need rules", description: "5 international return tickets escalated this week with no clear policy. All were handled similarly by your team.", impact: "Adding this rule could auto-resolve ~5 tickets/week", linkedTopicId: "t-8" },
-  { id: "ai-3", title: "Tone adjustment for live chat", description: "3 customers rated CSAT low citing 'too formal' tone on live chat. Consider switching to 'friendly' tone for chat channel.", impact: "Could improve chat CSAT by 0.2-0.3 points" },
+  { id: "ai-1", title: "High escalation rate on Product Issues", description: "Product damage claims have a {{escalation_rate_product_issues}}% escalation rate. Main gap: unclear rules on when to offer replacement vs refund for items near the $80 threshold.", impact: "Reducing to 25% would auto-resolve ~{{saved_tickets_per_week}} more tickets/week", linkedTopicId: "t-3" },
+  { id: "ai-2", title: "International returns need rules", description: "{{intl_return_count}} international return tickets escalated this week with no clear policy. All were handled similarly by your team.", impact: "Adding this rule could auto-resolve ~{{intl_saved_tickets}} tickets/week", linkedTopicId: "t-8" },
+  { id: "ai-3", title: "Tone adjustment for live chat", description: "{{low_csat_chat_count}} customers rated CSAT low citing 'too formal' tone on live chat. Consider switching to 'friendly' tone for chat channel.", impact: "Could improve chat CSAT by {{csat_improvement_range}} points" },
+];
+
+// ── Conversation Log ──────────────────────────────────────────
+
+export type ConversationLogMode = "production" | "training";
+export type ConversationOutcome = "resolved" | "escalated" | "pending";
+
+export interface ReasoningStep {
+  type: "classify" | "rule_match" | "action_check" | "decision" | "gap_signal" | "execute_action" | "generate_reply";
+  label: string;
+  detail: string;
+  timestamp: string;
+}
+
+export interface ConversationLog {
+  id: string;
+  ticketId: string;
+  zendeskTicketId: string;
+  zendeskUrl: string;
+  subject: string;
+  customerName: string;
+  initialIntent: string;
+  finalIntent: string;
+  intentChanged: boolean;
+  outcome: ConversationOutcome;
+  mode: ConversationLogMode;
+  confidence: number;
+  ruleMatched: string | null;
+  actionsTaken: string[];
+  totalTurns: number;
+  duration: number;
+  csat?: number;
+  createdAt: string;
+  resolvedAt?: string;
+  reasoning: ReasoningStep[];
+  messages: { role: "customer" | "agent" | "internal"; text: string; timestamp: string }[];
+  flagged: boolean;
+  flagNote?: string;
+}
+
+export const WEEKLY_SUMMARY = {
+  weekLabel: "Mar 23 \u2013 Mar 29, 2026",
+  variables: {
+    total_tickets: 505,
+    auto_resolved: 343,
+    auto_resolution_rate: 68,
+    auto_resolution_rate_delta: "+4%",
+    intent_changed_rate: 12,
+    intent_changed_rate_delta: "-3%",
+    avg_first_response: "45s",
+    avg_first_response_delta: "-12s",
+    csat: 4.3,
+    csat_delta: "+0.2",
+    top_intent: "Where Is My Order",
+    top_intent_volume: 156,
+    worst_intent: "Account Issues",
+    worst_intent_resolution: "44%",
+    escalation_rate_product_issues: 42,
+    saved_tickets_per_week: 9,
+    intl_return_count: 5,
+    intl_saved_tickets: 5,
+    low_csat_chat_count: 3,
+    csat_improvement_range: "0.2-0.3",
+  },
+  summaryTemplate: `## Weekly Performance Summary\n\n\`\`\`\nPeriod:          {{week_label}}\nTotal Tickets:   {{total_tickets}}\nAuto-Resolved:   {{auto_resolved}} ({{auto_resolution_rate}}%, {{auto_resolution_rate_delta}} vs prev week)\nIntent Changed:  {{intent_changed_rate}}% ({{intent_changed_rate_delta}} vs prev week)\nFirst Response:  {{avg_first_response}} ({{avg_first_response_delta}} vs prev week)\nCSAT:            {{csat}}/5 ({{csat_delta}} vs prev week)\n\`\`\`\n\n### Top Performing Intent\n**{{top_intent}}** — {{top_intent_volume}} tickets, highest resolution rate.\n\n### Needs Attention\n**{{worst_intent}}** — only {{worst_intent_resolution}} resolution rate.`,
+  recommendations: [
+    { id: "rec-1", text: "Product Issues 的升级率为 {{escalation_rate_product_issues}}%。建议检查相关规则并补充 $80 阈值附近的处理逻辑。", linkLabel: "查看 Product Issues 规则", linkPath: "/playbook" },
+    { id: "rec-2", text: "本周有 {{intl_return_count}} 张国际退货工单被升级，目前缺少对应规则。", linkLabel: "查看相关对话", linkPath: "/communication" },
+    { id: "rec-3", text: "{{low_csat_chat_count}} 位客户在 live chat 中给出低 CSAT，原因是语气过于正式。建议切换为 friendly 语气。", linkLabel: "修改 Rep 语气设置", linkPath: "/communication" },
+  ],
+};
+
+export const CONVERSATION_LOGS: ConversationLog[] = [
+  {
+    id: "cl-1", ticketId: "t-4412", zendeskTicketId: "4412",
+    zendeskUrl: "https://coastalliving.zendesk.com/agent/tickets/4412",
+    subject: "Damaged ceramic vase — replacement request", customerName: "Sarah Johnson",
+    initialIntent: "Damage Claim", finalIntent: "Damage Claim", intentChanged: false,
+    outcome: "resolved", mode: "production", confidence: 0.94,
+    ruleMatched: "Damage claims under $80 — auto-replace",
+    actionsTaken: ["Send Replacement"], totalTurns: 3, duration: 124, csat: 5,
+    createdAt: "2026-03-28T14:22:00Z", resolvedAt: "2026-03-28T14:24:04Z",
+    reasoning: [
+      { type: "classify", label: "Intent Classification", detail: "Detected intent: Damage Claim (confidence: 0.94). Customer reports cracked ceramic vase, requests replacement.", timestamp: "2026-03-28T14:22:01Z" },
+      { type: "rule_match", label: "Rule Matching", detail: "Matched Rule: 'Damage claims under $80 — auto-replace'. Item value $34.99 < $80 threshold. No photo required.", timestamp: "2026-03-28T14:22:01Z" },
+      { type: "action_check", label: "Permission Check", detail: "Action 'Send Replacement' = autonomous. Guardrail check: first exchange for this customer = OK.", timestamp: "2026-03-28T14:22:02Z" },
+      { type: "decision", label: "Decision", detail: "All checks passed. Proceeding with direct reply + replacement action.", timestamp: "2026-03-28T14:22:02Z" },
+      { type: "execute_action", label: "Execute Action", detail: "Called Shopify API: create_exchange(order_id=CLV-2026-4412, item=ceramic-vase-blue, reason=damaged). Exchange created successfully.", timestamp: "2026-03-28T14:22:03Z" },
+      { type: "generate_reply", label: "Generate Reply", detail: "Generated friendly reply acknowledging damage, confirming replacement initiated, no return needed.", timestamp: "2026-03-28T14:22:04Z" },
+    ],
+    messages: [
+      { role: "customer", text: "I received my ceramic vase and it's cracked. I'd like a replacement.", timestamp: "2026-03-28T14:22:00Z" },
+      { role: "agent", text: "Hi Sarah, I'm sorry to hear your ceramic vase arrived cracked! I've gone ahead and initiated a replacement — you should receive a shipping confirmation within 24 hours. No need to return the damaged item.", timestamp: "2026-03-28T14:22:04Z" },
+      { role: "customer", text: "That was fast! Thank you so much.", timestamp: "2026-03-28T14:23:30Z" },
+    ],
+    flagged: false,
+  },
+  {
+    id: "cl-2", ticketId: "t-4501", zendeskTicketId: "4501",
+    zendeskUrl: "https://coastalliving.zendesk.com/agent/tickets/4501",
+    subject: "Refund to PayPal instead of credit card", customerName: "Mike Torres",
+    initialIntent: "Refund Request", finalIntent: "Cross-Payment Refund", intentChanged: true,
+    outcome: "escalated", mode: "production", confidence: 0.72,
+    ruleMatched: null, actionsTaken: [], totalTurns: 2, duration: 45,
+    createdAt: "2026-03-28T16:10:00Z",
+    reasoning: [
+      { type: "classify", label: "Intent Classification", detail: "Initial intent: Refund Request (confidence: 0.72). Customer wants refund to different payment method (PayPal).", timestamp: "2026-03-28T16:10:01Z" },
+      { type: "classify", label: "Intent Reclassification", detail: "Reclassified to: Cross-Payment Refund. No standard refund rule covers cross-payment-method transfers.", timestamp: "2026-03-28T16:10:01Z" },
+      { type: "rule_match", label: "Rule Matching", detail: "No rule found for cross-payment-method refunds. 'Issue Refund' guardrail specifies 'same payment method'.", timestamp: "2026-03-28T16:10:02Z" },
+      { type: "decision", label: "Decision", detail: "Escalating to human agent. Sending gap signal to Orchestrator for Team Lead review.", timestamp: "2026-03-28T16:10:03Z" },
+      { type: "gap_signal", label: "Gap Signal Sent", detail: '{"type":"gap_signal","gap_type":"no_rule","description":"No rule for cross-payment refunds"}', timestamp: "2026-03-28T16:10:03Z" },
+    ],
+    messages: [
+      { role: "customer", text: "Can you refund to my PayPal instead of the original credit card?", timestamp: "2026-03-28T16:10:00Z" },
+      { role: "internal", text: "[ESCALATION] No rule covers cross-payment-method refunds. Escalating to human agent.", timestamp: "2026-03-28T16:10:03Z" },
+    ],
+    flagged: false,
+  },
+  {
+    id: "cl-3", ticketId: "t-4523", zendeskTicketId: "4523",
+    zendeskUrl: "https://coastalliving.zendesk.com/agent/tickets/4523",
+    subject: "Where is my order? Tracking shows delivered but not received", customerName: "Emily Davis",
+    initialIntent: "Where Is My Order", finalIntent: "Where Is My Order", intentChanged: false,
+    outcome: "resolved", mode: "production", confidence: 0.97,
+    ruleMatched: "WISMO — tracking shows delivered",
+    actionsTaken: ["Get Order Details", "Check Tracking"], totalTurns: 4, duration: 210, csat: 4,
+    createdAt: "2026-03-27T09:15:00Z", resolvedAt: "2026-03-27T09:18:30Z",
+    reasoning: [
+      { type: "classify", label: "Intent Classification", detail: "Detected intent: Where Is My Order (confidence: 0.97).", timestamp: "2026-03-27T09:15:01Z" },
+      { type: "rule_match", label: "Rule Matching", detail: "Matched Rule: 'WISMO — tracking shows delivered'. Check tracking, advise wait 48h.", timestamp: "2026-03-27T09:15:01Z" },
+      { type: "execute_action", label: "Execute Action", detail: "Called Shopify API: get_order(CLV-2026-4523). Order: Coastal Throw Blanket, $65.", timestamp: "2026-03-27T09:15:03Z" },
+      { type: "execute_action", label: "Execute Action", detail: "Called Shipping API: check_tracking(9400111899223033005). Status: Delivered, signed by neighbor.", timestamp: "2026-03-27T09:15:04Z" },
+      { type: "generate_reply", label: "Generate Reply", detail: "Generated reply with tracking details and suggestion to check with neighbor.", timestamp: "2026-03-27T09:15:05Z" },
+    ],
+    messages: [
+      { role: "customer", text: "Hi, my order CLV-2026-4523 shows delivered but I never got it.", timestamp: "2026-03-27T09:15:00Z" },
+      { role: "agent", text: "Hi Emily! I checked your tracking — USPS shows it was delivered yesterday and signed for by a neighbor. Could you check with them?", timestamp: "2026-03-27T09:15:05Z" },
+      { role: "customer", text: "Oh! Let me check with my neighbor. Thanks!", timestamp: "2026-03-27T09:16:30Z" },
+      { role: "customer", text: "Found it! My neighbor had it. Thanks!", timestamp: "2026-03-27T09:18:30Z" },
+    ],
+    flagged: false,
+  },
+  {
+    id: "cl-4", ticketId: "t-4530", zendeskTicketId: "4530",
+    zendeskUrl: "https://coastalliving.zendesk.com/agent/tickets/4530",
+    subject: "Cancel my subscription", customerName: "James Wilson",
+    initialIntent: "Cancellation", finalIntent: "Retention — Downgrade", intentChanged: true,
+    outcome: "resolved", mode: "training", confidence: 0.88,
+    ruleMatched: "Cancellation — offer alternatives first",
+    actionsTaken: [], totalTurns: 5, duration: 340, csat: 4,
+    createdAt: "2026-03-27T11:30:00Z", resolvedAt: "2026-03-27T11:35:40Z",
+    reasoning: [
+      { type: "classify", label: "Intent Classification", detail: "Detected intent: Cancellation (confidence: 0.88).", timestamp: "2026-03-27T11:30:01Z" },
+      { type: "rule_match", label: "Rule Matching", detail: "Matched Rule: 'Cancellation — offer alternatives first'. Must offer downgrade/pause.", timestamp: "2026-03-27T11:30:01Z" },
+      { type: "decision", label: "Decision", detail: "Training mode: generating internal note with suggested reply.", timestamp: "2026-03-27T11:30:02Z" },
+      { type: "generate_reply", label: "Generate Reply", detail: "[INTERNAL NOTE] Suggested: offer 50% discount or downgrade to Basic plan.", timestamp: "2026-03-27T11:30:03Z" },
+      { type: "classify", label: "Intent Reclassification", detail: "Customer accepted downgrade. Reclassified to: Retention — Downgrade.", timestamp: "2026-03-27T11:33:00Z" },
+    ],
+    messages: [
+      { role: "customer", text: "I want to cancel my subscription. It's too expensive.", timestamp: "2026-03-27T11:30:00Z" },
+      { role: "internal", text: "[INTERNAL NOTE] Suggested reply: offer 50% off for 3 months or downgrade to Basic plan at $9.99/mo.", timestamp: "2026-03-27T11:30:03Z" },
+      { role: "agent", text: "I understand, James. Before we process the cancellation, I'd like to offer: (1) 50% off for 3 months, or (2) downgrade to Basic at $9.99/mo.", timestamp: "2026-03-27T11:31:00Z" },
+      { role: "customer", text: "Actually the basic plan sounds good. Let's do that.", timestamp: "2026-03-27T11:33:00Z" },
+      { role: "agent", text: "Great choice! I've switched you to the Basic plan at $9.99/mo. The change takes effect on your next billing date.", timestamp: "2026-03-27T11:33:30Z" },
+    ],
+    flagged: false,
+  },
+  {
+    id: "cl-5", ticketId: "t-4593", zendeskTicketId: "4593",
+    zendeskUrl: "https://coastalliving.zendesk.com/agent/tickets/4593",
+    subject: "URGENT: Want to speak to a manager", customerName: "Robert Chen",
+    initialIntent: "Delivery Complaint", finalIntent: "Manager Request", intentChanged: true,
+    outcome: "escalated", mode: "production", confidence: 0.65,
+    ruleMatched: null, actionsTaken: ["Get Order Details"], totalTurns: 3, duration: 90,
+    createdAt: "2026-03-26T08:00:00Z",
+    reasoning: [
+      { type: "classify", label: "Intent Classification", detail: "Initial intent: Delivery Complaint (confidence: 0.65). 3 failed delivery attempts.", timestamp: "2026-03-26T08:00:01Z" },
+      { type: "execute_action", label: "Execute Action", detail: "Called Shopify API: get_order(CLV-2026-4593). Order: Coastal Oak Bookshelf, $450.", timestamp: "2026-03-26T08:00:02Z" },
+      { type: "classify", label: "Intent Reclassification", detail: "Customer explicitly requested manager. Reclassified to: Manager Request.", timestamp: "2026-03-26T08:00:30Z" },
+      { type: "decision", label: "Decision", detail: "Escalating immediately. High-value order ($450), frustrated customer, explicit manager request.", timestamp: "2026-03-26T08:00:31Z" },
+      { type: "gap_signal", label: "Gap Signal Sent", detail: '{"type":"gap_signal","gap_type":"no_rule","description":"No rule for manager requests with repeated delivery failures"}', timestamp: "2026-03-26T08:00:32Z" },
+    ],
+    messages: [
+      { role: "customer", text: "This is ridiculous! 3 times the driver said I wasn't home but I WAS. I want to speak to a manager NOW.", timestamp: "2026-03-26T08:00:00Z" },
+      { role: "internal", text: "[ESCALATION] Customer explicitly requested manager. High-value order ($450), 3 failed deliveries.", timestamp: "2026-03-26T08:00:32Z" },
+      { role: "agent", text: "I completely understand your frustration, Robert. I'm escalating this to a senior team member right away.", timestamp: "2026-03-26T08:00:35Z" },
+    ],
+    flagged: true, flagNote: "Customer very upset — 3 failed deliveries on $450 order.",
+  },
+  {
+    id: "cl-6", ticketId: "t-4540", zendeskTicketId: "4540",
+    zendeskUrl: "https://coastalliving.zendesk.com/agent/tickets/4540",
+    subject: "Do you ship to Hawaii?", customerName: "Lisa Nakamura",
+    initialIntent: "Pre-sale Question", finalIntent: "Pre-sale Question", intentChanged: false,
+    outcome: "resolved", mode: "training", confidence: 0.96,
+    ruleMatched: "Shipping inquiry — check knowledge base",
+    actionsTaken: [], totalTurns: 2, duration: 60, csat: 5,
+    createdAt: "2026-03-27T15:00:00Z", resolvedAt: "2026-03-27T15:01:00Z",
+    reasoning: [
+      { type: "classify", label: "Intent Classification", detail: "Detected intent: Pre-sale Question (confidence: 0.96).", timestamp: "2026-03-27T15:00:01Z" },
+      { type: "rule_match", label: "Rule Matching", detail: "Matched Rule: 'Shipping inquiry — check knowledge base'. Hawaii: $12 flat rate, 5-7 days.", timestamp: "2026-03-27T15:00:01Z" },
+      { type: "decision", label: "Decision", detail: "Training mode: generating internal note.", timestamp: "2026-03-27T15:00:02Z" },
+      { type: "generate_reply", label: "Generate Reply", detail: "[INTERNAL NOTE] Suggested: confirm Hawaii shipping at $12 flat rate.", timestamp: "2026-03-27T15:00:02Z" },
+    ],
+    messages: [
+      { role: "customer", text: "Hi! Do you ship to Hawaii? If so, how much?", timestamp: "2026-03-27T15:00:00Z" },
+      { role: "internal", text: "[INTERNAL NOTE] Suggested reply: 'Yes, we ship to all 50 US states including Hawaii! Flat rate $12, 5-7 business days.'", timestamp: "2026-03-27T15:00:02Z" },
+    ],
+    flagged: false,
+  },
 ];
 
 // ── Zendesk Sidebar Mock Data ──────────────────────────────
