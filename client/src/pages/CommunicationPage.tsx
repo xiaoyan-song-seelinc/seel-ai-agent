@@ -121,7 +121,7 @@ const TYPE_COLOR: Record<string, string> = {
   performance_summary: "text-blue-500",
   open_question: "text-violet-500",
   escalation_review: "text-red-500",
-  rule_update: "text-teal-500",
+  rule_update: "text-indigo-500",
   question: "text-amber-500",
 };
 const TYPE_BG: Record<string, string> = {
@@ -130,7 +130,7 @@ const TYPE_BG: Record<string, string> = {
   performance_summary: "bg-blue-50 text-blue-700",
   open_question: "bg-violet-50 text-violet-700",
   escalation_review: "bg-red-50 text-red-700",
-  rule_update: "bg-teal-50 text-teal-700",
+  rule_update: "bg-indigo-50 text-indigo-700",
   question: "bg-amber-50 text-amber-700",
 };
 const TYPE_LABEL: Record<string, string> = {
@@ -244,7 +244,7 @@ function TopicCard({
                 ))}
               </div>
               <button onClick={() => onAction(topic.id, "navigate:/performance")} className="mt-3 w-full text-center text-[11px] text-primary hover:underline py-1.5 rounded-lg hover:bg-blue-50/50 transition-colors">
-                View full performance dashboard →
+                View dashboard →
               </button>
             </div>
           </div>
@@ -274,7 +274,7 @@ function TopicCard({
                 />
                 <Button
                   size="sm"
-                  className="h-7 text-[10px] bg-teal-600 hover:bg-teal-700"
+                  className="h-7 text-[10px] bg-indigo-600 hover:bg-indigo-700"
                   disabled={!questionAnswer.trim()}
                   onClick={() => {
                     setQuestionAnswered(true);
@@ -418,7 +418,7 @@ function TopicCard({
                   <div key={reply.id} className="flex items-center gap-1.5 py-0.5">
                     <div className={cn(
                       "w-4 h-4 rounded-full flex items-center justify-center shrink-0",
-                      reply.sender === "ai" ? "bg-teal-100" : "bg-violet-100"
+                      reply.sender === "ai" ? "bg-teal-100" : "bg-indigo-100"
                     )}>
                       <span className="text-[7px]">
                         {reply.sender === "ai" ? "\u{1F454}" : "SC"}
@@ -441,7 +441,7 @@ function TopicCard({
           onClick={() => onOpenThread(topic.id)}
           className="mt-1.5 flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary transition-colors"
         >
-          <MessageCircle className="w-3 h-3" /> Reply to topic
+          <MessageCircle className="w-3 h-3" /> Reply
         </button>
       </div>
     </div>
@@ -483,7 +483,7 @@ function FullThreadPanel({
             <div key={msg.id} className="flex gap-2">
               <div className={cn(
                 "w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5",
-                msg.sender === "ai" ? "bg-teal-100" : "bg-violet-100"
+                msg.sender === "ai" ? "bg-teal-100" : "bg-indigo-100"
               )}>
                 <span className="text-[9px]">
                   {msg.sender === "ai" ? "\u{1F454}" : "SC"}
@@ -691,27 +691,19 @@ function SetupTab({
           {/* ── Step 1: Welcome ── */}
           <AlexBubble>
             <p className="text-[12px] leading-relaxed text-foreground">
-              Hi, I'm Alex — your AI team lead.
-            </p>
-            <p className="text-[12px] leading-relaxed text-foreground mt-2">
-              I'll help you set up your first AI support rep. Here's what we'll do:
+              I'm Alex, your AI team lead. Let's set up your AI support rep:
             </p>
             <ol className="text-[12px] leading-relaxed text-foreground mt-2 list-decimal list-inside space-y-0.5">
-              <li>Connect your tools (Shopify & Zendesk)</li>
-              <li>Upload your support docs so I can learn your policies</li>
-              <li>Configure your Rep's identity and permissions</li>
-              <li>Run a quick sanity check</li>
-              <li>Choose how you want your Rep to work</li>
+              <li>Connect your helpdesk</li>
+              <li>Import your policies</li>
+              <li>Configure & go live</li>
             </ol>
-            <p className="text-[12px] leading-relaxed text-foreground mt-2">
-              Let's get started.
-            </p>
           </AlexBubble>
 
           {step === "welcome" && (
             <div className="ml-9">
               <Button
-                className="h-9 px-6 text-[11px] bg-teal-600 hover:bg-teal-700 rounded-full"
+                className="h-9 px-6 text-[11px] bg-indigo-600 hover:bg-indigo-700 rounded-full"
                 onClick={() => setStep("shopify_check")}
               >
                 Let's go <ArrowRight className="w-3.5 h-3.5 ml-1" />
@@ -746,7 +738,7 @@ function SetupTab({
                       <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => toast.info("Contact your Seel point of contact for setup assistance.")}>
                         Contact Support
                       </Button>
-                      <Button size="sm" className="h-7 text-[10px] bg-teal-600 hover:bg-teal-700" onClick={() => setStep("zendesk_connect")}>
+                      <Button size="sm" className="h-7 text-[10px] bg-indigo-600 hover:bg-indigo-700" onClick={() => setStep("zendesk_connect")}>
                         Continue without order data
                       </Button>
                     </div>
@@ -836,7 +828,7 @@ function SetupTab({
             <>
               <AlexBubble>
                 <p className="text-[12px] leading-relaxed text-foreground">
-                  Now let's teach your Rep. Upload your customer service SOP documents — I'll extract rules and knowledge from them.
+                  Next, import your support policies. Upload your SOP, return policy, or FAQ docs. I'll extract actionable rules from them.
                 </p>
               </AlexBubble>
 
@@ -947,7 +939,7 @@ function SetupTab({
                       </p>
                       <Button
                         size="sm"
-                        className="mt-2 h-7 text-[10px] bg-teal-600 hover:bg-teal-700"
+                        className="mt-2 h-7 text-[10px] bg-indigo-600 hover:bg-indigo-700"
                         onClick={() => { setConflictIdx(0); setStep("conflicts"); }}
                       >
                         Review conflicts
@@ -1026,10 +1018,10 @@ function SetupTab({
               {step === "hire_ready" && (
                 <div className="ml-9">
                   <Button
-                    className="h-9 px-5 text-[11px] bg-teal-600 hover:bg-teal-700 rounded-full"
+                    className="h-9 px-5 text-[11px] bg-indigo-600 hover:bg-indigo-700 rounded-full"
                     onClick={onHireRep}
                   >
-                    Review & Hire Support Rep <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                    Configure AI Rep <ArrowRight className="w-3.5 h-3.5 ml-1" />
                   </Button>
                 </div>
               )}
@@ -1083,11 +1075,11 @@ function HireRepDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[720px] p-0 overflow-hidden">
-        <div className="bg-teal-600 px-6 py-4">
+        <div className="bg-indigo-600 px-6 py-4">
           <DialogHeader>
-            <DialogTitle className="text-white text-[16px]">Hire Support Rep</DialogTitle>
-            <DialogDescription className="text-teal-100 text-[12px]">
-              Configure your Rep's identity and permissions.
+            <DialogTitle className="text-white text-[16px]">Configure AI Rep</DialogTitle>
+            <DialogDescription className="text-indigo-100 text-[12px]">
+              Set up your rep's name, tone, and permissions.
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -1117,7 +1109,7 @@ function HireRepDialog({
                       className={cn(
                         "px-3 py-1.5 rounded-full text-[10.5px] border transition-colors",
                         p.label === personality
-                          ? "border-teal-400 bg-teal-50 text-teal-700"
+                          ? "border-indigo-400 bg-indigo-50 text-indigo-700"
                           : "border-border text-foreground hover:bg-accent"
                       )}
                       onClick={() => setPersonality(p.label)}
@@ -1147,7 +1139,7 @@ function HireRepDialog({
                           action.locked
                             ? "border-border/40 bg-muted/20"
                             : action.permission === "autonomous"
-                            ? "border-teal-200/60 bg-teal-50/30"
+                            ? "border-indigo-200/60 bg-indigo-50/30"
                             : "border-border bg-white"
                         )}
                       >
@@ -1183,7 +1175,7 @@ function HireRepDialog({
                             className={cn(
                               "shrink-0 px-2.5 py-1 rounded-full text-[9px] font-medium border transition-colors mt-0.5",
                               action.permission === "autonomous"
-                                ? "bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100"
+                                ? "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
                                 : "bg-muted/30 text-muted-foreground border-border hover:bg-accent"
                             )}
                           >
@@ -1201,7 +1193,7 @@ function HireRepDialog({
 
         <div className="px-6 py-3 border-t border-border">
           <Button
-            className="w-full h-10 bg-teal-600 hover:bg-teal-700 text-[13px]"
+            className="w-full h-10 bg-indigo-600 hover:bg-indigo-700 text-[13px]"
             onClick={() => onHire(name || "Ava")}
             disabled={!name.trim()}
           >
@@ -1330,7 +1322,7 @@ function RepProfilePanel({
       <ScrollArea className="flex-1">
         <div className="px-4 py-4">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-xl bg-violet-500 flex items-center justify-center text-white text-[16px] font-bold">
+            <div className="w-12 h-12 rounded-xl bg-indigo-500 flex items-center justify-center text-white text-[16px] font-bold">
               {initials}
             </div>
             <div>
@@ -1343,7 +1335,7 @@ function RepProfilePanel({
             className="text-[10px] text-muted-foreground hover:text-primary hover:underline transition-colors mb-4 flex items-center gap-1"
             onClick={() => { onClose(); (window as any).__setActiveView?.("config"); }}
           >
-            <Pencil className="w-3 h-3" /> Edit in Config
+            <Pencil className="w-3 h-3" /> Edit settings
           </button>
 
           <div className="mb-4">
@@ -1430,7 +1422,7 @@ function RepProfilePanel({
               <div className="space-y-2">
                 {configHistory.map((entry, i) => (
                   <div key={i} className="flex gap-2">
-                    <Badge variant="outline" className="text-[8px] shrink-0 mt-0.5 font-mono bg-violet-50 text-violet-600 border-violet-200">
+                    <Badge variant="outline" className="text-[8px] shrink-0 mt-0.5 font-mono bg-indigo-50 text-indigo-600 border-indigo-200">
                       {entry.hash}
                     </Badge>
                     <div>
@@ -1543,7 +1535,7 @@ function ScenarioCard({
             {scenario.actions.map((action, i) => (
               <div key={i} className="flex items-center gap-1.5">
                 {i > 0 && <span className="text-[9px] text-muted-foreground">→</span>}
-                <code className="text-[10px] text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded font-mono">
+                <code className="text-[10px] text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded font-mono">
                   {action}
                 </code>
               </div>
@@ -1554,7 +1546,7 @@ function ScenarioCard({
         {/* Draft reply */}
         <div>
           <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">My draft reply:</p>
-          <blockquote className="pl-3 border-l-2 border-teal-200 text-[11px] text-foreground leading-relaxed">
+          <blockquote className="pl-3 border-l-2 border-indigo-200 text-[11px] text-foreground leading-relaxed">
             {scenario.draftReply}
           </blockquote>
         </div>
@@ -1641,7 +1633,7 @@ function RepView({
 
   const RepBubble = ({ children }: { children: React.ReactNode }) => (
     <div className="flex gap-2.5">
-      <div className="w-7 h-7 rounded-full bg-violet-500 flex items-center justify-center text-white text-[10px] font-bold shrink-0 mt-0.5">
+      <div className="w-7 h-7 rounded-full bg-indigo-500 flex items-center justify-center text-white text-[10px] font-bold shrink-0 mt-0.5">
         {initials}
       </div>
       <div className="flex-1">
@@ -1688,7 +1680,7 @@ function RepView({
       {/* Header */}
       <div className="flex items-center justify-between px-4 h-11 border-b border-border shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 rounded-full bg-violet-500 flex items-center justify-center text-white text-[9px] font-bold">
+          <div className="w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center text-white text-[9px] font-bold">
             {initials}
           </div>
           <div className="flex items-center gap-1.5">
@@ -1883,7 +1875,7 @@ function RepView({
                   {phase === "handoff" && (
                     <div className="ml-9">
                       <Button
-                        className="h-9 px-5 text-[11px] bg-teal-600 hover:bg-teal-700 rounded-full"
+                        className="h-9 px-5 text-[11px] bg-indigo-600 hover:bg-indigo-700 rounded-full"
                         onClick={() => {
                           setPhase("role_guide");
                           onSwitchToTeamLead();
@@ -1934,7 +1926,7 @@ function RepView({
                   {postHirePhase === "role_guide" && (
                     <div className="ml-9 mt-2">
                       <Button
-                        className="h-9 px-5 text-[11px] bg-teal-600 hover:bg-teal-700 rounded-full"
+                        className="h-9 px-5 text-[11px] bg-indigo-600 hover:bg-indigo-700 rounded-full"
                         onClick={onRoleGuideDone}
                       >
                         Continue <ArrowRight className="w-3.5 h-3.5 ml-1" />
@@ -2034,7 +2026,7 @@ function ModeSelectionView({
           </DialogHeader>
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" size="sm" onClick={() => setShowConfirm(false)}>Cancel</Button>
-            <Button size="sm" className="bg-teal-600 hover:bg-teal-700" onClick={() => { setShowConfirm(false); onModeSelected("production"); }}>
+            <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700" onClick={() => { setShowConfirm(false); onModeSelected("production"); }}>
               Confirm
             </Button>
           </div>
@@ -2061,7 +2053,7 @@ interface AgentDef {
 
 const CONFIG_AGENTS: AgentDef[] = [
   { id: "alex", name: "Alex", role: "Team Lead", emoji: "👔", level: "Orchestrator", color: "teal", hasConfig: false },
-  { id: "ava", name: "Ava", role: "Support Rep", emoji: "💬", level: "Rep", color: "violet", hasConfig: true },
+  { id: "ava", name: "Ava", role: "Support Rep", emoji: "💬", level: "Rep", color: "indigo", hasConfig: true },
 ];
 
 const MODE_OPTIONS: { mode: AgentMode; icon: typeof Rocket; color: string; desc: string }[] = [
@@ -2152,7 +2144,7 @@ function ConfigPanel() {
                   <div className={cn(
                     "w-8 h-8 rounded-lg flex items-center justify-center text-[14px] shrink-0",
                     agent.color === "teal" && "bg-teal-100",
-                    agent.color === "violet" && "bg-violet-100"
+                    agent.color === "indigo" && "bg-indigo-100"
                   )}>
                     {agent.emoji}
                   </div>
@@ -2187,7 +2179,7 @@ function ConfigPanel() {
               <div className={cn(
                 "w-8 h-8 rounded-lg flex items-center justify-center text-[14px]",
                 currentAgent.color === "teal" && "bg-teal-100",
-                currentAgent.color === "violet" && "bg-violet-100"
+                currentAgent.color === "indigo" && "bg-indigo-100"
               )}>
                 {currentAgent.emoji}
               </div>
@@ -2362,7 +2354,7 @@ function ConfigPanel() {
             </DialogHeader>
             <div className="flex justify-end gap-2 mt-4">
               <Button variant="outline" size="sm" onClick={() => setShowConfirm(false)}>Cancel</Button>
-              <Button size="sm" className="bg-teal-600 hover:bg-teal-700" onClick={confirmSave}>Confirm & Save</Button>
+              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700" onClick={confirmSave}>Confirm & Save</Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -2513,10 +2505,10 @@ export default function CommunicationPage() {
                   onClick={() => setActiveView("rep")}
                   className={cn(
                     "w-9 h-9 rounded-xl flex items-center justify-center transition-colors",
-                    activeView === "rep" ? "bg-violet-100" : "hover:bg-accent"
+                    activeView === "rep" ? "bg-indigo-100" : "hover:bg-accent"
                   )}
                 >
-                  <div className="w-7 h-7 rounded-full bg-violet-500 flex items-center justify-center text-white text-[9px] font-bold">
+                  <div className="w-7 h-7 rounded-full bg-indigo-500 flex items-center justify-center text-white text-[9px] font-bold">
                     {getInitials(repName)}
                   </div>
                 </button>

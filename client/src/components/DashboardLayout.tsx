@@ -16,12 +16,8 @@ import {
   Bot,
   LayoutGrid,
   Bell,
-  ExternalLink,
-  HelpCircle,
-  Settings,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { toast } from "sonner";
 
 interface NavItem {
   label: string;
@@ -38,7 +34,7 @@ const mainNav: NavItem[] = [
   { label: "Protection", href: "/protection-placeholder", icon: ShieldCheck, disabled: true },
   { label: "Integrations", href: "/integrations", icon: Puzzle },
   { label: "Reviews", href: "/reviews-placeholder", icon: Star, disabled: true },
-  { label: "AI Support", href: "/", icon: Bot },
+  { label: "AI support", href: "/", icon: Bot },
 ];
 
 const customizeNav: NavItem[] = [
@@ -65,8 +61,7 @@ function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
   if (item.disabled) {
     return (
       <div
-        onClick={() => toast.info(`${item.label} — not part of this prototype`)}
-        className="flex items-center gap-2.5 px-3 py-[5px] rounded-lg text-[13px] cursor-default text-muted-foreground/40"
+        className="flex items-center gap-2.5 px-3 py-[5px] rounded-lg text-[13px] cursor-default text-muted-foreground/40 select-none"
       >
         <Icon className="w-[15px] h-[15px] shrink-0" />
         <span>{item.label}</span>
@@ -143,10 +138,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             </div>
             <div className="min-w-0">
               <p className="text-[12px] font-medium text-foreground truncate leading-tight">
-                seel-test-alexsong
-              </p>
-              <p className="text-[10px] text-muted-foreground truncate leading-tight">
-                .myshopify.com
+                alexsong.myshopify.com
               </p>
             </div>
           </div>
@@ -161,7 +153,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="px-2 mt-4">
-            <p className="px-3 py-1 text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider">
+            <p className="px-3 py-1 text-[10px] font-medium text-muted-foreground/50 tracking-wider">
               Customize
             </p>
             <nav className="space-y-0.5 mt-0.5">
@@ -172,25 +164,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </div>
         </ScrollArea>
 
-        {/* Bottom: demo links */}
-        <div className="px-2 pb-2 space-y-0.5 border-t border-border pt-2">
-          <Link href="/zendesk">
-            <div className="flex items-center gap-2 px-3 py-[5px] rounded-lg text-[11px] text-muted-foreground/50 hover:text-muted-foreground hover:bg-accent/50 transition-colors cursor-pointer">
-              <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-              <span>Zendesk Sidebar</span>
-            </div>
-          </Link>
-          <Link href="/communication">
-            <div className="flex items-center gap-2 px-3 py-[5px] rounded-lg text-[11px] text-muted-foreground/50 hover:text-muted-foreground hover:bg-accent/50 transition-colors cursor-pointer">
-              <Settings className="w-3.5 h-3.5 shrink-0" />
-              <span>Config</span>
-            </div>
-          </Link>
-          <div className="flex items-center gap-2 px-3 py-[5px] rounded-lg text-[11px] text-muted-foreground/30">
-            <HelpCircle className="w-3.5 h-3.5 shrink-0" />
-            <span>Help</span>
-          </div>
-        </div>
+        {/* Bottom spacer */}
+        <div className="px-2 pb-2 border-t border-border pt-2" />
       </aside>
 
       {/* Main content */}
@@ -200,7 +175,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <>
             <div className="shrink-0 bg-white border-b border-border">
               <div className="px-6 pt-4 pb-0">
-                <h1 className="text-[18px] font-bold text-foreground leading-tight">AI Support</h1>
+                <h1 className="text-[18px] font-bold text-foreground leading-tight">AI support</h1>
                 {/* Tab bar */}
                 <div className="flex items-center gap-1 mt-3 -mb-px">
                   {aiTabs.map((tab) => (

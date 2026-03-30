@@ -640,9 +640,7 @@ function UploadDocumentDialog({
         <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted/40 mt-1">
           <Bot className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            After importing, Alex (Team Lead) will process the content and
-            extract rules. This typically takes 30-60 minutes. You'll be
-            notified when it's ready for review.
+            After importing, rules will be extracted automatically. You'll be notified when ready for review.
           </p>
         </div>
 
@@ -662,10 +660,10 @@ function UploadDocumentDialog({
             className="h-8 text-[12px]"
           >
             {activeMethod === "upload"
-              ? "Upload & Process"
+              ? "Upload"
               : activeMethod === "url"
-              ? "Import & Process"
-              : "Save & Process"}
+              ? "Import"
+              : "Save"}
           </Button>
         </div>
       </DialogContent>
@@ -758,16 +756,7 @@ export default function PlaybookPage() {
           <div className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/10">
             <Bot className="w-4 h-4 text-primary shrink-0 mt-0.5" />
             <p className="text-[12px] text-foreground leading-relaxed flex-1">
-              Your Playbook contains all the rules your AI Rep follows. Rules are
-              learned from uploaded documents and conversations with your{" "}
-              <a
-                href="/communication"
-                className="text-primary font-medium hover:underline"
-              >
-                Team Lead
-              </a>
-              . Click any rule to see full details, version history, and linked
-              actions.
+              Your playbook contains the rules and knowledge your AI rep uses to handle tickets. Rules are learned from documents and conversations.
             </p>
             <button
               onClick={() => setShowGuide(false)}
@@ -822,14 +811,7 @@ export default function PlaybookPage() {
             {/* Bottom help */}
             <div className="mt-3 text-center">
               <p className="text-[11px] text-muted-foreground">
-                Rules are updated through conversations in{" "}
-                <a
-                  href="/communication"
-                  className="text-primary hover:underline"
-                >
-                  Communication
-                </a>{" "}
-                or by uploading documents.
+                Rules update automatically from your conversations and uploaded documents.
               </p>
             </div>
           </div>

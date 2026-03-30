@@ -70,7 +70,7 @@ const AGENTS: AgentDef[] = [
     role: "Team Lead",
     emoji: "👔",
     level: "Orchestrator",
-    color: "teal",
+    color: "indigo",
     hasConfig: false,
   },
   {
@@ -215,11 +215,8 @@ export default function AgentPage() {
         <div className="w-[220px] shrink-0 border-r border-border bg-[#fafafa] flex flex-col">
           <div className="px-3 py-3 border-b border-border">
             <h2 className="text-[13px] font-semibold text-foreground">
-              Agent Config
+              Agents
             </h2>
-            <p className="text-[10px] text-muted-foreground mt-0.5">
-              Configure all agents in one place
-            </p>
           </div>
 
           <ScrollArea className="flex-1">
@@ -238,7 +235,7 @@ export default function AgentPage() {
                   <div
                     className={cn(
                       "w-8 h-8 rounded-lg flex items-center justify-center text-[14px] shrink-0",
-                      agent.color === "teal" && "bg-teal-100",
+                      agent.color === "indigo" && "bg-indigo-100",
                       agent.color === "violet" && "bg-violet-100"
                     )}
                   >
@@ -288,7 +285,7 @@ export default function AgentPage() {
               <div
                 className={cn(
                   "w-8 h-8 rounded-lg flex items-center justify-center text-[14px]",
-                  currentAgent.color === "teal" && "bg-teal-100",
+                  currentAgent.color === "indigo" && "bg-indigo-100",
                   currentAgent.color === "violet" && "bg-violet-100"
                 )}
               >
@@ -320,16 +317,14 @@ export default function AgentPage() {
             {!currentAgent.hasConfig ? (
               /* Alex — no editable config */
               <div className="flex flex-col items-center justify-center py-20 px-6">
-                <div className="w-14 h-14 rounded-2xl bg-teal-100 flex items-center justify-center text-[24px] mb-4">
+                <div className="w-14 h-14 rounded-2xl bg-indigo-100 flex items-center justify-center text-[24px] mb-4">
                   👔
                 </div>
                 <h3 className="text-[15px] font-semibold text-foreground mb-1">
                   Alex — Team Lead
                 </h3>
                 <p className="text-[12px] text-muted-foreground text-center max-w-[360px] leading-relaxed">
-                  Alex is the orchestrator agent. He manages your playbook,
-                  monitors rep performance, and surfaces insights. His behavior
-                  is system-defined and not directly configurable.
+                  Alex manages your playbook, monitors performance, and surfaces insights. Configuration is automatic.
                 </p>
                 <div className="mt-6 flex items-center gap-2">
                   <Bot className="w-4 h-4 text-muted-foreground/50" />
@@ -345,7 +340,7 @@ export default function AgentPage() {
                 <Section
                   id="section-mode"
                   title="Mode"
-                  tip="Controls how the rep handles incoming Zendesk tickets. Training mode drafts as internal notes; Production replies directly."
+                  tip="Training: drafts replies as internal notes for review. Production: replies to customers directly."
                 >
                   <div className="grid grid-cols-3 gap-3">
                     {modeConfig.map(({ mode, icon: Icon, color, desc }) => (
@@ -431,7 +426,7 @@ export default function AgentPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <Label className="text-[12px] font-medium text-muted-foreground shrink-0">
-                          Disclose AI
+                          AI disclosure
                         </Label>
                         <Tip text="If enabled, the rep will tell customers it's an AI when directly asked." />
                         <Switch
@@ -492,7 +487,7 @@ export default function AgentPage() {
                 <Section
                   id="section-actions"
                   title="Actions & Permissions"
-                  tip="Toggle which actions the rep can perform autonomously. Disabled actions will be escalated to you."
+                  tip="Actions your rep can perform. Disabled actions are escalated to a human."
                 >
                   {Object.entries(groupedPermissions).map(
                     ([category, actions]) => (
@@ -595,12 +590,7 @@ export default function AgentPage() {
                 Confirm Changes
               </DialogTitle>
               <DialogDescription className="text-[12px]">
-                You are about to update{" "}
-                <span className="font-medium text-foreground">
-                  {currentAgent.name}
-                </span>
-                's configuration. Changes to mode and permissions will take
-                effect immediately on new tickets.
+                Changes apply immediately to new tickets.
               </DialogDescription>
             </DialogHeader>
             <div className="flex justify-end gap-2 mt-4">
@@ -613,7 +603,7 @@ export default function AgentPage() {
               </Button>
               <Button
                 size="sm"
-                className="bg-teal-600 hover:bg-teal-700"
+                className="bg-indigo-600 hover:bg-indigo-700"
                 onClick={confirmSave}
               >
                 Confirm & Save
