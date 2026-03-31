@@ -39,6 +39,7 @@ export interface Message {
   sender: MessageSender;
   content: string;
   timestamp: string;
+  managerName?: string; // e.g. "Jordan Chen", "Alex Song" — defaults to primary manager
   actions?: MessageAction[];
 }
 
@@ -599,8 +600,9 @@ export const TOPICS: Topic[] = [
     sourceTicketId: "4412",
     messages: [
       { id: "m-3-1", sender: "ai", content: "I escalated **ticket #4412** because the customer reported a damaged ceramic vase but didn't provide a photo. My current rule requires photo evidence for all damage claims.\n\nI noticed you processed a replacement immediately without asking for a photo. The order was $34.99.\n\nI'd like to learn from this: should I skip photo requirements for low-value items? If so, what's the threshold?", timestamp: "2026-03-12T10:00:00Z" },
-      { id: "m-3-2", sender: "manager", content: "Good catch. Yes — for items under $80, don't require photo evidence. It's not worth the customer friction. Just process the replacement or refund based on their preference.", timestamp: "2026-03-12T14:30:00Z" },
-      { id: "m-3-3", sender: "ai", content: "Got it! I've updated my **Damaged / Wrong Item** rule:\n\n> For damage claims on items under $80, process replacement or refund (customer's choice) without requiring photo evidence. For items $80+, still request photo before processing.\n\nThis should reduce escalations for low-value damage claims. I'll monitor the impact.", timestamp: "2026-03-12T14:31:00Z" },
+      { id: "m-3-2", sender: "manager", managerName: "Jordan Chen", content: "Good catch. Yes — for items under $80, don't require photo evidence. It's not worth the customer friction. Just process the replacement or refund based on their preference.", timestamp: "2026-03-12T14:30:00Z" },
+      { id: "m-3-2b", sender: "manager", managerName: "Alex Song", content: "Agreed — I'd set the threshold at $80 as Jordan said. Also add a note to flag VIP customers at any price point.", timestamp: "2026-03-12T14:45:00Z" },
+      { id: "m-3-3", sender: "ai", content: "Got it! I've updated my **Damaged / Wrong Item** rule:\n\n> For damage claims on items under $80, process replacement or refund (customer's choice) without requiring photo evidence. For items $80+, still request photo before processing.\n\nThis should reduce escalations for low-value damage claims. I'll monitor the impact.", timestamp: "2026-03-12T14:46:00Z" },
     ],
   },
   {
@@ -613,7 +615,7 @@ export const TOPICS: Topic[] = [
     preview: "I noticed 23% of agents extend the refund window for VIP customers. Should I do the same?",
     messages: [
       { id: "m-4-1", sender: "ai", content: "While analyzing historical tickets, I found that **23% of your team** extends the 30-day refund window to 45 days for VIP customers (those with 3+ orders).\n\nYour SOP says 30 days for everyone. Which should I follow?", timestamp: "2026-03-14T09:00:00Z" },
-      { id: "m-4-2", sender: "manager", content: "Good find. Yes, extend to 45 days for VIP customers. I'll update the SOP too. VIP = 3 or more completed orders.", timestamp: "2026-03-14T15:00:00Z" },
+      { id: "m-4-2", sender: "manager", managerName: "Jordan Chen", content: "Good find. Yes, extend to 45 days for VIP customers. I'll update the SOP too. VIP = 3 or more completed orders.", timestamp: "2026-03-14T15:00:00Z" },
       { id: "m-4-3", sender: "ai", content: "Updated! My refund policy now includes:\n\n> For VIP customers (3+ completed orders), extend return window from 30 to 45 days.\n\nI'll apply this going forward.", timestamp: "2026-03-14T15:01:00Z" },
     ],
   },
@@ -638,9 +640,9 @@ export const TOPICS: Topic[] = [
     updatedAt: "2026-03-20T09:30:00Z",
     preview: "Manager updated: Extended return window to 60 days for orders placed during spring sale.",
     messages: [
-      { id: "m-6-1", sender: "manager", content: "New rule: For orders placed during our Spring Sale (March 15-31), extend the return window to 60 days instead of the standard 30. This applies to all customers, not just VIP.", timestamp: "2026-03-20T09:00:00Z" },
+      { id: "m-6-1", sender: "manager", managerName: "Alex Song", content: "New rule: For orders placed during our Spring Sale (March 15-31), extend the return window to 60 days instead of the standard 30. This applies to all customers, not just VIP.", timestamp: "2026-03-20T09:00:00Z" },
       { id: "m-6-2", sender: "ai", content: "Understood! I've added this as a temporary rule:\n\n> Orders placed between March 15-31, 2026 have a 60-day return window (expires May 30, 2026). Applies to all customers.\n\nThis overrides the standard 30-day window and the VIP 45-day window for qualifying orders. I'll automatically revert to normal policy after May 30.\n\nDoes this look correct?", timestamp: "2026-03-20T09:01:00Z" },
-      { id: "m-6-3", sender: "manager", content: "Perfect, that's correct.", timestamp: "2026-03-20T09:30:00Z" },
+      { id: "m-6-3", sender: "manager", managerName: "Alex Song", content: "Perfect, that's correct.", timestamp: "2026-03-20T09:30:00Z" },
     ],
   },
   {

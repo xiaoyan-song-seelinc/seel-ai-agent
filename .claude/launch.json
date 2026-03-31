@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": ["-c", "PATH=$HOME/.nvm/versions/node/v20.20.2/bin:/opt/homebrew/bin:$PATH npm run dev -- --host"],
+      "port": 3000,
+      "autoPort": false
+    }
+  ]
+}
