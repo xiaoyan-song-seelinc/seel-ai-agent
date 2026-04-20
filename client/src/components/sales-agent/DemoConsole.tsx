@@ -11,27 +11,27 @@ export default function DemoConsole() {
   return (
     <div className="fixed bottom-4 right-4 z-40">
       {open ? (
-        <div className="w-[260px] bg-white border border-neutral-300 rounded-md shadow-[0_10px_28px_-12px_rgba(0,0,0,0.25)]">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-200 bg-neutral-50">
+        <div className="w-[260px] bg-white border border-[#E0E0E0] rounded-[10px] shadow-[0_10px_28px_-12px_rgba(0,0,0,0.25)]">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[#EAEAEA] bg-[#F9FAFB] rounded-t-[10px]">
             <div className="flex items-center gap-1.5">
-              <Wrench className="w-3 h-3 text-neutral-600" />
-              <p className="text-[12px] font-medium text-neutral-900">
+              <Wrench className="w-3.5 h-3.5 text-[#5C5F62]" />
+              <p className="text-[14px] font-medium text-[#202223]">
                 Demo console
               </p>
             </div>
             <button
               onClick={() => setOpen(false)}
-              className="text-neutral-500 hover:text-neutral-900"
+              className="text-[#8C8C8C] hover:text-[#202223]"
               aria-label="Minimize"
             >
               <ChevronDown className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <div className="p-3 space-y-3">
+          <div className="p-4 space-y-4">
             {/* Scenario */}
             <div>
-              <p className="text-[11px] font-medium text-neutral-500 uppercase tracking-[0.06em] mb-1.5">
+              <p className="text-[12px] font-semibold text-[#8C8C8C] uppercase tracking-[0.06em] mb-1.5">
                 Scenario
               </p>
               <div className="space-y-1">
@@ -57,7 +57,7 @@ export default function DemoConsole() {
 
             {/* Dependency */}
             <div>
-              <p className="text-[11px] font-medium text-neutral-500 uppercase tracking-[0.06em] mb-1.5">
+              <p className="text-[12px] font-semibold text-[#8C8C8C] uppercase tracking-[0.06em] mb-1.5">
                 Dependency status
               </p>
               <div className="space-y-1">
@@ -93,7 +93,7 @@ export default function DemoConsole() {
 
             {/* Shopify Plus */}
             <div>
-              <p className="text-[11px] font-medium text-neutral-500 uppercase tracking-[0.06em] mb-1.5">
+              <p className="text-[12px] font-semibold text-[#8C8C8C] uppercase tracking-[0.06em] mb-1.5">
                 Shopify Plus
               </p>
               <div className="space-y-1">
@@ -112,10 +112,10 @@ export default function DemoConsole() {
 
             {/* Platform */}
             <div>
-              <p className="text-[11px] font-medium text-neutral-500 uppercase tracking-[0.06em] mb-1.5">
+              <p className="text-[12px] font-semibold text-[#8C8C8C] uppercase tracking-[0.06em] mb-1.5">
                 Platform
               </p>
-              <div className="inline-flex rounded-[4px] bg-neutral-100 p-0.5 w-full">
+              <div className="inline-flex rounded-md bg-[#F7F7FC] border border-[#EAEAEA] p-0.5 w-full">
                 {(
                   [
                     { v: "shopify", l: "Shopify" },
@@ -125,10 +125,10 @@ export default function DemoConsole() {
                   <button
                     key={opt.v}
                     className={cn(
-                      "flex-1 py-1 text-[12px] font-medium rounded-[3px]",
+                      "flex-1 py-1 text-[12px] font-medium rounded",
                       store.platform === opt.v
-                        ? "bg-white text-neutral-900 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
-                        : "text-neutral-600 hover:text-neutral-900",
+                        ? "bg-white text-[#2121C4] shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
+                        : "text-[#5C5F62] hover:text-[#202223]",
                     )}
                     onClick={() => store.setPlatform(opt.v)}
                   >
@@ -138,7 +138,7 @@ export default function DemoConsole() {
               </div>
             </div>
 
-            <p className="text-[10px] text-neutral-400 leading-snug pt-1 border-t border-neutral-100">
+            <p className="text-[12px] text-[#8C8C8C] leading-snug pt-2 border-t border-[#F0F0F0]">
               Prototype-only controls. Changes are in-memory and apply immediately.
             </p>
           </div>
@@ -146,12 +146,12 @@ export default function DemoConsole() {
       ) : (
         <button
           onClick={() => setOpen(true)}
-          className="flex items-center gap-1.5 px-3 h-8 bg-neutral-900 text-white rounded-full shadow-[0_6px_16px_-4px_rgba(0,0,0,0.3)] hover:bg-neutral-800 text-[12px] font-medium"
+          className="flex items-center gap-1.5 px-4 h-10 bg-[#645AFF] text-white rounded-full shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-4px_rgba(0,0,0,0.1)] hover:bg-[#5A3AD9] text-[14px] font-medium"
         >
-          <Wrench className="w-3 h-3" />
+          <Wrench className="w-3.5 h-3.5" />
           Demo
-          <ChevronUp className="w-3 h-3 opacity-70" />
-          <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-white/15 capitalize">
+          <ChevronUp className="w-3.5 h-3.5 opacity-70" />
+          <span className="ml-1 text-[12px] px-2 py-0.5 rounded-full bg-white/15 capitalize">
             {scenarioBadge(store.scenario)}
           </span>
         </button>
@@ -178,15 +178,15 @@ function RadioRow({
   return (
     <label
       className={cn(
-        "flex items-center gap-2 px-2 py-1 rounded-[3px] cursor-pointer text-[12px]",
-        checked ? "bg-neutral-100 text-neutral-900" : "text-neutral-700 hover:bg-neutral-50",
+        "flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-[14px]",
+        checked ? "bg-[#ECE9FF] text-[#2121C4]" : "text-[#5C5F62] hover:bg-[#F7F7FC]",
       )}
     >
       <input
         type="radio"
         checked={checked}
         onChange={onSelect}
-        className="h-3 w-3 accent-neutral-900"
+        className="h-3 w-3 accent-[#2121C4]"
       />
       {label}
     </label>

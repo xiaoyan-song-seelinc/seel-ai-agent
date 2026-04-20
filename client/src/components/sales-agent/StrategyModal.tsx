@@ -275,11 +275,11 @@ export default function StrategyModal({ open, onClose, editingId }: Props) {
             <div className="space-y-3">
               <Field label="Source">
                 <div className="space-y-2">
-                  <label className="flex items-start gap-2 text-[13px] text-neutral-800 cursor-pointer">
+                  <label className="flex items-start gap-2 text-[14px] text-[#202223] cursor-pointer">
                     <input
                       type="radio"
                       name="manual_mode"
-                      className="mt-[3px] accent-neutral-900"
+                      className="mt-[3px] accent-[#2121C4]"
                       checked={draft.manualMode === "products"}
                       onChange={() =>
                         setDraft((d) => ({ ...d, manualMode: "products" }))
@@ -287,14 +287,14 @@ export default function StrategyModal({ open, onClose, editingId }: Props) {
                     />
                     <span>
                       Pick specific products
-                      <span className="text-neutral-500"> · up to 20</span>
+                      <span className="text-[#6B7280]"> · up to 20</span>
                     </span>
                   </label>
-                  <label className="flex items-start gap-2 text-[13px] text-neutral-800 cursor-pointer">
+                  <label className="flex items-start gap-2 text-[14px] text-[#202223] cursor-pointer">
                     <input
                       type="radio"
                       name="manual_mode"
-                      className="mt-[3px] accent-neutral-900"
+                      className="mt-[3px] accent-[#2121C4]"
                       checked={draft.manualMode === "collection"}
                       onChange={() =>
                         setDraft((d) => ({ ...d, manualMode: "collection" }))
@@ -306,9 +306,9 @@ export default function StrategyModal({ open, onClose, editingId }: Props) {
               </Field>
 
               {draft.manualMode === "products" ? (
-                <Panel className="p-3">
+                <Panel className="p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-[12px] font-medium text-neutral-700">
+                    <p className="text-[14px] font-medium text-[#202223]">
                       Products ({selectedProducts.length} / 20)
                     </p>
                     <SAButton
@@ -320,7 +320,7 @@ export default function StrategyModal({ open, onClose, editingId }: Props) {
                     </SAButton>
                   </div>
                   {selectedProducts.length === 0 ? (
-                    <p className="text-[12px] text-neutral-500 py-3 text-center">
+                    <p className="text-[12px] text-[#6B7280] py-3 text-center">
                       No products picked yet.
                     </p>
                   ) : (
@@ -331,13 +331,13 @@ export default function StrategyModal({ open, onClose, editingId }: Props) {
                           className="flex items-center gap-2 py-1"
                         >
                           <div
-                            className="w-6 h-6 rounded-[3px] border border-neutral-200 shrink-0"
+                            className="w-7 h-7 rounded border border-[#E0E0E0] shrink-0"
                             style={{ backgroundColor: p.image }}
                           />
-                          <span className="text-[12px] text-neutral-800 truncate flex-1">
+                          <span className="text-[14px] text-[#202223] truncate flex-1">
                             {p.title}
                           </span>
-                          <span className="text-[11px] text-neutral-500 tabular-nums">
+                          <span className="text-[12px] text-[#6B7280] tabular-nums">
                             ${p.price}
                           </span>
                         </div>
@@ -346,9 +346,9 @@ export default function StrategyModal({ open, onClose, editingId }: Props) {
                   )}
                 </Panel>
               ) : (
-                <Panel className="p-3">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <p className="text-[12px] font-medium text-neutral-700">
+                <Panel className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[14px] font-medium text-[#202223]">
                       Collection
                     </p>
                     <SAButton
@@ -360,14 +360,14 @@ export default function StrategyModal({ open, onClose, editingId }: Props) {
                     </SAButton>
                   </div>
                   {selectedCollection ? (
-                    <div className="text-[13px] text-neutral-800">
+                    <div className="text-[14px] text-[#202223]">
                       {selectedCollection.title}
-                      <span className="text-neutral-500 ml-1">
+                      <span className="text-[#6B7280] ml-1">
                         · {selectedCollection.productCount} products
                       </span>
                     </div>
                   ) : (
-                    <p className="text-[12px] text-neutral-500">
+                    <p className="text-[12px] text-[#6B7280]">
                       No collection picked yet.
                     </p>
                   )}
@@ -419,21 +419,21 @@ export default function StrategyModal({ open, onClose, editingId }: Props) {
         >
           {isReferenced ? (
             <div className="space-y-2">
-              <p className="text-[13px] text-neutral-800">
+              <p className="text-[14px] text-[#202223]">
                 "{existing.name}" is used by:
               </p>
-              <ul className="text-[13px] text-neutral-700 list-disc pl-5">
+              <ul className="text-[14px] text-[#5C5F62] list-disc pl-5">
                 {referencedBy.map((id) => (
                   <li key={id}>{touchpointLabel(id)}</li>
                 ))}
               </ul>
-              <p className="text-[12px] text-neutral-500 mt-2">
+              <p className="text-[12px] text-[#6B7280] mt-2">
                 Detach from these touchpoints, or pick a replacement strategy,
                 before deleting.
               </p>
             </div>
           ) : (
-            <p className="text-[13px] text-neutral-800">
+            <p className="text-[14px] text-[#202223]">
               Delete "{existing.name}"? This cannot be undone.
             </p>
           )}

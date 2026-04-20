@@ -25,24 +25,24 @@ export default function ExclusionRules() {
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3"
+        className="w-full flex items-center justify-between px-5 py-4"
       >
         <div className="text-left">
-          <p className="text-[13px] font-semibold text-neutral-900">
+          <p className="text-[16px] font-semibold text-[#202223]">
             Exclusion rules
           </p>
-          <p className="text-[11px] text-neutral-500">
+          <p className="text-[12px] text-[#6B7280] mt-0.5">
             Applied globally to every strategy output.
           </p>
         </div>
         {expanded ? (
-          <ChevronDown className="w-4 h-4 text-neutral-500" />
+          <ChevronDown className="w-4 h-4 text-[#8C8C8C]" />
         ) : (
-          <ChevronRight className="w-4 h-4 text-neutral-500" />
+          <ChevronRight className="w-4 h-4 text-[#8C8C8C]" />
         )}
       </button>
       {expanded && (
-        <div className="border-t border-neutral-100 divide-y divide-neutral-100">
+        <div className="border-t border-[#F0F0F0] divide-y divide-[#F0F0F0]">
           <ExcludedProducts onOpen={() => setProductPickerOpen(true)} />
           <ExcludedCollections onOpen={() => setCollectionPickerOpen(true)} />
           <ExcludedTags />
@@ -93,7 +93,7 @@ function ExcludedProducts({ onOpen }: { onOpen: () => void }) {
       }
     >
       {items.length === 0 ? (
-        <p className="text-[12px] text-neutral-500">No excluded products.</p>
+        <p className="text-[12px] text-[#6B7280]">No excluded products.</p>
       ) : (
         <div className="flex flex-wrap gap-1.5">
           {items.map(
@@ -138,7 +138,7 @@ function ExcludedCollections({ onOpen }: { onOpen: () => void }) {
       }
     >
       {items.length === 0 ? (
-        <p className="text-[12px] text-neutral-500">No excluded collections.</p>
+        <p className="text-[12px] text-[#6B7280]">No excluded collections.</p>
       ) : (
         <div className="flex flex-wrap gap-1.5">
           {items.map(
@@ -217,7 +217,7 @@ function ExcludedTags() {
     >
       <div className="flex flex-wrap items-center gap-1.5">
         {store.exclusion.tags.length === 0 && !editing && (
-          <p className="text-[12px] text-neutral-500">No excluded tags.</p>
+          <p className="text-[12px] text-[#6B7280]">No excluded tags.</p>
         )}
         {store.exclusion.tags.map((t) => (
           <Chip
@@ -291,11 +291,11 @@ function RuleRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn("px-4 py-3")}>
+    <div className={cn("px-5 py-4")}>
       <div className="flex items-start justify-between gap-4 mb-2">
         <div className="min-w-0">
-          <p className="text-[13px] font-medium text-neutral-900">{title}</p>
-          <p className="text-[11px] text-neutral-500">{hint}</p>
+          <p className="text-[14px] font-medium text-[#202223]">{title}</p>
+          <p className="text-[12px] text-[#6B7280] mt-0.5">{hint}</p>
         </div>
         <div className="shrink-0">{action}</div>
       </div>
