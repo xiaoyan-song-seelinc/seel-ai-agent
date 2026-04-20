@@ -28,7 +28,7 @@ export default function ExclusionRules({ embedded = false }: Props) {
   return (
     <div className={cn(embedded && "mt-6")}>
       <div className="flex items-center gap-1.5 mb-2">
-        <h3 className="text-[13px] font-semibold text-neutral-900">
+        <h3 className="text-[14px] font-semibold text-[#202223]">
           Exclusion rules
         </h3>
         <InfoTip>
@@ -37,7 +37,7 @@ export default function ExclusionRules({ embedded = false }: Props) {
         </InfoTip>
       </div>
       <Panel className="overflow-hidden">
-        <div className="divide-y divide-neutral-100">
+        <div className="divide-y divide-[#F0F0F0]">
           <ExcludedProducts onOpen={() => setProductPickerOpen(true)} />
           <ExcludedCollections onOpen={() => setCollectionPickerOpen(true)} />
           <ExcludedTags />
@@ -88,7 +88,7 @@ function ExcludedProducts({ onOpen }: { onOpen: () => void }) {
       }
     >
       {items.length === 0 ? (
-        <p className="text-[12px] text-neutral-500">No excluded products.</p>
+        <p className="text-[12px] text-[#6B7280]">No excluded products.</p>
       ) : (
         <div className="flex flex-wrap gap-1.5">
           {items.map(
@@ -133,7 +133,7 @@ function ExcludedCollections({ onOpen }: { onOpen: () => void }) {
       }
     >
       {items.length === 0 ? (
-        <p className="text-[12px] text-neutral-500">No excluded collections.</p>
+        <p className="text-[12px] text-[#6B7280]">No excluded collections.</p>
       ) : (
         <div className="flex flex-wrap gap-1.5">
           {items.map(
@@ -212,7 +212,7 @@ function ExcludedTags() {
     >
       <div className="flex flex-wrap items-center gap-1.5">
         {store.exclusion.tags.length === 0 && !editing && (
-          <p className="text-[12px] text-neutral-500">No excluded tags.</p>
+          <p className="text-[12px] text-[#6B7280]">No excluded tags.</p>
         )}
         {store.exclusion.tags.map((t) => (
           <Chip
@@ -289,7 +289,7 @@ function RuleRow({
     <div className={cn("px-4 py-3")}>
       <div className="flex items-start justify-between gap-4 mb-2">
         <div className="min-w-0 flex items-center gap-1">
-          <p className="text-[13px] font-medium text-neutral-900">{title}</p>
+          <p className="text-[14px] font-medium text-[#202223]">{title}</p>
           <InfoTip>{tip}</InfoTip>
         </div>
         <div className="shrink-0">{action}</div>
