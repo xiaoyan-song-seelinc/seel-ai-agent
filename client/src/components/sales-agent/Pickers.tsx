@@ -55,7 +55,7 @@ export function ProductPicker({
       width="max-w-[640px]"
       footer={
         <>
-          <span className="text-[12px] text-neutral-500 mr-auto">
+          <span className="text-[12px] text-[#6B7280] mr-auto">
             {selected.length} selected
             {maxSelection ? ` / ${maxSelection} max` : ""}
           </span>
@@ -75,9 +75,9 @@ export function ProductPicker({
           onChange={(e) => setQ(e.target.value)}
           autoFocus
         />
-        <div className="border border-neutral-200 rounded-[4px] max-h-[360px] overflow-auto divide-y divide-neutral-100">
+        <div className="border border-[#E0E0E0] rounded-md max-h-[360px] overflow-auto divide-y divide-[#F0F0F0]">
           {filtered.length === 0 && (
-            <div className="p-6 text-center text-[12px] text-neutral-500">
+            <div className="p-6 text-center text-[12px] text-[#6B7280]">
               No products match "{q}"
             </div>
           )}
@@ -114,8 +114,8 @@ function ProductRow({
   return (
     <label
       className={cn(
-        "flex items-center gap-3 px-3 py-2 cursor-pointer",
-        disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-neutral-50",
+        "flex items-center gap-3 px-3 py-2.5 cursor-pointer",
+        disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-[#F7F7FC]",
       )}
     >
       <input
@@ -123,15 +123,15 @@ function ProductRow({
         checked={checked}
         onChange={onToggle}
         disabled={disabled}
-        className="h-3.5 w-3.5 accent-neutral-900"
+        className="h-3.5 w-3.5 accent-[#2121C4]"
       />
       <div
-        className="w-9 h-9 rounded-[4px] border border-neutral-200 shrink-0"
+        className="w-9 h-9 rounded-md border border-[#E0E0E0] shrink-0"
         style={{ backgroundColor: product.image }}
       />
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] text-neutral-900 truncate">{product.title}</p>
-        <p className="text-[11px] text-neutral-500 tabular-nums">
+        <p className="text-[14px] text-[#202223] truncate">{product.title}</p>
+        <p className="text-[12px] text-[#6B7280] tabular-nums">
           ${product.price} · {product.inventory > 0 ? `${product.inventory} in stock` : "Out of stock"}
         </p>
       </div>
@@ -182,7 +182,7 @@ export function CollectionPicker({
       width="max-w-[520px]"
       footer={
         <>
-          <span className="text-[12px] text-neutral-500 mr-auto">
+          <span className="text-[12px] text-[#6B7280] mr-auto">
             {selected.length} selected
           </span>
           <SAButton variant="ghost" onClick={onClose}>
@@ -198,23 +198,23 @@ export function CollectionPicker({
         </>
       }
     >
-      <div className="border border-neutral-200 rounded-[4px] max-h-[360px] overflow-auto divide-y divide-neutral-100">
+      <div className="border border-[#E0E0E0] rounded-md max-h-[360px] overflow-auto divide-y divide-[#F0F0F0]">
         {COLLECTIONS.map((c) => {
           const checked = selected.includes(c.id);
           return (
             <label
               key={c.id}
-              className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-neutral-50"
+              className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-[#F7F7FC]"
             >
               <input
                 type={multiple ? "checkbox" : "radio"}
                 checked={checked}
                 onChange={() => toggle(c.id)}
-                className="h-3.5 w-3.5 accent-neutral-900"
+                className="h-3.5 w-3.5 accent-[#2121C4]"
               />
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] text-neutral-900">{c.title}</p>
-                <p className="text-[11px] text-neutral-500 tabular-nums">
+                <p className="text-[14px] text-[#202223]">{c.title}</p>
+                <p className="text-[12px] text-[#6B7280] tabular-nums">
                   {c.productCount} products
                 </p>
               </div>

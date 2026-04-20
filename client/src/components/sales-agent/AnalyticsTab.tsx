@@ -19,17 +19,16 @@ import { InfoTip, Panel, SAButton, SASelect } from "./primitives";
 type TrendKey = "total" | TouchpointId;
 
 const TREND_COLORS: Record<TrendKey, string> = {
-  total: "var(--primary)",
-  seel_rc: "#0ea5e9",
-  wfp_email: "#8b5cf6",
-  search_bar: "#10b981",
-  live_widget: "#f59e0b",
-  thank_you_page: "#ef4444",
+  total: "#2121C4",
+  seel_rc: "#0EA5E9",
+  wfp_email: "#645AFF",
+  search_bar: "#10B981",
+  live_widget: "#F59E0B",
+  thank_you_page: "#EF4444",
 };
 
 type Range = "7d" | "30d" | "90d";
 
-/* ── Metric copy (used both in KPI and table header tooltips) ── */
 const METRIC_COPY: Record<
   "revenue" | "orders" | "ctr" | "aov" | "impressions",
   { label: string; definition: string }
@@ -111,11 +110,11 @@ export default function AnalyticsTab() {
   };
 
   return (
-    <div className="max-w-[1200px] mx-auto px-6 py-6 space-y-5">
+    <div className="max-w-[1200px] mx-auto px-8 py-8 space-y-6">
       {/* Filters */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex items-center gap-1.5">
-          <label className="text-[12px] text-neutral-500">Time range</label>
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <label className="text-[14px] text-[#5C5F62]">Time range</label>
           <SASelect
             value={range}
             onChange={(e) => setRange(e.target.value as Range)}
@@ -127,15 +126,15 @@ export default function AnalyticsTab() {
         </div>
         <TouchpointFilter selected={selected} onChange={setSelected} />
         <div className="ml-auto">
-          <SAButton variant="secondary" size="sm" onClick={exportCsv}>
-            <Download className="w-3 h-3" />
+          <SAButton variant="secondary" size="md" onClick={exportCsv}>
+            <Download className="w-3.5 h-3.5" />
             Export CSV
           </SAButton>
         </div>
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-4 gap-4">
         <KpiCard
           label={METRIC_COPY.revenue.label}
           value={isEmpty ? "—" : formatCurrency(data.revenue)}
@@ -169,11 +168,11 @@ export default function AnalyticsTab() {
       </div>
 
       {/* Chart: Revenue Trend with per-touchpoint toggles */}
-      <Panel className="p-5">
+      <Panel className="p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-1.5">
-              <p className="text-[14px] font-semibold text-neutral-900">
+              <p className="text-[18px] font-semibold text-[#202223]">
                 Revenue trend
               </p>
               <InfoTip>
@@ -181,7 +180,7 @@ export default function AnalyticsTab() {
                 touchpoints to compare their contribution on the same axis.
               </InfoTip>
             </div>
-            <p className="text-[12px] text-neutral-500 mt-0.5">
+            <p className="text-[14px] text-[#6B7280] mt-1">
               Combined Revenue Trend and Revenue by Touchpoint in one view.
             </p>
           </div>
@@ -200,12 +199,12 @@ export default function AnalyticsTab() {
 
       {/* Detail table */}
       <Panel className="overflow-hidden">
-        <div className="px-5 py-4 border-b border-neutral-100">
-          <p className="text-[14px] font-semibold text-neutral-900">
+        <div className="px-5 py-4 border-b border-[#F0F0F0]">
+          <p className="text-[18px] font-semibold text-[#202223]">
             Touchpoint × Widget × Strategy
           </p>
         </div>
-        <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_minmax(0,1.4fr)_110px_90px_90px_150px] px-5 py-2.5 bg-neutral-50 border-b border-neutral-100 text-[11px] font-semibold text-neutral-500 uppercase tracking-[0.06em]">
+        <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_minmax(0,1.4fr)_110px_90px_90px_150px] px-5 py-4 bg-[#F7F7FC] border-b border-[#F0F0F0] text-[14px] font-semibold text-[#202223]">
           <div>Touchpoint</div>
           <div>Widget</div>
           <div>Strategy</div>
@@ -230,11 +229,11 @@ export default function AnalyticsTab() {
           </div>
         </div>
         {filteredRows.length === 0 ? (
-          <div className="py-8 text-center text-[12px] text-neutral-500">
+          <div className="py-10 text-center text-[14px] text-[#6B7280]">
             No data yet
           </div>
         ) : (
-          <div className="divide-y divide-neutral-100">
+          <div className="divide-y divide-[#F0F0F0]">
             {filteredRows.map((r) => {
               const ctr = r.impressions > 0 ? r.clicks / r.impressions : 0;
               const strategy = store.strategies.find(
@@ -243,17 +242,17 @@ export default function AnalyticsTab() {
               return (
                 <div
                   key={`${r.touchpointId}-${r.widget}`}
-                  className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_minmax(0,1.4fr)_110px_90px_90px_150px] items-center px-5 py-3 text-[13px] text-neutral-900 hover:bg-neutral-50"
+                  className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_minmax(0,1.4fr)_110px_90px_90px_150px] items-center px-5 py-4 text-[14px] text-[#202223] hover:bg-[#F5F5F5]"
                 >
                   <div className="truncate font-medium">
                     {touchpointLabel(r.touchpointId)}
                   </div>
-                  <div className="truncate text-neutral-500 font-mono text-[12px]">
+                  <div className="truncate text-[#6B7280] font-mono text-[12px]">
                     {r.widget}
                   </div>
-                  <div className="truncate text-neutral-700">
+                  <div className="truncate text-[#5C5F62]">
                     {strategy?.name ?? (
-                      <span className="text-neutral-400">—</span>
+                      <span className="text-[#8C8C8C]">—</span>
                     )}
                   </div>
                   <div className="text-right tabular-nums">
@@ -271,10 +270,10 @@ export default function AnalyticsTab() {
                     </span>
                     <span
                       className={cn(
-                        "ml-1.5 text-[11px]",
-                        r.delta > 0 && "text-emerald-700",
-                        r.delta < 0 && "text-red-700",
-                        r.delta === 0 && "text-neutral-400",
+                        "ml-1.5 text-[12px]",
+                        r.delta > 0 && "text-[#235935]",
+                        r.delta < 0 && "text-[#FF0000]",
+                        r.delta === 0 && "text-[#8C8C8C]",
                       )}
                     >
                       ({formatDelta(r.delta)})
@@ -311,7 +310,7 @@ function TouchpointFilter({
     <div className="relative">
       <SAButton variant="secondary" size="md" onClick={() => setOpen((v) => !v)}>
         {label}
-        <ChevronDown className="w-3 h-3 opacity-60" />
+        <ChevronDown className="w-3.5 h-3.5 opacity-60" />
       </SAButton>
       {open && (
         <>
@@ -320,22 +319,22 @@ function TouchpointFilter({
             onClick={() => setOpen(false)}
             aria-hidden="true"
           />
-          <div className="absolute z-20 mt-1 left-0 w-[240px] bg-white border border-neutral-200 rounded-md shadow-[0_10px_24px_-8px_rgba(0,0,0,0.18)] py-1">
+          <div className="absolute z-20 mt-1 left-0 w-[240px] bg-white border border-[#E0E0E0] rounded-lg shadow-[0_10px_24px_-8px_rgba(0,0,0,0.18)] py-1">
             <button
-              className="w-full text-left px-3 py-1.5 text-[12px] text-neutral-600 hover:bg-neutral-50"
+              className="w-full text-left px-3 py-2 text-[12px] text-[#5C5F62] hover:bg-[#F7F7FC]"
               onClick={() =>
                 onChange(selected.length === allIds.length ? [] : allIds)
               }
             >
               {selected.length === allIds.length ? "Clear all" : "Select all"}
             </button>
-            <div className="border-t border-neutral-100" />
+            <div className="border-t border-[#F0F0F0]" />
             {TOUCHPOINTS.map((t) => {
               const checked = selected.includes(t.id);
               return (
                 <label
                   key={t.id}
-                  className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-neutral-50 text-[13px]"
+                  className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-[#F7F7FC] text-[14px] text-[#202223]"
                 >
                   <input
                     type="checkbox"
@@ -344,7 +343,7 @@ function TouchpointFilter({
                       if (checked) onChange(selected.filter((x) => x !== t.id));
                       else onChange([...selected, t.id]);
                     }}
-                    className="h-3.5 w-3.5 accent-[var(--primary)]"
+                    className="h-3.5 w-3.5 accent-[#2121C4]"
                   />
                   {t.label}
                 </label>
@@ -370,17 +369,17 @@ function KpiCard({
   tip: string;
 }) {
   return (
-    <Panel className="px-4 py-4">
-      <div className="flex items-center gap-1 text-[12px] text-neutral-500">
+    <Panel className="px-6 py-5">
+      <div className="flex items-center gap-1 text-[14px] text-[#5C5F62] font-medium">
         <span>{label}</span>
         <InfoTip>{tip}</InfoTip>
       </div>
-      <p className="text-[24px] font-semibold text-neutral-900 tabular-nums leading-tight mt-1">
+      <p className="text-[30px] font-bold text-[#202223] tabular-nums leading-tight mt-2">
         {value}
       </p>
-      <div className="flex items-center gap-1.5 mt-1">
+      <div className="flex items-center gap-1.5 mt-2">
         <DeltaText value={delta} />
-        <span className="text-[11px] text-neutral-400">vs previous</span>
+        <span className="text-[12px] text-[#8C8C8C]">vs previous</span>
       </div>
     </Panel>
   );
@@ -389,7 +388,7 @@ function KpiCard({
 /* ── Delta text ─────────────────────────────────────────── */
 function DeltaText({ value }: { value: number | null }) {
   if (value === null || value === undefined)
-    return <span className="text-[12px] text-neutral-400">—</span>;
+    return <span className="text-[12px] text-[#8C8C8C]">—</span>;
   const pct = (value * 100).toFixed(1);
   const positive = value > 0;
   const zero = value === 0;
@@ -397,9 +396,9 @@ function DeltaText({ value }: { value: number | null }) {
     <span
       className={cn(
         "text-[12px] font-medium tabular-nums",
-        zero && "text-neutral-400",
-        !zero && positive && "text-emerald-700",
-        !zero && !positive && "text-red-700",
+        zero && "text-[#8C8C8C]",
+        !zero && positive && "text-[#235935]",
+        !zero && !positive && "text-[#FF0000]",
       )}
     >
       {positive && "+"}
@@ -426,7 +425,6 @@ function RevenueTrendChart({
     () => new Set<TrendKey>(["total"]),
   );
 
-  // Per-touchpoint share of total revenue → scales daily series proportionally.
   const shareByTp = useMemo(() => {
     const map = new Map<TouchpointId, number>();
     const total = data.byTouchpoint.reduce((s, r) => s + r.revenue, 0);
@@ -436,7 +434,6 @@ function RevenueTrendChart({
     return map;
   }, [data.byTouchpoint]);
 
-  // Daily rows keyed by touchpoint + total, for multi-line chart.
   const chartData = useMemo(() => {
     return data.daily.map((d) => {
       const row: Record<string, number | string> = {
@@ -451,7 +448,6 @@ function RevenueTrendChart({
     });
   }, [data.daily, shareByTp]);
 
-  // Revenue totals per touchpoint for the toggle chips.
   const totalsByTp = useMemo(() => {
     const map = new Map<TouchpointId, number>();
     data.byTouchpoint.forEach((r) => map.set(r.touchpointId, r.revenue));
@@ -468,13 +464,12 @@ function RevenueTrendChart({
     });
   };
 
-  // Visible touchpoints filtered by the top-level selector.
   const visibleTps = TOUCHPOINTS.filter((t) => selected.includes(t.id));
 
   return (
     <>
       {/* Toggle chips */}
-      <div className="flex items-center gap-1.5 flex-wrap mt-3">
+      <div className="flex items-center gap-1.5 flex-wrap mt-4">
         <TrendChip
           label="All touchpoints"
           active={activeKeys.has("total")}
@@ -506,32 +501,32 @@ function RevenueTrendChart({
           >
             <CartesianGrid
               strokeDasharray="3 3"
-              stroke="#e5e5e5"
+              stroke="#F0F0F0"
               vertical={false}
             />
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 11, fill: "#737373" }}
+              tick={{ fontSize: 12, fill: "#6B7280" }}
               tickLine={false}
-              axisLine={{ stroke: "#e5e5e5" }}
+              axisLine={{ stroke: "#E0E0E0" }}
               interval={Math.ceil(data.daily.length / 8)}
             />
             <YAxis
-              tick={{ fontSize: 11, fill: "#737373" }}
+              tick={{ fontSize: 12, fill: "#6B7280" }}
               tickLine={false}
               axisLine={false}
               tickFormatter={(v) => `$${v}`}
             />
             <Tooltip
               contentStyle={{
-                background: "#111",
+                background: "#202223",
                 border: "none",
                 borderRadius: 6,
                 color: "#fff",
                 fontSize: 12,
                 padding: "6px 8px",
               }}
-              labelStyle={{ color: "#a3a3a3" }}
+              labelStyle={{ color: "#D9D9D9" }}
               formatter={(v: number, name: string) => [
                 formatCurrency(v),
                 trendKeyLabel(name as TrendKey),
@@ -541,7 +536,7 @@ function RevenueTrendChart({
               verticalAlign="bottom"
               height={24}
               iconType="circle"
-              wrapperStyle={{ fontSize: 11, color: "#525252" }}
+              wrapperStyle={{ fontSize: 12, color: "#5C5F62" }}
               formatter={(v) => trendKeyLabel(v as TrendKey)}
             />
             {activeKeys.has("total") && (
@@ -550,7 +545,7 @@ function RevenueTrendChart({
                 dataKey="total"
                 name="total"
                 stroke={TREND_COLORS.total}
-                strokeWidth={1.75}
+                strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 3, fill: TREND_COLORS.total }}
               />
@@ -599,21 +594,21 @@ function TrendChip({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md border text-[12px] transition-colors",
+        "inline-flex items-center gap-1.5 h-8 px-3 rounded-md border text-[12px] transition-colors",
         active
-          ? "bg-white border-neutral-300 text-neutral-900"
-          : "bg-neutral-50 border-neutral-200 text-neutral-500 hover:text-neutral-800",
+          ? "bg-white border-[#2121C4] text-[#202223]"
+          : "bg-[#F9FAFB] border-[#E0E0E0] text-[#6B7280] hover:text-[#202223]",
       )}
       aria-pressed={active}
     >
       <span
         className="inline-block w-2 h-2 rounded-full shrink-0"
         style={{
-          backgroundColor: active ? color : "#d4d4d4",
+          backgroundColor: active ? color : "#D9D9D9",
         }}
       />
       <span className="font-medium">{label}</span>
-      <span className="text-neutral-400 tabular-nums">{value}</span>
+      <span className="text-[#8C8C8C] tabular-nums">{value}</span>
     </button>
   );
 }
@@ -622,7 +617,7 @@ function TrendChip({
 function EmptyChart() {
   return (
     <div className="h-[180px] flex items-center justify-center">
-      <p className="text-[12px] text-neutral-400">No data yet</p>
+      <p className="text-[14px] text-[#8C8C8C]">No data yet</p>
     </div>
   );
 }

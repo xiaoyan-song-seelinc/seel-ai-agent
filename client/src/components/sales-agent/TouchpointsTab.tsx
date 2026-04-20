@@ -39,12 +39,12 @@ function TouchpointTagChip({ tag }: { tag: TouchpointTag }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center h-[18px] px-1.5 rounded border text-[10px] font-medium leading-none",
+        "inline-flex items-center h-5 px-1.5 rounded border text-[12px] font-medium leading-none",
         meta.className,
       )}
     >
       {tag === "seel_exclusive" && (
-        <Sparkles className="w-2.5 h-2.5 mr-0.5" />
+        <Sparkles className="w-3 h-3 mr-0.5" />
       )}
       {meta.label}
     </span>
@@ -56,18 +56,18 @@ function ShopifyPlusWidget({ met }: { met: boolean }) {
   return (
     <div
       className={cn(
-        "flex items-start gap-3 rounded-md border px-4 py-3",
+        "flex items-start gap-3 rounded-lg border px-4 py-3",
         met
-          ? "bg-emerald-50/60 border-emerald-200"
-          : "bg-amber-50 border-amber-200",
+          ? "bg-[#E2F7DA]/40 border-[#CDE9C3]"
+          : "bg-[#FFFBEB] border-[#F5E6C8] border-l-[3px] border-l-[#FBBF24]",
       )}
     >
       <div
         className={cn(
           "w-8 h-8 rounded-md flex items-center justify-center shrink-0 border",
           met
-            ? "bg-white border-emerald-200 text-emerald-700"
-            : "bg-white border-amber-200 text-amber-700",
+            ? "bg-white border-[#CDE9C3] text-[#235935]"
+            : "bg-white border-[#F5E6C8] text-[#D97706]",
         )}
       >
         {met ? (
@@ -80,18 +80,18 @@ function ShopifyPlusWidget({ met }: { met: boolean }) {
         <div className="flex items-center gap-2 flex-wrap">
           <p
             className={cn(
-              "text-[13px] font-semibold",
-              met ? "text-emerald-800" : "text-amber-900",
+              "text-[14px] font-semibold",
+              met ? "text-[#235935]" : "text-[#202223]",
             )}
           >
             Required: Shopify Plus
           </p>
           <span
             className={cn(
-              "inline-flex items-center h-[18px] px-1.5 rounded text-[10px] font-medium border",
+              "inline-flex items-center h-5 px-1.5 rounded text-[12px] font-medium border",
               met
-                ? "bg-white text-emerald-700 border-emerald-300"
-                : "bg-white text-amber-700 border-amber-300",
+                ? "bg-white text-[#235935] border-[#CDE9C3]"
+                : "bg-white text-[#D97706] border-[#F5E6C8]",
             )}
           >
             {met ? "Met" : "Not met"}
@@ -100,7 +100,7 @@ function ShopifyPlusWidget({ met }: { met: boolean }) {
         <p
           className={cn(
             "text-[12px] mt-0.5",
-            met ? "text-emerald-700/80" : "text-amber-800/90",
+            met ? "text-[#235935]/80" : "text-[#6B7280]",
           )}
         >
           {met
@@ -134,7 +134,6 @@ export default function TouchpointsTab() {
 
   const selected = visible.find((t) => t.id === selectedId) ?? visible[0];
 
-  // Group by stage
   const grouped = useMemo(() => {
     const g: Record<Stage, TouchpointMeta[]> = {
       pre_purchase: [],
@@ -148,13 +147,13 @@ export default function TouchpointsTab() {
   return (
     <div className="flex h-full min-h-0">
       {/* Left column: touchpoint cards */}
-      <div className="w-[340px] shrink-0 border-r border-neutral-200 bg-[#fafafa] overflow-auto">
-        <div className="px-4 py-5 space-y-5">
+      <div className="w-[340px] shrink-0 border-r border-[#E0E0E0] bg-[#F9FAFB] overflow-auto">
+        <div className="px-5 py-6 space-y-6">
           {(Object.keys(grouped) as Stage[]).map((stage) => {
             if (grouped[stage].length === 0) return null;
             return (
               <div key={stage}>
-                <p className="text-[11px] font-semibold text-neutral-500 uppercase tracking-[0.08em] mb-2 px-0.5">
+                <p className="text-[12px] font-semibold text-[#8C8C8C] uppercase tracking-[0.08em] mb-2 px-0.5">
                   {STAGE_LABEL[stage]}
                 </p>
                 <div className="space-y-2">
@@ -175,7 +174,7 @@ export default function TouchpointsTab() {
 
       {/* Right column: detail with two accordions */}
       <div className="flex-1 min-w-0 overflow-auto">
-        <div className="max-w-[760px] px-6 py-6">
+        <div className="max-w-[760px] px-8 py-8">
           {selected && <TouchpointDetail meta={selected} />}
         </div>
       </div>
@@ -214,64 +213,64 @@ function TouchpointCard({
     <button
       onClick={onClick}
       className={cn(
-        "w-full text-left bg-white border rounded-lg p-3 transition-all",
+        "w-full text-left bg-white border rounded-[10px] p-4 transition-all",
         active
-          ? "border-primary/40 ring-2 ring-primary/10"
-          : "border-neutral-200 hover:border-neutral-300",
+          ? "border-[#2121C4] ring-2 ring-[rgba(33,33,196,0.1)]"
+          : "border-[#E0E0E0] hover:border-[#D9D9D9] hover:bg-[#F9FAFB]",
       )}
     >
-      <div className="flex items-start gap-2.5">
+      <div className="flex items-start gap-3">
         <div
           className={cn(
-            "w-8 h-8 rounded-md flex items-center justify-center shrink-0 border",
+            "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
             active
-              ? "bg-primary/8 border-primary/20 text-primary"
-              : "bg-neutral-50 border-neutral-200 text-neutral-600",
+              ? "bg-[#ECE9FF] text-[#2121C4]"
+              : "bg-[#F7F7FC] text-[#5C5F62]",
           )}
         >
-          <Icon className="w-4 h-4" />
+          <Icon className="w-5 h-5" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-            <p className="text-[13px] font-semibold text-neutral-900 truncate">
+            <p className="text-[14px] font-semibold text-[#202223] truncate">
               {meta.label}
             </p>
             {meta.previewOnly && (
-              <span className="text-[10px] text-neutral-500 bg-neutral-100 border border-neutral-200 px-1 py-[1px] rounded shrink-0">
+              <span className="text-[12px] text-[#5C5F62] bg-[#E7EBF5] border border-[#DADEE9] px-1.5 py-[1px] rounded shrink-0">
                 preview
               </span>
             )}
           </div>
           {(meta.tags?.length || meta.requiresShopifyPlus) && (
-            <div className="flex items-center gap-1 flex-wrap mb-1">
+            <div className="flex items-center gap-1 flex-wrap mb-1.5">
               {meta.tags?.map((tag) => (
                 <TouchpointTagChip key={tag} tag={tag} />
               ))}
               {meta.requiresShopifyPlus && (
-                <span className="inline-flex items-center h-[18px] px-1.5 rounded border text-[10px] font-medium leading-none bg-neutral-50 text-neutral-700 border-neutral-300">
+                <span className="inline-flex items-center h-5 px-1.5 rounded border text-[12px] font-medium leading-none bg-[#F7F7FC] text-[#5C5F62] border-[#DADEE9]">
                   Shopify Plus
                 </span>
               )}
             </div>
           )}
-          <p className="text-[11px] text-neutral-500 leading-snug line-clamp-2">
+          <p className="text-[12px] text-[#6B7280] leading-snug line-clamp-2">
             {meta.description}
           </p>
-          <div className="flex items-center gap-1.5 mt-2 text-[11px]">
+          <div className="flex items-center gap-1.5 mt-2 text-[12px]">
             <StatusDot kind={statusKind} />
             <span
               className={cn(
-                statusKind === "on" && "text-emerald-700",
-                statusKind === "warn" && "text-amber-700",
-                statusKind === "off" && "text-neutral-500",
+                statusKind === "on" && "text-[#235935]",
+                statusKind === "warn" && "text-[#D97706]",
+                statusKind === "off" && "text-[#6B7280]",
               )}
             >
               {statusLabel}
             </span>
             {strategy && (
               <>
-                <span className="text-neutral-300">·</span>
-                <span className="text-neutral-500 truncate">
+                <span className="text-[#D9D9D9]">·</span>
+                <span className="text-[#6B7280] truncate">
                   {strategy.name}
                 </span>
               </>
@@ -289,24 +288,24 @@ function TouchpointDetail({ meta }: { meta: TouchpointMeta }) {
   const Icon = TOUCHPOINT_ICON[meta.id];
   if (meta.id === "thank_you_page") return <ThankYouPageDetail />;
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <header className="flex items-start gap-3 pb-1">
-        <div className="w-10 h-10 rounded-md bg-primary/8 border border-primary/15 flex items-center justify-center shrink-0 text-primary">
+        <div className="w-10 h-10 rounded-lg bg-[#ECE9FF] flex items-center justify-center shrink-0 text-[#2121C4]">
           <Icon className="w-5 h-5" />
         </div>
         <div className="min-w-0">
-          <p className="text-[11px] text-neutral-500 uppercase tracking-[0.08em]">
+          <p className="text-[12px] text-[#8C8C8C] uppercase tracking-[0.08em]">
             {STAGE_LABEL[meta.stage]}
           </p>
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-[18px] font-bold text-neutral-900 leading-tight">
+            <h2 className="text-[24px] font-bold text-[#202223] leading-tight">
               {meta.label}
             </h2>
             {meta.tags?.map((tag) => (
               <TouchpointTagChip key={tag} tag={tag} />
             ))}
           </div>
-          <p className="text-[13px] text-neutral-500 mt-0.5">
+          <p className="text-[14px] text-[#6B7280] mt-1">
             {meta.description}
           </p>
         </div>
@@ -317,7 +316,7 @@ function TouchpointDetail({ meta }: { meta: TouchpointMeta }) {
       )}
 
       <Accordion title="Setting" defaultOpen={true}>
-        <div className="px-5 py-4">
+        <div className="px-5 py-5">
           {meta.dependencyKey ? (
             <DependencySetting meta={meta} />
           ) : (
@@ -360,8 +359,8 @@ function DependencySetting({ meta }: { meta: TouchpointMeta }) {
 
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-[13px] font-medium text-neutral-900">Enabled</p>
-          <p className="text-[12px] text-neutral-500 mt-0.5">
+          <p className="text-[14px] font-medium text-[#202223]">Enabled</p>
+          <p className="text-[12px] text-[#6B7280] mt-0.5">
             Show Sales Agent recommendations on {meta.label}.
           </p>
         </div>
@@ -372,7 +371,7 @@ function DependencySetting({ meta }: { meta: TouchpointMeta }) {
         />
       </div>
 
-      <div className="text-[12px] text-neutral-500 bg-neutral-50 border border-neutral-200 rounded-md px-3 py-2">
+      <div className="text-[12px] text-[#6B7280] bg-[#F9FAFB] border border-[#E0E0E0] rounded-lg px-3 py-2.5">
         Recommendations on {meta.label} are driven by the shopper's real-time
         query or conversation, so no explicit strategy is selected.
       </div>
@@ -390,8 +389,8 @@ function StrategySetting({ meta }: { meta: TouchpointMeta }) {
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-[13px] font-medium text-neutral-900">Enabled</p>
-          <p className="text-[12px] text-neutral-500 mt-0.5">
+          <p className="text-[14px] font-medium text-[#202223]">Enabled</p>
+          <p className="text-[12px] text-[#6B7280] mt-0.5">
             Serve recommendations at this touchpoint.
           </p>
         </div>
@@ -401,7 +400,7 @@ function StrategySetting({ meta }: { meta: TouchpointMeta }) {
         />
       </div>
 
-      <div className="border-t border-neutral-100 pt-4">
+      <div className="border-t border-[#F0F0F0] pt-4">
         <Field
           label="Strategy"
           help="This strategy is shared with other touchpoints using it."
@@ -443,7 +442,7 @@ function TouchpointStats({ touchpointId }: { touchpointId: TouchpointId }) {
 
   if (isEmpty) {
     return (
-      <div className="px-5 py-6 text-center text-[12px] text-neutral-500">
+      <div className="px-5 py-8 text-center text-[14px] text-[#6B7280]">
         No traffic in the last 30 days.
       </div>
     );
@@ -481,36 +480,36 @@ function TouchpointStats({ touchpointId }: { touchpointId: TouchpointId }) {
   ];
 
   return (
-    <div className="px-5 py-4 space-y-4">
+    <div className="px-5 py-5 space-y-4">
       <div className="grid grid-cols-4 gap-4">
         {cells.map((c) => (
           <div key={c.label}>
-            <div className="flex items-center gap-1 text-[11px] text-neutral-500">
+            <div className="flex items-center gap-1 text-[12px] text-[#6B7280]">
               <span className="uppercase tracking-[0.06em] font-medium">
                 {c.label}
               </span>
               <InfoTip>{c.tip}</InfoTip>
             </div>
-            <p className="text-[18px] font-semibold text-neutral-900 tabular-nums mt-0.5">
+            <p className="text-[24px] font-bold text-[#202223] tabular-nums leading-tight mt-1">
               {c.value}
             </p>
             {c.sub && (
-              <p className="text-[11px] mt-0.5 tabular-nums">
+              <p className="text-[12px] mt-0.5 tabular-nums">
                 <span
                   className={cn(
-                    c.sub.startsWith("+") && "text-emerald-700",
-                    c.sub.startsWith("−") && "text-red-700",
+                    c.sub.startsWith("+") && "text-[#235935]",
+                    c.sub.startsWith("−") && "text-[#FF0000]",
                   )}
                 >
                   {c.sub}
                 </span>
-                <span className="text-neutral-400 ml-1">vs previous</span>
+                <span className="text-[#8C8C8C] ml-1">vs previous</span>
               </p>
             )}
           </div>
         ))}
       </div>
-      <p className="text-[11px] text-neutral-400 pt-2 border-t border-neutral-100">
+      <p className="text-[12px] text-[#8C8C8C] pt-3 border-t border-[#F0F0F0]">
         Last 30 days · attribution window 7 days.
       </p>
     </div>
@@ -531,24 +530,24 @@ function ThankYouPageDetail() {
   const widget = store.thankYouWidgets.find((w) => w.id === drawerWidgetId);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <header className="flex items-start gap-3 pb-1">
-        <div className="w-10 h-10 rounded-md bg-neutral-100 border border-neutral-200 flex items-center justify-center shrink-0 text-neutral-600">
+        <div className="w-10 h-10 rounded-lg bg-[#F7F7FC] border border-[#E0E0E0] flex items-center justify-center shrink-0 text-[#5C5F62]">
           <Package className="w-5 h-5" />
         </div>
         <div className="min-w-0">
-          <p className="text-[11px] text-neutral-500 uppercase tracking-[0.08em]">
+          <p className="text-[12px] text-[#8C8C8C] uppercase tracking-[0.08em]">
             Post-purchase
           </p>
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-[18px] font-bold text-neutral-900 leading-tight">
+            <h2 className="text-[24px] font-bold text-[#202223] leading-tight">
               Thank You Page
             </h2>
             {meta.tags?.map((tag) => (
               <TouchpointTagChip key={tag} tag={tag} />
             ))}
           </div>
-          <p className="text-[13px] text-neutral-500 mt-0.5">
+          <p className="text-[14px] text-[#6B7280] mt-1">
             Order confirmation recommendations.
           </p>
         </div>
@@ -564,9 +563,9 @@ function ThankYouPageDetail() {
       </Callout>
 
       <Accordion title="Setting" defaultOpen={true}>
-        <div className="px-5 py-4 space-y-3">
+        <div className="px-5 py-5 space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-[13px] font-medium text-neutral-800">
+            <p className="text-[14px] font-medium text-[#202223]">
               Widgets ({store.thankYouWidgets.length})
             </p>
             <SAButton variant="secondary" size="sm" disabled>
@@ -574,7 +573,7 @@ function ThankYouPageDetail() {
             </SAButton>
           </div>
 
-          <div className="border border-neutral-200 rounded-md divide-y divide-neutral-100">
+          <div className="border border-[#E0E0E0] rounded-lg divide-y divide-[#F0F0F0]">
             {store.thankYouWidgets.map((w) => {
               const strategy = store.strategies.find(
                 (s) => s.id === w.strategyId,
@@ -587,10 +586,10 @@ function ThankYouPageDetail() {
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <StatusDot kind={w.enabled ? "on" : "off"} />
                     <div className="min-w-0">
-                      <p className="text-[13px] font-medium text-neutral-900 truncate">
+                      <p className="text-[14px] font-medium text-[#202223] truncate">
                         {w.name}
                       </p>
-                      <p className="text-[11px] text-neutral-500 truncate">
+                      <p className="text-[12px] text-[#6B7280] truncate">
                         {strategy?.name ?? "No strategy"} · {w.productCount}{" "}
                         products · CTA "{w.ctaLabel}"
                       </p>
@@ -676,8 +675,8 @@ function ThankYouWidgetDrawer({
 
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[13px] font-medium text-neutral-900">Enabled</p>
-              <p className="text-[12px] text-neutral-500">
+              <p className="text-[14px] font-medium text-[#202223]">Enabled</p>
+              <p className="text-[12px] text-[#6B7280]">
                 Toggle this widget on the Thank You Page.
               </p>
             </div>
@@ -760,21 +759,21 @@ function ThankYouWidgetDrawer({
             </Field>
           </div>
 
-          <div className="border border-neutral-200 rounded-md">
+          <div className="border border-[#E0E0E0] rounded-lg">
             <button
               type="button"
               onClick={() => setV2Open((v) => !v)}
-              className="w-full flex items-center justify-between px-3 py-2 text-left"
+              className="w-full flex items-center justify-between px-4 py-2.5 text-left"
             >
-              <span className="text-[13px] font-medium text-neutral-900">
+              <span className="text-[14px] font-medium text-[#202223]">
                 V2 capabilities
               </span>
-              <span className="text-[11px] text-neutral-500">
+              <span className="text-[12px] text-[#6B7280]">
                 {v2Open ? "Hide" : "Show"}
               </span>
             </button>
             {v2Open && (
-              <div className="border-t border-neutral-200 divide-y divide-neutral-100">
+              <div className="border-t border-[#F0F0F0] divide-y divide-[#F0F0F0]">
                 {[
                   { k: "Layout", v: "Grid (default)" },
                   { k: "Countdown", v: "Not configured" },
@@ -784,13 +783,13 @@ function ThankYouWidgetDrawer({
                 ].map((row) => (
                   <div
                     key={row.k}
-                    className="flex items-center justify-between px-3 py-2 opacity-60"
+                    className="flex items-center justify-between px-4 py-2.5 opacity-60"
                   >
                     <div>
-                      <p className="text-[12px] font-medium text-neutral-700">
+                      <p className="text-[12px] font-medium text-[#5C5F62]">
                         {row.k}
                       </p>
-                      <p className="text-[11px] text-neutral-500">{row.v}</p>
+                      <p className="text-[12px] text-[#8C8C8C]">{row.v}</p>
                     </div>
                     <SAToggle checked={false} disabled onChange={() => {}} />
                   </div>

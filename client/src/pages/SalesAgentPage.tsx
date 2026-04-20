@@ -1,5 +1,6 @@
 /* ── Sales Agent Page ──────────────────────────────────────
-   Single page, 3 top-level tabs: Touchpoints · Strategies · Analytics
+   Seel design system: #2121C4 primary, page bg #F9FAFB,
+   H1 30px/bold, 14px tabs with 2px #2121C4 underline.
    ──────────────────────────────────────────────────────── */
 
 import { useLocation, useRoute, Link } from "wouter";
@@ -27,18 +28,17 @@ export default function SalesAgentPage() {
     return "touchpoints";
   })();
 
-  // Silence unused var warning on location while keeping it as a re-render trigger
   void location;
 
   return (
-    <div className="flex flex-col h-full bg-[#fafafa]">
+    <div className="flex flex-col h-full bg-[#F9FAFB]">
       {/* Module header */}
-      <div className="shrink-0 bg-white border-b border-neutral-200">
-        <div className="px-6 pt-5">
-          <h1 className="text-[22px] font-bold text-neutral-900 leading-tight">
+      <div className="shrink-0 bg-white border-b border-[#E0E0E0]">
+        <div className="px-8 pt-6">
+          <h1 className="text-[30px] font-bold text-[#202223] leading-9">
             Sales Agent
           </h1>
-          <div className="flex items-center gap-1 mt-4 -mb-px">
+          <div className="flex items-center gap-8 mt-5 -mb-px">
             {TABS.map((t) => {
               const href =
                 t.key === "touchpoints" ? "/sales-agent" : `/sales-agent/${t.key}`;
@@ -47,16 +47,13 @@ export default function SalesAgentPage() {
                 <Link key={t.key} href={href}>
                   <button
                     className={cn(
-                      "px-3 pb-3 text-[14px] font-semibold transition-colors relative",
+                      "pb-3 text-[14px] font-medium transition-colors border-b-2 -mb-px",
                       active
-                        ? "text-primary"
-                        : "text-neutral-500 hover:text-neutral-900",
+                        ? "text-[#2121C4] border-[#2121C4]"
+                        : "text-[#8C8C8C] hover:text-[#202223] border-transparent",
                     )}
                   >
                     {t.label}
-                    {active && (
-                      <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary" />
-                    )}
                   </button>
                 </Link>
               );

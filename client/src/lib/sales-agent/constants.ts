@@ -82,19 +82,19 @@ export const TOUCHPOINT_TAG_META: Record<
 > = {
   seel_exclusive: {
     label: "Seel-exclusive",
-    className: "bg-primary/10 text-primary border-primary/20",
+    className: "bg-[#ECE9FF] text-[#2121C4] border-[#D6D2FF]",
   },
   network_ready: {
     label: "Network-ready",
-    className: "bg-sky-50 text-sky-700 border-sky-200",
+    className: "bg-[#F2F6FE] text-[#2121C4] border-[#D6E7FF]",
   },
   ai_powered: {
     label: "AI-powered",
-    className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    className: "bg-[#E2F7DA] text-[#235935] border-[#CDE9C3]",
   },
   new: {
     label: "New",
-    className: "bg-amber-50 text-amber-700 border-amber-200",
+    className: "bg-[#FFFBEB] text-[#D97706] border-[#F5E6C8]",
   },
 };
 
