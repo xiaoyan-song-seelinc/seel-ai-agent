@@ -8,12 +8,24 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
+  Legend,
 } from "recharts";
 import { cn } from "@/lib/utils";
 import { useSalesAgent } from "@/lib/sales-agent/store";
 import { TOUCHPOINTS, touchpointLabel } from "@/lib/sales-agent/constants";
 import type { TouchpointId } from "@/lib/sales-agent/types";
 import { InfoTip, Panel, SAButton, SASelect } from "./primitives";
+
+type TrendKey = "total" | TouchpointId;
+
+const TREND_COLORS: Record<TrendKey, string> = {
+  total: "var(--primary)",
+  seel_rc: "#0ea5e9",
+  wfp_email: "#8b5cf6",
+  search_bar: "#10b981",
+  live_widget: "#f59e0b",
+  thank_you_page: "#ef4444",
+};
 
 type Range = "7d" | "30d" | "90d";
 
@@ -156,89 +168,35 @@ export default function AnalyticsTab() {
         />
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-[2fr_1fr] gap-3">
-        <Panel className="p-5">
-          <div className="flex items-center gap-1.5">
-            <p className="text-[14px] font-semibold text-neutral-900">
-              Revenue trend
+      {/* Chart: Revenue Trend with per-touchpoint toggles */}
+      <Panel className="p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-1.5">
+              <p className="text-[14px] font-semibold text-neutral-900">
+                Revenue trend
+              </p>
+              <InfoTip>
+                Attributed revenue by day, over the selected window. Toggle
+                touchpoints to compare their contribution on the same axis.
+              </InfoTip>
+            </div>
+            <p className="text-[12px] text-neutral-500 mt-0.5">
+              Combined Revenue Trend and Revenue by Touchpoint in one view.
             </p>
-            <InfoTip>Attributed revenue by day, over the selected window.</InfoTip>
           </div>
-          <div className="h-[220px] mt-3">
-            {isEmpty ? (
-              <EmptyChart />
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={data.daily.map((d) => ({
-                    date: d.date.slice(5),
-                    revenue: d.revenue,
-                  }))}
-                  margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="#e5e5e5"
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fontSize: 11, fill: "#737373" }}
-                    tickLine={false}
-                    axisLine={{ stroke: "#e5e5e5" }}
-                    interval={Math.ceil(data.daily.length / 8)}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 11, fill: "#737373" }}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(v) => `$${v}`}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      background: "#111",
-                      border: "none",
-                      borderRadius: 6,
-                      color: "#fff",
-                      fontSize: 12,
-                      padding: "6px 8px",
-                    }}
-                    labelStyle={{ color: "#a3a3a3" }}
-                    formatter={(v: number) => [formatCurrency(v), "Revenue"]}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="revenue"
-                    stroke="var(--primary)"
-                    strokeWidth={1.75}
-                    dot={false}
-                    activeDot={{ r: 3, fill: "var(--primary)" }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
+        </div>
+        {isEmpty ? (
+          <div className="h-[260px] mt-3">
+            <EmptyChart />
           </div>
-        </Panel>
-
-        <Panel className="p-5">
-          <div className="flex items-center gap-1.5">
-            <p className="text-[14px] font-semibold text-neutral-900">
-              Revenue by touchpoint
-            </p>
-            <InfoTip>
-              Share of attributed revenue contributed by each touchpoint.
-            </InfoTip>
-          </div>
-          <div className="mt-4">
-            {isEmpty ? (
-              <EmptyChart />
-            ) : (
-              <TouchpointBars data={data.byTouchpoint} total={data.revenue} />
-            )}
-          </div>
-        </Panel>
-      </div>
+        ) : (
+          <RevenueTrendChart
+            data={data}
+            selected={selected}
+          />
+        )}
+      </Panel>
 
       {/* Detail table */}
       <Panel className="overflow-hidden">
@@ -456,37 +414,207 @@ function formatDelta(d: number): string {
   return d > 0 ? `+${pct}%` : `−${pct}%`;
 }
 
-/* ── Revenue-by-touchpoint horizontal bar ──────────────── */
-function TouchpointBars({
+/* ── Revenue trend chart with per-touchpoint toggles ─── */
+function RevenueTrendChart({
   data,
-  total,
+  selected,
 }: {
-  data: { touchpointId: TouchpointId; revenue: number }[];
-  total: number;
+  data: import("@/lib/sales-agent/types").AnalyticsData;
+  selected: TouchpointId[];
 }) {
-  const sorted = [...data].sort((a, b) => b.revenue - a.revenue);
+  const [activeKeys, setActiveKeys] = useState<Set<TrendKey>>(
+    () => new Set<TrendKey>(["total"]),
+  );
+
+  // Per-touchpoint share of total revenue → scales daily series proportionally.
+  const shareByTp = useMemo(() => {
+    const map = new Map<TouchpointId, number>();
+    const total = data.byTouchpoint.reduce((s, r) => s + r.revenue, 0);
+    data.byTouchpoint.forEach((r) => {
+      map.set(r.touchpointId, total > 0 ? r.revenue / total : 0);
+    });
+    return map;
+  }, [data.byTouchpoint]);
+
+  // Daily rows keyed by touchpoint + total, for multi-line chart.
+  const chartData = useMemo(() => {
+    return data.daily.map((d) => {
+      const row: Record<string, number | string> = {
+        date: d.date.slice(5),
+        total: d.revenue,
+      };
+      TOUCHPOINTS.forEach((t) => {
+        const share = shareByTp.get(t.id) ?? 0;
+        row[t.id] = Math.round(d.revenue * share);
+      });
+      return row;
+    });
+  }, [data.daily, shareByTp]);
+
+  // Revenue totals per touchpoint for the toggle chips.
+  const totalsByTp = useMemo(() => {
+    const map = new Map<TouchpointId, number>();
+    data.byTouchpoint.forEach((r) => map.set(r.touchpointId, r.revenue));
+    return map;
+  }, [data.byTouchpoint]);
+
+  const toggleKey = (k: TrendKey) => {
+    setActiveKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      if (next.size === 0) next.add("total");
+      return next;
+    });
+  };
+
+  // Visible touchpoints filtered by the top-level selector.
+  const visibleTps = TOUCHPOINTS.filter((t) => selected.includes(t.id));
+
   return (
-    <div className="space-y-2.5">
-      {sorted.map((d) => {
-        const pct = total > 0 ? (d.revenue / total) * 100 : 0;
-        return (
-          <div key={d.touchpointId}>
-            <div className="flex items-center justify-between text-[11px] text-neutral-500 mb-0.5">
-              <span className="text-neutral-800 text-[12px] font-medium">
-                {touchpointLabel(d.touchpointId)}
-              </span>
-              <span className="tabular-nums">{formatCurrency(d.revenue)}</span>
-            </div>
-            <div className="h-1.5 bg-neutral-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-primary rounded-full"
-                style={{ width: `${pct}%` }}
+    <>
+      {/* Toggle chips */}
+      <div className="flex items-center gap-1.5 flex-wrap mt-3">
+        <TrendChip
+          label="All touchpoints"
+          active={activeKeys.has("total")}
+          color={TREND_COLORS.total}
+          value={formatCurrency(data.revenue)}
+          onClick={() => toggleKey("total")}
+        />
+        {visibleTps.map((t) => {
+          const active = activeKeys.has(t.id);
+          const revenue = totalsByTp.get(t.id) ?? 0;
+          return (
+            <TrendChip
+              key={t.id}
+              label={touchpointLabel(t.id)}
+              active={active}
+              color={TREND_COLORS[t.id]}
+              value={formatCurrency(revenue)}
+              onClick={() => toggleKey(t.id)}
+            />
+          );
+        })}
+      </div>
+
+      <div className="h-[280px] mt-4">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart
+            data={chartData}
+            margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
+          >
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="#e5e5e5"
+              vertical={false}
+            />
+            <XAxis
+              dataKey="date"
+              tick={{ fontSize: 11, fill: "#737373" }}
+              tickLine={false}
+              axisLine={{ stroke: "#e5e5e5" }}
+              interval={Math.ceil(data.daily.length / 8)}
+            />
+            <YAxis
+              tick={{ fontSize: 11, fill: "#737373" }}
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(v) => `$${v}`}
+            />
+            <Tooltip
+              contentStyle={{
+                background: "#111",
+                border: "none",
+                borderRadius: 6,
+                color: "#fff",
+                fontSize: 12,
+                padding: "6px 8px",
+              }}
+              labelStyle={{ color: "#a3a3a3" }}
+              formatter={(v: number, name: string) => [
+                formatCurrency(v),
+                trendKeyLabel(name as TrendKey),
+              ]}
+            />
+            <Legend
+              verticalAlign="bottom"
+              height={24}
+              iconType="circle"
+              wrapperStyle={{ fontSize: 11, color: "#525252" }}
+              formatter={(v) => trendKeyLabel(v as TrendKey)}
+            />
+            {activeKeys.has("total") && (
+              <Line
+                type="monotone"
+                dataKey="total"
+                name="total"
+                stroke={TREND_COLORS.total}
+                strokeWidth={1.75}
+                dot={false}
+                activeDot={{ r: 3, fill: TREND_COLORS.total }}
               />
-            </div>
-          </div>
-        );
-      })}
-    </div>
+            )}
+            {visibleTps.map((t) =>
+              activeKeys.has(t.id) ? (
+                <Line
+                  key={t.id}
+                  type="monotone"
+                  dataKey={t.id}
+                  name={t.id}
+                  stroke={TREND_COLORS[t.id]}
+                  strokeWidth={1.5}
+                  dot={false}
+                  activeDot={{ r: 3, fill: TREND_COLORS[t.id] }}
+                />
+              ) : null,
+            )}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </>
+  );
+}
+
+function trendKeyLabel(k: TrendKey): string {
+  if (k === "total") return "All touchpoints";
+  return touchpointLabel(k);
+}
+
+function TrendChip({
+  label,
+  active,
+  color,
+  value,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  color: string;
+  value: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md border text-[12px] transition-colors",
+        active
+          ? "bg-white border-neutral-300 text-neutral-900"
+          : "bg-neutral-50 border-neutral-200 text-neutral-500 hover:text-neutral-800",
+      )}
+      aria-pressed={active}
+    >
+      <span
+        className="inline-block w-2 h-2 rounded-full shrink-0"
+        style={{
+          backgroundColor: active ? color : "#d4d4d4",
+        }}
+      />
+      <span className="font-medium">{label}</span>
+      <span className="text-neutral-400 tabular-nums">{value}</span>
+    </button>
   );
 }
 

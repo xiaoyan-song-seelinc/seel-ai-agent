@@ -91,6 +91,25 @@ export default function DemoConsole() {
               </div>
             </div>
 
+            {/* Shopify Plus */}
+            <div>
+              <p className="text-[11px] font-medium text-neutral-500 uppercase tracking-[0.06em] mb-1.5">
+                Shopify Plus
+              </p>
+              <div className="space-y-1">
+                <RadioRow
+                  label="On Shopify Plus"
+                  checked={store.dependency.shopifyPlus}
+                  onSelect={() => store.setDependency({ shopifyPlus: true })}
+                />
+                <RadioRow
+                  label="Not on Shopify Plus"
+                  checked={!store.dependency.shopifyPlus}
+                  onSelect={() => store.setDependency({ shopifyPlus: false })}
+                />
+              </div>
+            </div>
+
             {/* Platform */}
             <div>
               <p className="text-[11px] font-medium text-neutral-500 uppercase tracking-[0.06em] mb-1.5">
