@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Copy } from "lucide-react";
 import { useSalesAgent } from "@/lib/sales-agent/store";
 import { InfoTip, Panel, SAButton } from "./primitives";
 import ExclusionRules from "./ExclusionRules";
@@ -11,6 +11,7 @@ import {
 import type { Strategy } from "@/lib/sales-agent/types";
 
 export default function StrategiesTab() {
+  const store = useSalesAgent();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -22,24 +23,32 @@ export default function StrategiesTab() {
     setEditingId(id);
     setModalOpen(true);
   };
+  const duplicate = (id: string) => {
+    const src = store.strategies.find((s) => s.id === id);
+    if (!src) return;
+    const newId = `s_${Math.random().toString(36).slice(2, 9)}`;
+    const copy: Strategy = {
+      ...src,
+      id: newId,
+      name: `${src.name} (copy)`,
+      updatedAt: new Date().toISOString(),
+    };
+    store.addStrategy(copy);
+  };
 
   return (
-    <div className="max-w-[1040px] mx-auto px-6 py-6 space-y-6">
-      {/* Strategies list — top */}
+    <div className="max-w-[1040px] mx-auto px-6 py-6 space-y-8">
+      {/* Own Product Strategies */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-[16px] font-bold text-neutral-900">
-                Strategies
+                Own Product Strategies
               </h2>
-              <span className="inline-flex items-center h-5 px-1.5 rounded bg-primary/8 text-primary text-[11px] font-medium">
-                Online Products
-              </span>
               <InfoTip>
-                Strategies currently operate on your store's Own products.
-                Network Products (Seel-network inventory) are coming in a
-                future release.
+                Recipes that source from your store's own catalog and are
+                referenced by touchpoints.
               </InfoTip>
             </div>
             <p className="text-[13px] text-neutral-500 mt-0.5">
@@ -52,9 +61,33 @@ export default function StrategiesTab() {
           </SAButton>
         </div>
 
-        <StrategyTable onEdit={openEdit} />
+        <StrategyTable
+          onEdit={openEdit}
+          onDuplicate={duplicate}
+        />
+      </section>
 
-        <NetworkProductsTeaser />
+      {/* Network Product Strategies — coming soon */}
+      <section className="space-y-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-[16px] font-bold text-neutral-900">
+              Network Product Strategies
+            </h2>
+            <span className="inline-flex items-center h-5 px-1.5 rounded bg-neutral-200 text-neutral-600 text-[11px] font-medium">
+              Coming soon
+            </span>
+            <InfoTip>
+              Recommend products from the Seel network to capture demand your
+              catalog doesn't serve.
+            </InfoTip>
+          </div>
+          <p className="text-[13px] text-neutral-500 mt-0.5">
+            Source recommendations from the Seel network inventory.
+          </p>
+        </div>
+
+        <NetworkProductsPlaceholder />
       </section>
 
       {/* Exclusion rules — bottom */}
@@ -69,33 +102,31 @@ export default function StrategiesTab() {
   );
 }
 
-/* ── Network Products teaser (future scope) ────────────── */
-function NetworkProductsTeaser() {
+/* ── Network Products placeholder (future scope) ────────────── */
+function NetworkProductsPlaceholder() {
   return (
-    <div className="border border-dashed border-neutral-300 rounded-lg px-4 py-3 flex items-center justify-between bg-neutral-50/50">
-      <div>
-        <div className="flex items-center gap-2">
-          <p className="text-[13px] font-medium text-neutral-700">
-            Network Products
-          </p>
-          <span className="inline-flex items-center h-5 px-1.5 rounded bg-neutral-200 text-neutral-600 text-[11px] font-medium">
-            Coming soon
-          </span>
-        </div>
-        <p className="text-[12px] text-neutral-500 mt-0.5">
+    <Panel className="border-dashed bg-neutral-50/50">
+      <div className="px-6 py-10 flex flex-col items-center justify-center text-center">
+        <p className="text-[14px] font-medium text-neutral-700">
+          Coming Soon
+        </p>
+        <p className="text-[12px] text-neutral-500 mt-1 max-w-[420px]">
           Recommend products from the Seel network to capture demand your
-          catalog doesn't serve.
+          catalog doesn't serve. Stay tuned for an upcoming release.
         </p>
       </div>
-      <SAButton variant="secondary" size="sm" disabled>
-        Not available
-      </SAButton>
-    </div>
+    </Panel>
   );
 }
 
 /* ── Strategy table ─────────────────────────────────────── */
-function StrategyTable({ onEdit }: { onEdit: (id: string) => void }) {
+function StrategyTable({
+  onEdit,
+  onDuplicate,
+}: {
+  onEdit: (id: string) => void;
+  onDuplicate: (id: string) => void;
+}) {
   const store = useSalesAgent();
 
   const rows = useMemo(() => {
@@ -120,16 +151,22 @@ function StrategyTable({ onEdit }: { onEdit: (id: string) => void }) {
 
   return (
     <Panel className="overflow-hidden">
-      <div className="grid grid-cols-[minmax(0,2fr)_120px_minmax(0,1.4fr)_120px_80px] items-center px-4 py-2.5 bg-neutral-50 border-b border-neutral-100 text-[11px] font-medium text-neutral-500 uppercase tracking-[0.06em]">
+      <div className="grid grid-cols-[minmax(0,2fr)_120px_minmax(0,1.4fr)_120px_150px] items-center px-4 py-2.5 bg-neutral-50 border-b border-neutral-100 text-[11px] font-medium text-neutral-500 uppercase tracking-[0.06em]">
         <div>Name</div>
         <div>Type</div>
         <div>Used by</div>
         <div>Updated</div>
-        <div className="text-right">Action</div>
+        <div className="text-right">Actions</div>
       </div>
       <div className="divide-y divide-neutral-100">
         {rows.map(({ s, refs }) => (
-          <StrategyRow key={s.id} strategy={s} refs={refs} onEdit={onEdit} />
+          <StrategyRow
+            key={s.id}
+            strategy={s}
+            refs={refs}
+            onEdit={onEdit}
+            onDuplicate={onDuplicate}
+          />
         ))}
       </div>
     </Panel>
@@ -140,13 +177,15 @@ function StrategyRow({
   strategy,
   refs,
   onEdit,
+  onDuplicate,
 }: {
   strategy: Strategy;
   refs: string[];
   onEdit: (id: string) => void;
+  onDuplicate: (id: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-[minmax(0,2fr)_120px_minmax(0,1.4fr)_120px_80px] items-center px-4 py-3 text-[13px] text-neutral-900 hover:bg-neutral-50">
+    <div className="grid grid-cols-[minmax(0,2fr)_120px_minmax(0,1.4fr)_120px_150px] items-center px-4 py-3 text-[13px] text-neutral-900 hover:bg-neutral-50">
       <div className="min-w-0">
         <p className="font-medium truncate">{strategy.name}</p>
         <p className="text-[11px] text-neutral-500 truncate">
@@ -168,7 +207,16 @@ function StrategyRow({
       <div className="text-[12px] text-neutral-500 tabular-nums">
         {formatDate(strategy.updatedAt)}
       </div>
-      <div className="text-right">
+      <div className="flex items-center justify-end gap-1">
+        <SAButton
+          variant="ghost"
+          size="sm"
+          onClick={() => onDuplicate(strategy.id)}
+          title="Duplicate strategy"
+        >
+          <Copy className="w-3 h-3" />
+          Duplicate
+        </SAButton>
         <SAButton variant="ghost" size="sm" onClick={() => onEdit(strategy.id)}>
           Edit
         </SAButton>

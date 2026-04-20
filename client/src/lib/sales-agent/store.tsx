@@ -141,6 +141,7 @@ export function SalesAgentProvider({ children }: { children: ReactNode }) {
   const [dependency, setDependencyState] = useState<DependencyStatus>({
     searchBar: true,
     liveWidget: true,
+    shopifyPlus: true,
   });
 
   const [touchpoints, setTouchpoints] = useState<TouchpointConfig[]>(() =>

@@ -1,4 +1,4 @@
-import type { Stage, StrategyType, TouchpointId } from "./types";
+import type { Stage, StrategyType, TouchpointId, TouchpointTag } from "./types";
 
 export interface TouchpointMeta {
   id: TouchpointId;
@@ -13,6 +13,10 @@ export interface TouchpointMeta {
   picksStrategy: boolean;
   /** Whether the touchpoint has a platform dependency */
   dependencyKey?: "searchBar" | "liveWidget";
+  /** Touchpoint requires the store to be on Shopify Plus. */
+  requiresShopifyPlus?: boolean;
+  /** Optional display tags (Seel-exclusive, Network-ready, etc.). */
+  tags?: TouchpointTag[];
 }
 
 export const TOUCHPOINTS: TouchpointMeta[] = [
@@ -25,6 +29,7 @@ export const TOUCHPOINTS: TouchpointMeta[] = [
     previewOnly: false,
     picksStrategy: false,
     dependencyKey: "searchBar",
+    tags: ["ai_powered"],
   },
   {
     id: "live_widget",
@@ -35,6 +40,7 @@ export const TOUCHPOINTS: TouchpointMeta[] = [
     previewOnly: false,
     picksStrategy: false,
     dependencyKey: "liveWidget",
+    tags: ["ai_powered"],
   },
   {
     id: "thank_you_page",
@@ -44,6 +50,8 @@ export const TOUCHPOINTS: TouchpointMeta[] = [
     shopifyOnly: true,
     previewOnly: true,
     picksStrategy: false,
+    requiresShopifyPlus: true,
+    tags: ["new"],
   },
   {
     id: "seel_rc",
@@ -53,6 +61,7 @@ export const TOUCHPOINTS: TouchpointMeta[] = [
     shopifyOnly: false,
     previewOnly: false,
     picksStrategy: true,
+    tags: ["seel_exclusive", "network_ready"],
   },
   {
     id: "wfp_email",
@@ -62,8 +71,32 @@ export const TOUCHPOINTS: TouchpointMeta[] = [
     shopifyOnly: false,
     previewOnly: false,
     picksStrategy: true,
+    tags: ["seel_exclusive"],
   },
 ];
+
+/** Styled metadata per tag variant. */
+export const TOUCHPOINT_TAG_META: Record<
+  TouchpointTag,
+  { label: string; className: string }
+> = {
+  seel_exclusive: {
+    label: "Seel-exclusive",
+    className: "bg-primary/10 text-primary border-primary/20",
+  },
+  network_ready: {
+    label: "Network-ready",
+    className: "bg-sky-50 text-sky-700 border-sky-200",
+  },
+  ai_powered: {
+    label: "AI-powered",
+    className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  },
+  new: {
+    label: "New",
+    className: "bg-amber-50 text-amber-700 border-amber-200",
+  },
+};
 
 export const STAGE_LABEL: Record<Stage, string> = {
   pre_purchase: "Pre-purchase",

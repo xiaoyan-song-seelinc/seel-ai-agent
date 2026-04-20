@@ -4,9 +4,10 @@ import { useSalesAgent } from "@/lib/sales-agent/store";
 import {
   STAGE_LABEL,
   TOUCHPOINTS,
+  TOUCHPOINT_TAG_META,
   type TouchpointMeta,
 } from "@/lib/sales-agent/constants";
-import type { Stage, TouchpointId } from "@/lib/sales-agent/types";
+import type { Stage, TouchpointId, TouchpointTag } from "@/lib/sales-agent/types";
 import {
   Accordion,
   Callout,
@@ -27,8 +28,89 @@ import {
   Search,
   Mail,
   Undo2,
+  Check,
+  Sparkles,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
+
+/* ── Small tag chip for touchpoint tags ─────────────────── */
+function TouchpointTagChip({ tag }: { tag: TouchpointTag }) {
+  const meta = TOUCHPOINT_TAG_META[tag];
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center h-[18px] px-1.5 rounded border text-[10px] font-medium leading-none",
+        meta.className,
+      )}
+    >
+      {tag === "seel_exclusive" && (
+        <Sparkles className="w-2.5 h-2.5 mr-0.5" />
+      )}
+      {meta.label}
+    </span>
+  );
+}
+
+/* ── Shopify Plus required widget ───────────────────────── */
+function ShopifyPlusWidget({ met }: { met: boolean }) {
+  return (
+    <div
+      className={cn(
+        "flex items-start gap-3 rounded-md border px-4 py-3",
+        met
+          ? "bg-emerald-50/60 border-emerald-200"
+          : "bg-amber-50 border-amber-200",
+      )}
+    >
+      <div
+        className={cn(
+          "w-8 h-8 rounded-md flex items-center justify-center shrink-0 border",
+          met
+            ? "bg-white border-emerald-200 text-emerald-700"
+            : "bg-white border-amber-200 text-amber-700",
+        )}
+      >
+        {met ? (
+          <Check className="w-4 h-4" />
+        ) : (
+          <Sparkles className="w-4 h-4" />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p
+            className={cn(
+              "text-[13px] font-semibold",
+              met ? "text-emerald-800" : "text-amber-900",
+            )}
+          >
+            Required: Shopify Plus
+          </p>
+          <span
+            className={cn(
+              "inline-flex items-center h-[18px] px-1.5 rounded text-[10px] font-medium border",
+              met
+                ? "bg-white text-emerald-700 border-emerald-300"
+                : "bg-white text-amber-700 border-amber-300",
+            )}
+          >
+            {met ? "Met" : "Not met"}
+          </span>
+        </div>
+        <p
+          className={cn(
+            "text-[12px] mt-0.5",
+            met ? "text-emerald-700/80" : "text-amber-800/90",
+          )}
+        >
+          {met
+            ? "Your store is on Shopify Plus, so this touchpoint is available."
+            : "This touchpoint relies on Shopify Plus-only customizations. Upgrade to Shopify Plus to enable it."}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 /* ── Icon per touchpoint ───────────────────────────────── */
 const TOUCHPOINT_ICON: Record<TouchpointId, typeof Search> = {
@@ -150,7 +232,7 @@ function TouchpointCard({
           <Icon className="w-4 h-4" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 mb-0.5">
+          <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
             <p className="text-[13px] font-semibold text-neutral-900 truncate">
               {meta.label}
             </p>
@@ -160,6 +242,18 @@ function TouchpointCard({
               </span>
             )}
           </div>
+          {(meta.tags?.length || meta.requiresShopifyPlus) && (
+            <div className="flex items-center gap-1 flex-wrap mb-1">
+              {meta.tags?.map((tag) => (
+                <TouchpointTagChip key={tag} tag={tag} />
+              ))}
+              {meta.requiresShopifyPlus && (
+                <span className="inline-flex items-center h-[18px] px-1.5 rounded border text-[10px] font-medium leading-none bg-neutral-50 text-neutral-700 border-neutral-300">
+                  Shopify Plus
+                </span>
+              )}
+            </div>
+          )}
           <p className="text-[11px] text-neutral-500 leading-snug line-clamp-2">
             {meta.description}
           </p>
@@ -191,6 +285,7 @@ function TouchpointCard({
 
 /* ── Detail container with two accordions ────────────── */
 function TouchpointDetail({ meta }: { meta: TouchpointMeta }) {
+  const store = useSalesAgent();
   const Icon = TOUCHPOINT_ICON[meta.id];
   if (meta.id === "thank_you_page") return <ThankYouPageDetail />;
   return (
@@ -203,14 +298,23 @@ function TouchpointDetail({ meta }: { meta: TouchpointMeta }) {
           <p className="text-[11px] text-neutral-500 uppercase tracking-[0.08em]">
             {STAGE_LABEL[meta.stage]}
           </p>
-          <h2 className="text-[18px] font-bold text-neutral-900 leading-tight">
-            {meta.label}
-          </h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-[18px] font-bold text-neutral-900 leading-tight">
+              {meta.label}
+            </h2>
+            {meta.tags?.map((tag) => (
+              <TouchpointTagChip key={tag} tag={tag} />
+            ))}
+          </div>
           <p className="text-[13px] text-neutral-500 mt-0.5">
             {meta.description}
           </p>
         </div>
       </header>
+
+      {meta.requiresShopifyPlus && (
+        <ShopifyPlusWidget met={store.dependency.shopifyPlus} />
+      )}
 
       <Accordion title="Setting" defaultOpen={true}>
         <div className="px-5 py-4">
@@ -422,6 +526,7 @@ function formatDeltaInline(d: number): string {
 /* ── Thank You Page detail (V2 preview) ────────────────── */
 function ThankYouPageDetail() {
   const store = useSalesAgent();
+  const meta = TOUCHPOINTS.find((t) => t.id === "thank_you_page")!;
   const [drawerWidgetId, setDrawerWidgetId] = useState<string | null>(null);
   const widget = store.thankYouWidgets.find((w) => w.id === drawerWidgetId);
 
@@ -435,14 +540,23 @@ function ThankYouPageDetail() {
           <p className="text-[11px] text-neutral-500 uppercase tracking-[0.08em]">
             Post-purchase
           </p>
-          <h2 className="text-[18px] font-bold text-neutral-900 leading-tight">
-            Thank You Page
-          </h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-[18px] font-bold text-neutral-900 leading-tight">
+              Thank You Page
+            </h2>
+            {meta.tags?.map((tag) => (
+              <TouchpointTagChip key={tag} tag={tag} />
+            ))}
+          </div>
           <p className="text-[13px] text-neutral-500 mt-0.5">
             Order confirmation recommendations.
           </p>
         </div>
       </header>
+
+      {meta.requiresShopifyPlus && (
+        <ShopifyPlusWidget met={store.dependency.shopifyPlus} />
+      )}
 
       <Callout tone="info" title="Preview — not in this release">
         The Thank You Page composer ships in V2. Widgets below are read-only

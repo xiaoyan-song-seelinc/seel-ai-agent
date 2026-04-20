@@ -106,7 +106,15 @@ export type DemoScenario = "empty" | "active" | "configured_no_traffic";
 export interface DependencyStatus {
   searchBar: boolean; // true = met
   liveWidget: boolean;
+  shopifyPlus: boolean; // true = store is on Shopify Plus
 }
+
+/** Touchpoint tag variants — picked per-touchpoint for display. */
+export type TouchpointTag =
+  | "seel_exclusive"
+  | "network_ready"
+  | "ai_powered"
+  | "new";
 
 export interface DailyPoint {
   date: string; // YYYY-MM-DD
