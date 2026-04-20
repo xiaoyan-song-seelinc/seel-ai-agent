@@ -213,10 +213,10 @@ export default function AnalyticsTab() {
       <Panel className="overflow-hidden">
         <div className="px-6 py-5 border-b border-[#F0F0F0]">
           <p className="text-[18px] font-semibold text-[#202223]">
-            Performance breakdown
-          </p>
-          <p className="text-[12px] text-[#6B7280] mt-0.5">
-            Revenue and engagement per touchpoint, widget, and strategy.
+            Performance breakdown{" "}
+            <span className="text-[14px] font-normal text-[#6B7280]">
+              (Revenue and engagement per touchpoint, widget, and strategy)
+            </span>
           </p>
         </div>
         <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_minmax(0,1.4fr)_110px_90px_90px_150px] px-6 py-4 bg-[#F7F7FC] border-b border-[#F0F0F0] text-[14px] font-semibold text-[#202223]">
@@ -551,7 +551,11 @@ function RevenueTrendChart({
   selected: TouchpointId[];
 }) {
   const [activeKeys, setActiveKeys] = useState<Set<TrendKey>>(
-    () => new Set<TrendKey>(["total"]),
+    () =>
+      new Set<TrendKey>([
+        "total",
+        ...(TOUCHPOINTS.map((t) => t.id) as TrendKey[]),
+      ]),
   );
 
   const shareByTp = useMemo(() => {
@@ -741,7 +745,7 @@ function RevenueByTouchpointChart({
             cursor={{ fill: "rgba(0,0,0,0.03)" }}
             formatter={(v: number) => [formatCurrency(v), "Revenue"]}
           />
-          <Bar dataKey="revenue" fill="#1A1A1A" radius={[0, 3, 3, 0]} />
+          <Bar dataKey="revenue" fill="#2121C4" radius={[0, 3, 3, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>

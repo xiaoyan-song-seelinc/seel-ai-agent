@@ -6,9 +6,10 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
+  Trash2,
 } from "lucide-react";
 import { useSalesAgent } from "@/lib/sales-agent/store";
-import { Chip, InfoTip, Panel, SAButton, Segmented } from "./primitives";
+import { Chip, InfoTip, Modal, Panel, SAButton, Segmented } from "./primitives";
 import ExclusionRules from "./ExclusionRules";
 import StrategyDrawer from "./StrategyDrawer";
 import {
@@ -26,6 +27,7 @@ export default function StrategiesTab() {
   const store = useSalesAgent();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const openNew = () => {
     setEditingId(null);
@@ -50,6 +52,11 @@ export default function StrategiesTab() {
     setEditingId(newId);
     setModalOpen(true);
   };
+
+  const deletingStrategy = deletingId
+    ? store.strategies.find((s) => s.id === deletingId) ?? null
+    : null;
+  const deletingRefs = deletingId ? store.isStrategyReferenced(deletingId) : [];
 
   return (
     <div className="max-w-[1040px] mx-auto px-8 py-8 space-y-8">
@@ -76,7 +83,11 @@ export default function StrategiesTab() {
           </SAButton>
         </div>
 
-        <StrategyTable onEdit={openEdit} onDuplicate={duplicate} />
+        <StrategyTable
+          onEdit={openEdit}
+          onDuplicate={duplicate}
+          onDelete={setDeletingId}
+        />
 
         {/* Exclusion rules scoped to Own Product Strategies */}
         <ExclusionRules embedded />
@@ -110,6 +121,59 @@ export default function StrategiesTab() {
         editingId={editingId}
         onClose={() => setModalOpen(false)}
       />
+
+      <Modal
+        open={!!deletingStrategy}
+        onClose={() => setDeletingId(null)}
+        title={
+          deletingRefs.length > 0 ? "Cannot delete strategy" : "Delete strategy"
+        }
+        width="max-w-[440px]"
+        footer={
+          deletingRefs.length > 0 ? (
+            <SAButton variant="primary" onClick={() => setDeletingId(null)}>
+              OK
+            </SAButton>
+          ) : (
+            <>
+              <SAButton variant="ghost" onClick={() => setDeletingId(null)}>
+                Cancel
+              </SAButton>
+              <SAButton
+                variant="danger"
+                onClick={() => {
+                  if (deletingId) store.removeStrategy(deletingId);
+                  setDeletingId(null);
+                }}
+              >
+                Delete
+              </SAButton>
+            </>
+          )
+        }
+      >
+        {deletingStrategy &&
+          (deletingRefs.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-[14px] text-[#202223]">
+                "{deletingStrategy.name}" is used by:
+              </p>
+              <ul className="text-[14px] text-[#5C5F62] list-disc pl-5">
+                {deletingRefs.map((id) => (
+                  <li key={id}>{touchpointLabel(id)}</li>
+                ))}
+              </ul>
+              <p className="text-[12px] text-[#6B7280] mt-2">
+                Detach from these touchpoints, or pick a replacement strategy,
+                before deleting.
+              </p>
+            </div>
+          ) : (
+            <p className="text-[14px] text-[#202223]">
+              Delete "{deletingStrategy.name}"? This cannot be undone.
+            </p>
+          ))}
+      </Modal>
     </div>
   );
 }
@@ -135,9 +199,11 @@ function NetworkProductsPlaceholder() {
 function StrategyTable({
   onEdit,
   onDuplicate,
+  onDelete,
 }: {
   onEdit: (id: string) => void;
   onDuplicate: (id: string) => void;
+  onDelete: (id: string) => void;
 }) {
   const store = useSalesAgent();
   const [filter, setFilter] = useState<UsedByFilter>("all");
@@ -220,6 +286,7 @@ function StrategyTable({
                 refs={refs}
                 onEdit={onEdit}
                 onDuplicate={onDuplicate}
+                onDelete={onDelete}
               />
             ))
           )}
@@ -260,11 +327,13 @@ function StrategyRow({
   refs,
   onEdit,
   onDuplicate,
+  onDelete,
 }: {
   strategy: Strategy;
   refs: string[];
   onEdit: (id: string) => void;
   onDuplicate: (id: string) => void;
+  onDelete: (id: string) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -297,6 +366,12 @@ function StrategyRow({
         >
           <Pencil className="w-3.5 h-3.5" />
         </IconButton>
+        <IconButton
+          label="Duplicate strategy"
+          onClick={() => onDuplicate(strategy.id)}
+        >
+          <Copy className="w-3.5 h-3.5" />
+        </IconButton>
         <div className="relative">
           <IconButton
             label="More actions"
@@ -316,11 +391,12 @@ function StrategyRow({
                 <MenuItem
                   onClick={() => {
                     setMenuOpen(false);
-                    onDuplicate(strategy.id);
+                    onDelete(strategy.id);
                   }}
-                  icon={<Copy className="w-3.5 h-3.5" />}
+                  icon={<Trash2 className="w-3.5 h-3.5" />}
+                  danger
                 >
-                  Duplicate
+                  Delete
                 </MenuItem>
               </div>
             </>
@@ -365,18 +441,25 @@ function MenuItem({
   onClick,
   icon,
   children,
+  danger = false,
 }: {
   onClick: () => void;
   icon: React.ReactNode;
   children: React.ReactNode;
+  danger?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-[#1A1A1A] hover:bg-[#F5F5F5]"
+      className={cn(
+        "w-full flex items-center gap-2 px-3 py-1.5 text-[13px] hover:bg-[#F5F5F5]",
+        danger ? "text-[#B22222]" : "text-[#1A1A1A]",
+      )}
     >
-      <span className="text-[#8C8C8C]">{icon}</span>
+      <span className={danger ? "text-[#B22222]" : "text-[#8C8C8C]"}>
+        {icon}
+      </span>
       {children}
     </button>
   );

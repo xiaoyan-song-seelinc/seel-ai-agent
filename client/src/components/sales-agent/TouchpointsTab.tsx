@@ -120,10 +120,6 @@ const TOUCHPOINT_ICON: Record<TouchpointId, typeof Search> = {
   wfp_email: Mail,
 };
 
-type TypeFilter = "all" | "search" | "exclusive";
-type StatusFilter = "all" | "on" | "off";
-type StageFilter = "all" | "pre" | "post";
-
 export default function TouchpointsTab() {
   const store = useSalesAgent();
   const visible = useMemo(
@@ -132,46 +128,18 @@ export default function TouchpointsTab() {
     [store.platform],
   );
 
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [stageFilter, setStageFilter] = useState<StageFilter>("all");
-
   const [selectedId, setSelectedId] = useState<TouchpointId>(
     visible[0]?.id ?? "seel_rc",
   );
 
-  // Confirm dialog for enable actions
+  // Confirm dialog for enable / disable actions
   const [confirm, setConfirm] = useState<{
     title: string;
     body: string;
     onConfirm: () => void;
   } | null>(null);
 
-  const filtered = useMemo(() => {
-    return visible.filter((t) => {
-      // Type filter
-      if (typeFilter === "search" && !t.tags?.includes("ai_powered")) return false;
-      if (typeFilter === "exclusive" && !t.tags?.includes("seel_exclusive"))
-        return false;
-      // Stage filter (collapse live_chat into pre)
-      if (stageFilter === "pre" && t.stage === "post_purchase") return false;
-      if (stageFilter === "post" && t.stage !== "post_purchase") return false;
-      // Status filter — On requires enabled AND dependency met.
-      const tp = store.touchpoints.find((x) => x.id === t.id);
-      const depMet =
-        !t.dependencyKey || store.dependency[t.dependencyKey] === true;
-      const isOn = !!tp?.enabled && depMet;
-      if (statusFilter === "on" && !isOn) return false;
-      if (statusFilter === "off" && isOn) return false;
-      return true;
-    });
-  }, [visible, typeFilter, statusFilter, stageFilter, store.touchpoints, store.dependency]);
-
-  const selected =
-    filtered.find((t) => t.id === selectedId) ??
-    filtered[0] ??
-    visible.find((t) => t.id === selectedId) ??
-    visible[0];
+  const selected = visible.find((t) => t.id === selectedId) ?? visible[0];
 
   const grouped = useMemo(() => {
     const g: Record<Stage, TouchpointMeta[]> = {
@@ -179,53 +147,36 @@ export default function TouchpointsTab() {
       live_chat: [],
       post_purchase: [],
     };
-    filtered.forEach((t) => g[t.stage].push(t));
+    visible.forEach((t) => g[t.stage].push(t));
     return g;
-  }, [filtered]);
+  }, [visible]);
 
   return (
     <div className="flex h-full min-h-0">
       {/* Left column: touchpoint cards */}
       <div className="w-[340px] shrink-0 border-r border-[#E0E0E0] bg-[#F9FAFB] overflow-auto">
-        <div className="px-5 py-5 space-y-5">
-          <TouchpointFilters
-            typeFilter={typeFilter}
-            statusFilter={statusFilter}
-            stageFilter={stageFilter}
-            onTypeChange={setTypeFilter}
-            onStatusChange={setStatusFilter}
-            onStageChange={setStageFilter}
-          />
-
-          {filtered.length === 0 ? (
-            <div className="text-[12px] text-[#8C8C8C] bg-white border border-[#E4E4E0] rounded-lg px-3 py-4 text-center">
-              No touchpoints match these filters.
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {(Object.keys(grouped) as Stage[]).map((stage) => {
-                if (grouped[stage].length === 0) return null;
-                return (
-                  <div key={stage}>
-                    <p className="text-[12px] font-semibold text-[#8C8C8C] uppercase tracking-[0.08em] mb-2 px-0.5">
-                      {STAGE_LABEL[stage]}
-                    </p>
-                    <div className="space-y-2">
-                      {grouped[stage].map((t) => (
-                        <TouchpointCard
-                          key={t.id}
-                          meta={t}
-                          active={selected?.id === t.id}
-                          onClick={() => setSelectedId(t.id)}
-                          onRequestConfirm={(c) => setConfirm(c)}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+        <div className="px-5 py-6 space-y-6">
+          {(Object.keys(grouped) as Stage[]).map((stage) => {
+            if (grouped[stage].length === 0) return null;
+            return (
+              <div key={stage}>
+                <p className="text-[12px] font-semibold text-[#8C8C8C] uppercase tracking-[0.08em] mb-2 px-0.5">
+                  {STAGE_LABEL[stage]}
+                </p>
+                <div className="space-y-2">
+                  {grouped[stage].map((t) => (
+                    <TouchpointCard
+                      key={t.id}
+                      meta={t}
+                      active={selected?.id === t.id}
+                      onClick={() => setSelectedId(t.id)}
+                      onRequestConfirm={(c) => setConfirm(c)}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -241,7 +192,7 @@ export default function TouchpointsTab() {
         </div>
       </div>
 
-      {/* Enable confirmation */}
+      {/* Enable / disable confirmation */}
       <Modal
         open={!!confirm}
         onClose={() => setConfirm(null)}
@@ -268,112 +219,6 @@ export default function TouchpointsTab() {
           {confirm?.body}
         </p>
       </Modal>
-    </div>
-  );
-}
-
-/* ── Filter chips at top of touchpoint list ───────────────── */
-function TouchpointFilters({
-  typeFilter,
-  statusFilter,
-  stageFilter,
-  onTypeChange,
-  onStatusChange,
-  onStageChange,
-}: {
-  typeFilter: TypeFilter;
-  statusFilter: StatusFilter;
-  stageFilter: StageFilter;
-  onTypeChange: (v: TypeFilter) => void;
-  onStatusChange: (v: StatusFilter) => void;
-  onStageChange: (v: StageFilter) => void;
-}) {
-  return (
-    <div className="space-y-3">
-      <FilterRow label="Type">
-        <TagFilter<TypeFilter>
-          value={typeFilter}
-          onChange={onTypeChange}
-          options={[
-            { value: "all", label: "All" },
-            { value: "search", label: "Search" },
-            { value: "exclusive", label: "Exclusive" },
-          ]}
-        />
-      </FilterRow>
-      <FilterRow label="Status">
-        <TagFilter<StatusFilter>
-          value={statusFilter}
-          onChange={onStatusChange}
-          options={[
-            { value: "all", label: "All" },
-            { value: "on", label: "On" },
-            { value: "off", label: "Off" },
-          ]}
-        />
-      </FilterRow>
-      <FilterRow label="Stage">
-        <TagFilter<StageFilter>
-          value={stageFilter}
-          onChange={onStageChange}
-          options={[
-            { value: "all", label: "All" },
-            { value: "pre", label: "Pre-purchase" },
-            { value: "post", label: "Post-purchase" },
-          ]}
-        />
-      </FilterRow>
-    </div>
-  );
-}
-
-function FilterRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <p className="text-[11px] font-semibold text-[#8C8C8C] uppercase tracking-[0.08em] mb-1.5 px-0.5">
-        {label}
-      </p>
-      <div className="-mx-0.5 overflow-x-auto">{children}</div>
-    </div>
-  );
-}
-
-function TagFilter<T extends string>({
-  value,
-  onChange,
-  options,
-}: {
-  value: T;
-  onChange: (v: T) => void;
-  options: { value: T; label: string }[];
-}) {
-  return (
-    <div className="flex items-center gap-1.5 px-0.5 min-w-max">
-      {options.map((o) => {
-        const active = value === o.value;
-        return (
-          <button
-            key={o.value}
-            type="button"
-            onClick={() => onChange(o.value)}
-            className={cn(
-              "inline-flex items-center h-7 px-2.5 rounded-full text-[12px] font-medium whitespace-nowrap transition-colors border",
-              active
-                ? "bg-[#1A1A1A] text-white border-[#1A1A1A]"
-                : "bg-white text-[#52525B] border-[#E4E4E0] hover:border-[#1A1A1A] hover:text-[#1A1A1A]",
-            )}
-            aria-pressed={active}
-          >
-            {o.label}
-          </button>
-        );
-      })}
     </div>
   );
 }
@@ -422,7 +267,11 @@ function TouchpointCard({
         onConfirm: () => store.updateTouchpoint(meta.id, { enabled: true }),
       });
     } else {
-      store.updateTouchpoint(meta.id, { enabled: false });
+      onRequestConfirm({
+        title: `Turn off ${meta.label}?`,
+        body: `Shoppers will stop seeing Sales Agent recommendations at ${meta.label}. You can turn it back on any time.`,
+        onConfirm: () => store.updateTouchpoint(meta.id, { enabled: false }),
+      });
     }
   };
 
@@ -657,7 +506,11 @@ function DependencySetting({
         onConfirm: () => store.updateTouchpoint(meta.id, { enabled: true }),
       });
     } else {
-      store.updateTouchpoint(meta.id, { enabled: false });
+      onRequestConfirm({
+        title: `Turn off ${meta.label}?`,
+        body: `Shoppers will stop seeing Sales Agent recommendations at ${meta.label}. You can turn it back on any time.`,
+        onConfirm: () => store.updateTouchpoint(meta.id, { enabled: false }),
+      });
     }
   };
 
@@ -726,7 +579,11 @@ function StrategySetting({
         onConfirm: () => store.updateTouchpoint(meta.id, { enabled: true }),
       });
     } else {
-      store.updateTouchpoint(meta.id, { enabled: false });
+      onRequestConfirm({
+        title: `Turn off ${meta.label}?`,
+        body: `Shoppers will stop seeing recommendations at ${meta.label}. You can turn it back on any time.`,
+        onConfirm: () => store.updateTouchpoint(meta.id, { enabled: false }),
+      });
     }
   };
 
