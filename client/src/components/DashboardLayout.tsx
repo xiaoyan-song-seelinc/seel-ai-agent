@@ -35,9 +35,9 @@ const mainNav: NavItem[] = [
   { label: "Orders", href: "/orders-placeholder", icon: ShoppingCart, disabled: true },
   { label: "Issues", href: "/issues-placeholder", icon: AlertCircle, disabled: true },
   { label: "Protection", href: "/protection-placeholder", icon: ShieldCheck, disabled: true },
-  { label: "Integrations", href: "/integrations", icon: Puzzle },
+  { label: "Integrations", href: "/integrations", icon: Puzzle, disabled: true },
   { label: "Reviews", href: "/reviews-placeholder", icon: Star, disabled: true },
-  { label: "AI support", href: "/", icon: Bot },
+  { label: "AI support", href: "/communication", icon: Bot, disabled: true },
   { label: "Support Agent", href: "/support-agent-placeholder", icon: Headphones, disabled: true },
   { label: "Sales Agent", href: "/sales-agent", icon: Sparkles },
 ];
@@ -100,24 +100,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
-  const isActive = (href: string) => {
-    if (href === "/") {
-      return (
-        location === "/" ||
-        location.startsWith("/communication") ||
-        location.startsWith("/playbook") ||
-        location.startsWith("/performance")
-      );
-    }
-    return location.startsWith(href);
-  };
-
   // Determine if we're inside the AI Support module
   const isAISupport =
-    location === "/" ||
     location.startsWith("/communication") ||
     location.startsWith("/playbook") ||
     location.startsWith("/performance");
+
+  const isActive = (href: string) => {
+    if (href === "/communication") return isAISupport;
+    return location.startsWith(href);
+  };
 
   // Which AI tab is active?
   const activeAITab = (() => {

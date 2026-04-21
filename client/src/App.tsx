@@ -17,8 +17,12 @@ import { SalesAgentProvider } from "./lib/sales-agent/store";
 function Router() {
   return (
     <Switch>
-      {/* AI Support module — default landing is Agents (formerly Communication) */}
-      <Route path="/" component={CommunicationPage} />
+      {/* Default landing is Sales Agent */}
+      <Route path="/">
+        <Redirect to="/sales-agent" />
+      </Route>
+
+      {/* AI Support module */}
       <Route path="/communication" component={CommunicationPage} />
       <Route path="/playbook" component={PlaybookPage} />
       <Route path="/performance" component={Performance} />
