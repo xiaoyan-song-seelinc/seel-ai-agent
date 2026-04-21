@@ -4,7 +4,6 @@ import { useSalesAgent } from "@/lib/sales-agent/store";
 import {
   STAGE_LABEL,
   TOUCHPOINTS,
-  TOUCHPOINT_HOW_IT_WORKS,
   TOUCHPOINT_TAG_META,
   type TouchpointMeta,
 } from "@/lib/sales-agent/constants";
@@ -342,9 +341,6 @@ function TouchpointCard({
               </span>
             )}
           </div>
-          <p className="text-[12px] text-[#6B7280] mt-0.5 leading-snug">
-            {meta.description}
-          </p>
           {!depMet && meta.dependencyKey && (
             <div className="mt-1.5 text-[12px]">
               <Link href="/">
@@ -437,7 +433,6 @@ function TouchpointDetail({
               <TouchpointTagChip tag="seel_exclusive" />
             )}
           </div>
-          <p className="text-[14px] text-[#6B7280] mt-1">{meta.description}</p>
         </div>
         <div
           className="shrink-0 pt-1"
@@ -464,7 +459,7 @@ function TouchpointDetail({
         <ShopifyPlusWidget met={store.dependency.shopifyPlus} />
       )}
 
-      <HowItWorksSection touchpointId={meta.id} />
+      <TouchpointDescriptionBlock description={meta.description} />
 
       {meta.dependencyKey ? (
         <DependencyNotice meta={meta} />
@@ -496,36 +491,14 @@ function DetailSection({
   );
 }
 
-/* ── How it works — neutral description of the touchpoint ───── */
-function HowItWorksSection({ touchpointId }: { touchpointId: TouchpointId }) {
-  const steps = TOUCHPOINT_HOW_IT_WORKS[touchpointId];
-  if (!steps || steps.length === 0) return null;
-
+/* ── Plain description block under the header ──────────────── */
+function TouchpointDescriptionBlock({ description }: { description: string }) {
   return (
-    <DetailSection title="How it works">
-      <div className="rounded-lg bg-[#F9FAFB] border border-[#EFEFEF] px-5 py-5">
-        <ol className="space-y-5">
-          {steps.map((step, idx) => (
-            <li key={idx} className="flex items-start gap-3">
-              <div
-                className="w-7 h-7 rounded-full bg-white flex items-center justify-center shrink-0 text-[13px] font-semibold text-[#8C8C8C] tabular-nums"
-                aria-hidden="true"
-              >
-                {idx + 1}
-              </div>
-              <div className="min-w-0 flex-1 pt-0.5">
-                <p className="text-[14px] font-semibold text-[#202223] leading-snug">
-                  {step.title}
-                </p>
-                <p className="text-[13px] text-[#5C5F62] leading-relaxed mt-1">
-                  {step.description}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </div>
-    </DetailSection>
+    <div className="rounded-lg bg-[#F9FAFB] border border-[#EFEFEF] px-5 py-4">
+      <p className="text-[14px] text-[#5C5F62] leading-relaxed">
+        {description}
+      </p>
+    </div>
   );
 }
 
@@ -728,9 +701,6 @@ function ThankYouPageDetail({
               <TouchpointTagChip tag="seel_exclusive" />
             )}
           </div>
-          <p className="text-[14px] text-[#6B7280] mt-1">
-            Order confirmation recommendations.
-          </p>
         </div>
         <div className="shrink-0 pt-1" title="Available in V2.">
           <SAToggle
@@ -751,7 +721,7 @@ function ThankYouPageDetail({
         previews of the upcoming capability set.
       </Callout>
 
-      <HowItWorksSection touchpointId="thank_you_page" />
+      <TouchpointDescriptionBlock description={meta.description} />
 
       <DetailSection title="Setting">
         <div className="space-y-3">
