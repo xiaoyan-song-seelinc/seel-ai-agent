@@ -4,6 +4,7 @@ import { useSalesAgent } from "@/lib/sales-agent/store";
 import {
   STAGE_LABEL,
   TOUCHPOINTS,
+  TOUCHPOINT_HOW_IT_WORKS,
   TOUCHPOINT_TAG_META,
   type TouchpointMeta,
 } from "@/lib/sales-agent/constants";
@@ -460,6 +461,8 @@ function TouchpointDetail({
         <ShopifyPlusWidget met={store.dependency.shopifyPlus} />
       )}
 
+      <HowItWorksSection touchpointId={meta.id} />
+
       {meta.dependencyKey ? (
         <DependencyNotice meta={meta} />
       ) : (
@@ -487,6 +490,39 @@ function DetailSection({
       <h3 className="text-[14px] font-semibold text-[#202223] mb-2">{title}</h3>
       {children}
     </section>
+  );
+}
+
+/* ── How it works — neutral description of the touchpoint ───── */
+function HowItWorksSection({ touchpointId }: { touchpointId: TouchpointId }) {
+  const steps = TOUCHPOINT_HOW_IT_WORKS[touchpointId];
+  if (!steps || steps.length === 0) return null;
+
+  return (
+    <DetailSection title="How it works">
+      <div className="rounded-lg bg-[#F9FAFB] border border-[#EFEFEF] px-5 py-5">
+        <ol className="space-y-5">
+          {steps.map((step, idx) => (
+            <li key={idx} className="flex items-start gap-3">
+              <div
+                className="w-7 h-7 rounded-full bg-white flex items-center justify-center shrink-0 text-[13px] font-semibold text-[#8C8C8C] tabular-nums"
+                aria-hidden="true"
+              >
+                {idx + 1}
+              </div>
+              <div className="min-w-0 flex-1 pt-0.5">
+                <p className="text-[14px] font-semibold text-[#202223] leading-snug">
+                  {step.title}
+                </p>
+                <p className="text-[13px] text-[#5C5F62] leading-relaxed mt-1">
+                  {step.description}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </DetailSection>
   );
 }
 
@@ -714,6 +750,8 @@ function ThankYouPageDetail({
         The Thank You Page composer ships in V2. Widgets below are read-only
         previews of the upcoming capability set.
       </Callout>
+
+      <HowItWorksSection touchpointId="thank_you_page" />
 
       <DetailSection title="Setting">
         <div className="space-y-3">
