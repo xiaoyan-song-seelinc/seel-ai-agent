@@ -37,7 +37,6 @@ type DraftCommon = {
   id: string;
   name: string;
   type: StrategyType;
-  maxProducts: number;
   timeWindow: TimeWindowDays;
   sortBy: BestSellersSortBy;
   manualMode: ManualMode;
@@ -50,7 +49,6 @@ function emptyDraft(): DraftCommon {
     id: "",
     name: "",
     type: "best_sellers",
-    maxProducts: 5,
     timeWindow: 30,
     sortBy: "revenue",
     manualMode: "products",
@@ -64,7 +62,6 @@ function draftFromStrategy(s: Strategy): DraftCommon {
     id: s.id,
     name: s.name,
     type: s.type,
-    maxProducts: s.maxProducts,
     timeWindow: s.type === "best_sellers" || s.type === "new_arrivals" ? s.timeWindow : 30,
     sortBy: s.type === "best_sellers" ? s.sortBy : "revenue",
     manualMode: s.type === "manual" ? s.mode : "products",
@@ -83,7 +80,6 @@ function draftToStrategy(d: DraftCommon, fallbackId: string): Strategy {
       type: "best_sellers",
       timeWindow: d.timeWindow,
       sortBy: d.sortBy,
-      maxProducts: d.maxProducts,
       updatedAt,
     };
   if (d.type === "new_arrivals")
@@ -92,7 +88,6 @@ function draftToStrategy(d: DraftCommon, fallbackId: string): Strategy {
       name: d.name,
       type: "new_arrivals",
       timeWindow: d.timeWindow,
-      maxProducts: d.maxProducts,
       updatedAt,
     };
   if (d.type === "similar")
@@ -100,7 +95,6 @@ function draftToStrategy(d: DraftCommon, fallbackId: string): Strategy {
       id,
       name: d.name,
       type: "similar",
-      maxProducts: d.maxProducts,
       updatedAt,
     };
   return {
@@ -110,7 +104,6 @@ function draftToStrategy(d: DraftCommon, fallbackId: string): Strategy {
     mode: d.manualMode,
     productIds: d.manualMode === "products" ? d.productIds : [],
     collectionId: d.manualMode === "collection" ? d.collectionId : null,
-    maxProducts: d.maxProducts,
     updatedAt,
   };
 }
@@ -150,7 +143,6 @@ export default function StrategyDrawer({ open, onClose, editingId }: Props) {
   const hasNonNameChanges = useMemo(() => {
     if (!existing) return false;
     if (existing.type !== draft.type) return true;
-    if (existing.maxProducts !== draft.maxProducts) return true;
     if (existing.type === "best_sellers") {
       if (draft.timeWindow !== existing.timeWindow) return true;
       if (draft.sortBy !== existing.sortBy) return true;
@@ -346,45 +338,39 @@ export default function StrategyDrawer({ open, onClose, editingId }: Props) {
                   ))}
                 </SASelect>
               </Field>
-              <MaxProductsField draft={draft} setDraft={setDraft} />
             </div>
           )}
 
           {draft.type === "new_arrivals" && (
-            <div className="grid grid-cols-2 gap-3">
-              <Field
-                label="Time window"
-                help={isReferenced ? "Locked while live." : undefined}
+            <Field
+              label="Time window"
+              help={isReferenced ? "Locked while live." : undefined}
+            >
+              <SASelect
+                value={String(draft.timeWindow)}
+                disabled={isReferenced}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    timeWindow: Number(e.target.value) as TimeWindowDays,
+                  }))
+                }
+                className="w-full"
               >
-                <SASelect
-                  value={String(draft.timeWindow)}
-                  disabled={isReferenced}
-                  onChange={(e) =>
-                    setDraft((d) => ({
-                      ...d,
-                      timeWindow: Number(e.target.value) as TimeWindowDays,
-                    }))
-                  }
-                >
-                  {TIME_WINDOW_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </SASelect>
-              </Field>
-              <MaxProductsField draft={draft} setDraft={setDraft} />
-            </div>
+                {TIME_WINDOW_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </SASelect>
+            </Field>
           )}
 
           {draft.type === "similar" && (
-            <>
-              <MaxProductsField draft={draft} setDraft={setDraft} />
-              <Callout tone="info">
-                Reference product is the most expensive line item in the
-                shopper's most recent order.
-              </Callout>
-            </>
+            <Callout tone="info">
+              Reference product is the most expensive line item in the
+              shopper's most recent order.
+            </Callout>
           )}
 
           {draft.type === "manual" && (
@@ -474,8 +460,6 @@ export default function StrategyDrawer({ open, onClose, editingId }: Props) {
                   )}
                 </Panel>
               )}
-
-              <MaxProductsField draft={draft} setDraft={setDraft} />
             </div>
           )}
         </div>
@@ -747,28 +731,3 @@ function ReorderableProductList({
   );
 }
 
-function MaxProductsField({
-  draft,
-  setDraft,
-}: {
-  draft: DraftCommon;
-  setDraft: (f: (d: DraftCommon) => DraftCommon) => void;
-}) {
-  return (
-    <Field label="Max products shown" help="Between 1 and 10.">
-      <SAInput
-        type="number"
-        min={1}
-        max={10}
-        value={draft.maxProducts}
-        onChange={(e) =>
-          setDraft((d) => ({
-            ...d,
-            maxProducts: Math.max(1, Math.min(10, Number(e.target.value) || 1)),
-          }))
-        }
-        className="w-28"
-      />
-    </Field>
-  );
-}

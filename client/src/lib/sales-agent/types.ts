@@ -53,7 +53,6 @@ export interface BaseStrategy {
   id: string;
   name: string;
   type: StrategyType;
-  maxProducts: number;
   updatedAt: string; // iso
 }
 
@@ -100,6 +99,9 @@ export interface TouchpointConfig {
   id: TouchpointId;
   enabled: boolean;
   strategyId: string | null; // null when the touchpoint does not pick a strategy (search_bar / live_widget)
+  /** How many products the touchpoint renders. Only surfaced in the UI for
+   *  touchpoints that pick a strategy (seel_rc / wfp_email). Range 1–10. */
+  productCount: number;
 }
 
 export type Platform = "shopify" | "shopline";
