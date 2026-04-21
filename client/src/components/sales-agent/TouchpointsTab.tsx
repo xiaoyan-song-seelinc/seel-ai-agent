@@ -438,8 +438,6 @@ function TouchpointDetail({
 
       {meta.id === "seel_rc" && <SeelRCDebugSwitcher />}
 
-      <TouchpointDescriptionBlock description={meta.description} />
-
       {meta.dependencyKey ? (
         <DependencyNotice meta={meta} />
       ) : meta.id === "seel_rc" ? (
@@ -473,15 +471,6 @@ function DetailSection({
       <h3 className="text-[14px] font-semibold text-[#202223] mb-2">{title}</h3>
       {children}
     </section>
-  );
-}
-
-/* ── Quote-style description under the header ──────────────── */
-function TouchpointDescriptionBlock({ description }: { description: string }) {
-  return (
-    <blockquote className="border-l-2 border-[#E0E0E0] pl-3 text-[14px] text-[#5C5F62] leading-relaxed">
-      {description}
-    </blockquote>
   );
 }
 
@@ -1057,8 +1046,6 @@ function ThankYouPageDetail({
         The Thank You Page composer ships in V2. Widgets below are read-only
         previews of the upcoming capability set.
       </Callout>
-
-      <TouchpointDescriptionBlock description={meta.description} />
 
       <DetailSection title="Setting">
         <div className="space-y-3">
