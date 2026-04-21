@@ -37,7 +37,7 @@ const mainNav: NavItem[] = [
   { label: "Protection", href: "/protection-placeholder", icon: ShieldCheck, disabled: true },
   { label: "Integrations", href: "/integrations", icon: Puzzle, disabled: true },
   { label: "Reviews", href: "/reviews-placeholder", icon: Star, disabled: true },
-  { label: "AI support", href: "/communication", icon: Bot },
+  { label: "AI support", href: "/communication", icon: Bot, disabled: true },
   { label: "Support Agent", href: "/support-agent-placeholder", icon: Headphones, disabled: true },
   { label: "Sales Agent", href: "/sales-agent", icon: Sparkles },
 ];
