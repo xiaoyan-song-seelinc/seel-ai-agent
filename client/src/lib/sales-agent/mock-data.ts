@@ -47,14 +47,12 @@ export const ACTIVE_STRATEGIES: Strategy[] = [
     type: "best_sellers",
     timeWindow: 30,
     sortBy: "revenue",
-    maxProducts: 5,
     updatedAt: "2026-04-12T10:24:00Z",
   },
   {
     id: "s_related",
     name: "Related products",
     type: "similar",
-    maxProducts: 4,
     updatedAt: "2026-04-03T15:11:00Z",
   },
   {
@@ -64,7 +62,6 @@ export const ACTIVE_STRATEGIES: Strategy[] = [
     mode: "collection",
     productIds: [],
     collectionId: "c_spring",
-    maxProducts: 6,
     updatedAt: "2026-04-15T08:40:00Z",
   },
 ];
