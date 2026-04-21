@@ -32,14 +32,17 @@ export default function StrategiesTab() {
   const store = useSalesAgent();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [autoEditName, setAutoEditName] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const openNew = () => {
     setEditingId(null);
+    setAutoEditName(true);
     setModalOpen(true);
   };
   const openEdit = (id: string) => {
     setEditingId(id);
+    setAutoEditName(false);
     setModalOpen(true);
   };
   const duplicate = (id: string) => {
@@ -49,12 +52,14 @@ export default function StrategiesTab() {
     const copy: Strategy = {
       ...src,
       id: newId,
-      name: `${src.name} (Copy)`,
+      name: "New Strategy",
       updatedAt: new Date().toISOString(),
     };
     store.addStrategy(copy);
-    // Jump straight to Edit panel for the newly created copy.
+    // Jump straight to Edit panel for the newly created copy, with the
+    // name field auto-focused + selected for quick rename.
     setEditingId(newId);
+    setAutoEditName(true);
     setModalOpen(true);
   };
 
@@ -65,22 +70,16 @@ export default function StrategiesTab() {
 
   return (
     <div className="max-w-[1040px] mx-auto px-8 py-8 space-y-8">
-      {/* Own Product Strategies */}
+      {/* Strategies */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-[24px] font-bold text-[#202223]">
-                Own Product Strategies
-              </h2>
-              <InfoTip>
-                Recipes that source from your store's own catalog and are
-                referenced by touchpoints.
-              </InfoTip>
-            </div>
-            <p className="text-[14px] text-[#6B7280] mt-1">
-              Reusable recipes referenced by touchpoints.
-            </p>
+          <div className="flex items-center gap-2">
+            <h2 className="text-[24px] font-bold text-[#202223]">
+              Strategies
+            </h2>
+            <InfoTip>
+              Reusable Strategies Referenced by Touchpoints
+            </InfoTip>
           </div>
           <SAButton variant="primary" onClick={openNew}>
             <Plus className="w-3.5 h-3.5" />
@@ -94,36 +93,14 @@ export default function StrategiesTab() {
           onDelete={setDeletingId}
         />
 
-        {/* Exclusion rules scoped to Own Product Strategies */}
+        {/* Exclusion rules scoped to Strategies */}
         <ExclusionRules embedded />
-      </section>
-
-      {/* Network Product Strategies — coming soon */}
-      <section className="space-y-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-[24px] font-bold text-[#202223]">
-              Network Product Strategies
-            </h2>
-            <span className="inline-flex items-center h-5 px-1.5 rounded bg-[#E7EBF5] text-[#5C5F62] border border-[#DADEE9] text-[12px] font-medium">
-              Coming soon
-            </span>
-            <InfoTip>
-              Recommend products from the Seel network to capture demand your
-              catalog doesn't serve.
-            </InfoTip>
-          </div>
-          <p className="text-[14px] text-[#6B7280] mt-1">
-            Source recommendations from the Seel network inventory.
-          </p>
-        </div>
-
-        <NetworkProductsPlaceholder />
       </section>
 
       <StrategyDrawer
         open={modalOpen}
         editingId={editingId}
+        autoEditName={autoEditName}
         onClose={() => setModalOpen(false)}
       />
 
@@ -180,23 +157,6 @@ export default function StrategiesTab() {
           ))}
       </Modal>
     </div>
-  );
-}
-
-/* ── Network Products placeholder (future scope) ────────────── */
-function NetworkProductsPlaceholder() {
-  return (
-    <Panel className="border-dashed bg-[#F9FAFB]">
-      <div className="px-6 py-10 flex flex-col items-center justify-center text-center">
-        <p className="text-[16px] font-semibold text-[#202223]">
-          Coming Soon
-        </p>
-        <p className="text-[14px] text-[#6B7280] mt-1 max-w-[420px]">
-          Recommend products from the Seel network to capture demand your
-          catalog doesn't serve. Stay tuned for an upcoming release.
-        </p>
-      </div>
-    </Panel>
   );
 }
 

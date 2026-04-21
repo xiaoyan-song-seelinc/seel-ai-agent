@@ -15,7 +15,7 @@ import {
 import { ProductPicker, CollectionPicker } from "./Pickers";
 
 interface Props {
-  /** Render as embedded sub-group (inside Own Product Strategies) */
+  /** Render as an embedded sub-group under the Strategies section */
   embedded?: boolean;
 }
 
@@ -32,8 +32,8 @@ export default function ExclusionRules({ embedded = false }: Props) {
           Exclusion rules
         </h3>
         <InfoTip>
-          Applied globally to every Own Product strategy output — these
-          products, collections, or tags never surface in recommendations.
+          Applied globally to every strategy output — these products,
+          collections, or tags never surface in recommendations.
         </InfoTip>
       </div>
       <Panel className="overflow-hidden">

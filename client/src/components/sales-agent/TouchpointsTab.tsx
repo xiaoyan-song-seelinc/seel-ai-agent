@@ -476,37 +476,42 @@ function DetailSection({
   );
 }
 
-/* ── Plain description block under the header ──────────────── */
+/* ── Quote-style description under the header ──────────────── */
 function TouchpointDescriptionBlock({ description }: { description: string }) {
   return (
-    <div className="rounded-lg bg-[#F9FAFB] border border-[#EFEFEF] px-5 py-4">
-      <p className="text-[14px] text-[#5C5F62] leading-relaxed">
-        {description}
-      </p>
-    </div>
+    <blockquote className="border-l-2 border-[#E0E0E0] pl-3 text-[14px] text-[#5C5F62] leading-relaxed">
+      {description}
+    </blockquote>
   );
 }
 
-/* ── Inline dependency notice for Search Bar / LiveChat Widget ── */
+/* ── Inline dependency notice — lightweight single-row warning with a
+ *    link-style Set up CTA on the same line. */
 function DependencyNotice({ meta }: { meta: TouchpointMeta }) {
   const store = useSalesAgent();
   const depMet = store.dependency[meta.dependencyKey!];
   if (depMet) return null;
+  const message =
+    meta.id === "search_bar"
+      ? "AI Search isn't enabled for this store yet."
+      : "Support Agent isn't connected to your storefront yet.";
   return (
-    <Callout tone="warn" title="Dependency not met">
-      <p>
-        {meta.id === "search_bar"
-          ? "AI Search is not enabled for this store. Enable Search Bar in Support Agent before turning on this touchpoint."
-          : "Live Chat Widget is not connected to the storefront. Enable it from Support Agent before turning on this touchpoint."}
-      </p>
-      <div className="mt-2">
-        <Link href="/">
-          <SAButton variant="secondary" size="sm">
-            Set up
-          </SAButton>
-        </Link>
+    <div className="flex items-center justify-between gap-3 rounded-md border border-[#F0E2C2] bg-[#FFFBEB] px-3 py-2">
+      <div className="flex items-center gap-2 min-w-0">
+        <span
+          aria-hidden="true"
+          className="inline-block w-1.5 h-1.5 rounded-full bg-[#D97706] shrink-0"
+        />
+        <p className="text-[13px] text-[#5C5F62] leading-snug truncate">
+          {message}
+        </p>
       </div>
-    </Callout>
+      <Link href="/">
+        <span className="text-[13px] font-medium text-[#2121C4] hover:underline whitespace-nowrap cursor-pointer">
+          Set up
+        </span>
+      </Link>
+    </div>
   );
 }
 

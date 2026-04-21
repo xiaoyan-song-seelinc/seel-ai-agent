@@ -318,7 +318,7 @@ export function Modal({
 interface DrawerProps {
   open: boolean;
   onClose: () => void;
-  title: string;
+  title: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
   width?: string;
@@ -347,12 +347,20 @@ export function Drawer({
         role="dialog"
         aria-modal="true"
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#EAEAEA]">
-          <h2 className="text-[18px] font-semibold text-[#202223]">{title}</h2>
+        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-[#EAEAEA]">
+          <div className="min-w-0 flex-1">
+            {typeof title === "string" ? (
+              <h2 className="text-[18px] font-semibold text-[#202223] truncate">
+                {title}
+              </h2>
+            ) : (
+              title
+            )}
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded hover:bg-[#F7F7FC] text-[#8C8C8C] hover:text-[#202223]"
+            className="p-1 rounded hover:bg-[#F7F7FC] text-[#8C8C8C] hover:text-[#202223] shrink-0"
             aria-label="Close"
           >
             <X className="w-4 h-4" />

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Pencil } from "lucide-react";
 import {
   Callout,
   Drawer,
@@ -31,6 +32,9 @@ interface Props {
   onClose: () => void;
   /** strategyId for edit, null for create */
   editingId: string | null;
+  /** When true, the drawer opens with the name field focused and its text
+   *  pre-selected — used by Duplicate so the user can rename immediately. */
+  autoEditName?: boolean;
 }
 
 type DraftCommon = {
@@ -47,7 +51,7 @@ type DraftCommon = {
 function emptyDraft(): DraftCommon {
   return {
     id: "",
-    name: "",
+    name: "New Strategy",
     type: "best_sellers",
     timeWindow: 30,
     sortBy: "revenue",
@@ -108,7 +112,12 @@ function draftToStrategy(d: DraftCommon, fallbackId: string): Strategy {
   };
 }
 
-export default function StrategyDrawer({ open, onClose, editingId }: Props) {
+export default function StrategyDrawer({
+  open,
+  onClose,
+  editingId,
+  autoEditName = false,
+}: Props) {
   const store = useSalesAgent();
   const existing = editingId
     ? store.strategies.find((s) => s.id === editingId) ?? null
@@ -123,14 +132,28 @@ export default function StrategyDrawer({ open, onClose, editingId }: Props) {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
 
+  // Inline name editing lives in the drawer heading.
+  const [editingName, setEditingName] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
+
   useEffect(() => {
     if (!open) return;
     if (existing) setDraft(draftFromStrategy(existing));
     else setDraft(emptyDraft());
     setConfirmDeleteOpen(false);
     setConfirmSaveOpen(false);
+    // For a fresh create or an explicit duplicate flow, open the name field
+    // focused + selected so the user can retype immediately.
+    setEditingName(!existing || autoEditName);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, editingId]);
+  }, [open, editingId, autoEditName]);
+
+  useEffect(() => {
+    if (editingName && nameInputRef.current) {
+      nameInputRef.current.focus();
+      nameInputRef.current.select();
+    }
+  }, [editingName, open]);
 
   const referencedBy = useMemo(
     () => (editingId ? store.isStrategyReferenced(editingId) : []),
@@ -239,7 +262,51 @@ export default function StrategyDrawer({ open, onClose, editingId }: Props) {
       <Drawer
         open={open}
         onClose={onClose}
-        title={existing ? "Edit strategy" : "New strategy"}
+        title={
+          <div className="flex items-center gap-2 min-w-0">
+            {editingName ? (
+              <SAInput
+                ref={nameInputRef}
+                value={draft.name}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, name: e.target.value }))
+                }
+                onBlur={() => {
+                  if (draft.name.trim().length > 0) setEditingName(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (draft.name.trim().length > 0) setEditingName(false);
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    if (existing) {
+                      setDraft((d) => ({ ...d, name: existing.name }));
+                    }
+                    setEditingName(false);
+                  }
+                }}
+                placeholder="Strategy name"
+                className="h-9 text-[18px] font-semibold"
+              />
+            ) : (
+              <>
+                <h2 className="text-[18px] font-semibold text-[#202223] truncate">
+                  {draft.name || "Untitled strategy"}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setEditingName(true)}
+                  aria-label="Edit name"
+                  title="Edit name"
+                  className="shrink-0 inline-flex items-center justify-center h-7 w-7 rounded-md text-[#5C5F62] hover:bg-[#F2F6FE] hover:text-[#2121C4]"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              </>
+            )}
+          </div>
+        }
         width="w-[560px]"
         footer={
           <>
@@ -270,15 +337,6 @@ export default function StrategyDrawer({ open, onClose, editingId }: Props) {
             </Callout>
           )}
 
-          <Field label="Name" htmlFor="strat_name">
-            <SAInput
-              id="strat_name"
-              value={draft.name}
-              onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-              placeholder="e.g. Top Sellers — 30 days"
-            />
-          </Field>
-
           <Field
             label="Type"
             help={
@@ -298,13 +356,9 @@ export default function StrategyDrawer({ open, onClose, editingId }: Props) {
           {/* Type-specific fields */}
           {draft.type === "best_sellers" && (
             <div className="space-y-3">
-              <Field
-                label="Time window"
-                help={isReferenced ? "Time window is locked while this strategy is live." : undefined}
-              >
+              <Field label="Time window">
                 <SASelect
                   value={String(draft.timeWindow)}
-                  disabled={isReferenced}
                   onChange={(e) =>
                     setDraft((d) => ({
                       ...d,
@@ -342,13 +396,9 @@ export default function StrategyDrawer({ open, onClose, editingId }: Props) {
           )}
 
           {draft.type === "new_arrivals" && (
-            <Field
-              label="Time window"
-              help={isReferenced ? "Locked while live." : undefined}
-            >
+            <Field label="Time window">
               <SASelect
                 value={String(draft.timeWindow)}
-                disabled={isReferenced}
                 onChange={(e) =>
                   setDraft((d) => ({
                     ...d,

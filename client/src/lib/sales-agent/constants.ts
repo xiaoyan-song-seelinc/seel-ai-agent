@@ -34,7 +34,7 @@ export const TOUCHPOINTS: TouchpointMeta[] = [
   },
   {
     id: "live_widget",
-    label: "Live Chat Widget",
+    label: "Support Agent",
     stage: "pre_purchase",
     description:
       "Shoppers asking product questions mid-chat get relevant picks inline, without leaving the conversation.",
