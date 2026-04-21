@@ -5,7 +5,6 @@ import { useSalesAgent, type RcNetworkState } from "@/lib/sales-agent/store";
 import {
   STAGE_LABEL,
   TOUCHPOINTS,
-  TOUCHPOINT_HOW_IT_WORKS,
   TOUCHPOINT_TAG_META,
   type TouchpointMeta,
 } from "@/lib/sales-agent/constants";
@@ -200,7 +199,6 @@ export default function TouchpointsTab() {
                       meta={t}
                       active={selected?.id === t.id}
                       onClick={() => setSelectedId(t.id)}
-                      onRequestConfirm={(c) => setConfirm(c)}
                     />
                   ))}
                 </div>
@@ -258,57 +256,21 @@ function TouchpointCard({
   meta,
   active,
   onClick,
-  onRequestConfirm,
 }: {
   meta: TouchpointMeta;
   active: boolean;
   onClick: () => void;
-  onRequestConfirm: (c: {
-    title: string;
-    body: string;
-    onConfirm: () => void;
-  }) => void;
 }) {
   const store = useSalesAgent();
   const tp = store.touchpoints.find((t) => t.id === meta.id);
   const depMet =
     !meta.dependencyKey || store.dependency[meta.dependencyKey] === true;
-  const shopifyPlusMet =
-    !meta.requiresShopifyPlus || store.dependency.shopifyPlus;
-  const needsStrategy = meta.picksStrategy && !tp?.strategyId;
-  const toggleDisabled =
-    !depMet || !shopifyPlusMet || meta.previewOnly || needsStrategy;
 
   const Icon = TOUCHPOINT_ICON[meta.id];
   const isOn = !!tp?.enabled && depMet;
 
   // Only show Seel-exclusive tag in the list
   const showTag = meta.tags?.includes("seel_exclusive");
-
-  const handleToggle = (v: boolean) => {
-    if (toggleDisabled) return;
-    if (v) {
-      onRequestConfirm({
-        title: `Turn on ${meta.label}?`,
-        body: `Once enabled, Sales Agent recommendations will be served on ${meta.label} in production. You can switch it off at any time.`,
-        onConfirm: () => store.updateTouchpoint(meta.id, { enabled: true }),
-      });
-    } else {
-      onRequestConfirm({
-        title: `Turn off ${meta.label}?`,
-        body: `Shoppers will stop seeing Sales Agent recommendations at ${meta.label}. You can turn it back on any time.`,
-        onConfirm: () => store.updateTouchpoint(meta.id, { enabled: false }),
-      });
-    }
-  };
-
-  const toggleTooltip = toggleDisabled
-    ? needsStrategy
-      ? "Select a strategy before enabling."
-      : meta.previewOnly
-        ? "Available in V2."
-        : "Dependency not met."
-    : undefined;
 
   return (
     <button
@@ -343,9 +305,6 @@ function TouchpointCard({
               </span>
             )}
           </div>
-          <p className="text-[12px] text-[#6B7280] mt-0.5 leading-snug">
-            {meta.description}
-          </p>
           {!depMet && meta.dependencyKey && (
             <div className="mt-1.5 text-[12px]">
               <Link href="/">
@@ -359,20 +318,33 @@ function TouchpointCard({
             </div>
           )}
         </div>
-        <span
-          onClick={(e) => e.stopPropagation()}
-          className="shrink-0 pt-0.5"
-          title={toggleTooltip}
-        >
-          <SAToggle
-            checked={isOn}
-            disabled={toggleDisabled}
-            onChange={handleToggle}
-            ariaLabel={`Enable ${meta.label}`}
-          />
-        </span>
+        <TouchpointStatusPill isOn={isOn} />
       </div>
     </button>
+  );
+}
+
+/* ── Non-interactive status pill for touchpoint cards ────── */
+function TouchpointStatusPill({ isOn }: { isOn: boolean }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 h-6 px-2 rounded-full text-[12px] font-medium shrink-0 border select-none",
+        isOn
+          ? "bg-[#E9F7E2] border-[#CDE9C3] text-[#235935]"
+          : "bg-[#F5F5F5] border-[#E4E4E4] text-[#6B7280]",
+      )}
+      aria-label={isOn ? "On" : "Off"}
+    >
+      <span
+        aria-hidden="true"
+        className={cn(
+          "inline-block w-1.5 h-1.5 rounded-full",
+          isOn ? "bg-[#52C41A]" : "bg-[#BFBFBF]",
+        )}
+      />
+      {isOn ? "On" : "Off"}
+    </span>
   );
 }
 
@@ -438,7 +410,6 @@ function TouchpointDetail({
               <TouchpointTagChip tag="seel_exclusive" />
             )}
           </div>
-          <p className="text-[14px] text-[#6B7280] mt-1">{meta.description}</p>
         </div>
         <div
           className="shrink-0 pt-1"
@@ -467,7 +438,7 @@ function TouchpointDetail({
 
       {meta.id === "seel_rc" && <SeelRCDebugSwitcher />}
 
-      <HowItWorksSection touchpointId={meta.id} />
+      <TouchpointDescriptionBlock description={meta.description} />
 
       {meta.dependencyKey ? (
         <DependencyNotice meta={meta} />
@@ -505,36 +476,14 @@ function DetailSection({
   );
 }
 
-/* ── How it works — neutral description of the touchpoint ───── */
-function HowItWorksSection({ touchpointId }: { touchpointId: TouchpointId }) {
-  const steps = TOUCHPOINT_HOW_IT_WORKS[touchpointId];
-  if (!steps || steps.length === 0) return null;
-
+/* ── Plain description block under the header ──────────────── */
+function TouchpointDescriptionBlock({ description }: { description: string }) {
   return (
-    <DetailSection title="How it works">
-      <div className="rounded-lg bg-[#F9FAFB] border border-[#EFEFEF] px-5 py-5">
-        <ol className="space-y-5">
-          {steps.map((step, idx) => (
-            <li key={idx} className="flex items-start gap-3">
-              <div
-                className="w-7 h-7 rounded-full bg-white flex items-center justify-center shrink-0 text-[13px] font-semibold text-[#8C8C8C] tabular-nums"
-                aria-hidden="true"
-              >
-                {idx + 1}
-              </div>
-              <div className="min-w-0 flex-1 pt-0.5">
-                <p className="text-[14px] font-semibold text-[#202223] leading-snug">
-                  {step.title}
-                </p>
-                <p className="text-[13px] text-[#5C5F62] leading-relaxed mt-1">
-                  {step.description}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </div>
-    </DetailSection>
+    <div className="rounded-lg bg-[#F9FAFB] border border-[#EFEFEF] px-5 py-4">
+      <p className="text-[14px] text-[#5C5F62] leading-relaxed">
+        {description}
+      </p>
+    </div>
   );
 }
 
@@ -613,23 +562,6 @@ function StrategySetting({
           <option value="__new__">+ Create new strategy…</option>
         </SASelect>
       </Field>
-      <Field label="Product count" help="Between 1 and 10.">
-        <SAInput
-          type="number"
-          min={1}
-          max={10}
-          value={tp.productCount}
-          onChange={(e) =>
-            store.updateTouchpoint(meta.id, {
-              productCount: Math.max(
-                1,
-                Math.min(10, Number(e.target.value) || 1),
-              ),
-            })
-          }
-          className="w-28"
-        />
-      </Field>
     </div>
   );
 }
@@ -658,18 +590,20 @@ function SeelRCSetting({
   const networkOn = store.rcNetworkState !== "disabled";
   const ownOn = store.rcOwnEnabled;
 
-  // Own → on (mutex: Network goes to disabled; confirm if currently active).
+  // Own toggle. Both sources can be OFF; they only cannot both be ON.
   const handleOwnToggle = (v: boolean) => {
     if (!v) {
-      // Exactly one source must be active; can't turn Own off directly.
+      // Off is allowed — both sources may be off.
+      store.setRcOwnEnabled(false);
       return;
     }
     if (ownOn) return;
     if (store.rcNetworkState === "active") {
+      // Enabling Own would stop an active Network setup; confirm.
       setModal({ kind: "disable-active", nextOwn: true });
       return;
     }
-    // pending → off (no confirmation). Flip directly.
+    // Network disabled or pending → just switch.
     store.setRcNetworkState("disabled");
     store.setRcOwnEnabled(true);
   };
@@ -681,11 +615,10 @@ function SeelRCSetting({
       setModal({ kind: "enable" });
     } else {
       if (store.rcNetworkState === "active") {
-        setModal({ kind: "disable-active", nextOwn: true });
+        setModal({ kind: "disable-active", nextOwn: ownOn });
       } else {
-        // pending → off (no confirmation).
+        // pending → off (no confirmation). Leave Own as-is.
         store.setRcNetworkState("disabled");
-        store.setRcOwnEnabled(true);
       }
     }
   };
@@ -728,6 +661,7 @@ function SeelRCSetting({
       <RcSourceCard
         title="Own Products"
         checked={ownOn}
+        otherOn={networkOn}
         onChange={handleOwnToggle}
       >
         <div className="space-y-3">
@@ -748,24 +682,6 @@ function SeelRCSetting({
               <option value="__new__">+ Create new strategy…</option>
             </SASelect>
           </Field>
-          <Field label="Product count" help="Between 1 and 10.">
-            <SAInput
-              type="number"
-              min={1}
-              max={10}
-              value={tp.productCount}
-              disabled={!ownOn}
-              onChange={(e) =>
-                store.updateTouchpoint(meta.id, {
-                  productCount: Math.max(
-                    1,
-                    Math.min(10, Number(e.target.value) || 1),
-                  ),
-                })
-              }
-              className="w-28"
-            />
-          </Field>
         </div>
       </RcSourceCard>
 
@@ -774,8 +690,9 @@ function SeelRCSetting({
         title="Network Products"
         description="Earn commission by showing partner products on attributed sales."
         checked={networkOn}
+        otherOn={ownOn}
         onChange={handleNetworkToggle}
-        footer={<NetworkStatusRow state={store.rcNetworkState} />}
+        badge={<NetworkInlineBadge state={store.rcNetworkState} />}
       />
 
       {/* Enable modal */}
@@ -834,24 +751,29 @@ function SeelRCSetting({
   );
 }
 
-/* A card with a header-level toggle. Tooltip shows on the OFF toggle only. */
+/* A card with a header-level toggle. The mutex tooltip shows only when the
+ * opposite source is ON (because that is the only case where clicking the
+ * off toggle causes a switch). An optional `badge` renders inline to the
+ * left of the toggle — used for the Network pending / enabled indicator. */
 function RcSourceCard({
   title,
   description,
   checked,
+  otherOn,
   onChange,
   children,
-  footer,
+  badge,
 }: {
   title: string;
   description?: string;
   checked: boolean;
+  otherOn: boolean;
   onChange: (v: boolean) => void;
   children?: React.ReactNode;
-  footer?: React.ReactNode;
+  badge?: React.ReactNode;
 }) {
   const [hover, setHover] = useState(false);
-  const showTip = !checked && hover;
+  const showTip = !checked && otherOn && hover;
   return (
     <div className="bg-white border border-[#E4E4E0] rounded-[6px]">
       <div className="flex items-start gap-3 px-4 py-3.5">
@@ -865,65 +787,56 @@ function RcSourceCard({
             </p>
           )}
         </div>
-        <div
-          className="relative shrink-0 pt-0.5"
-          onMouseEnter={() => setHover(true)}
-          onMouseLeave={() => setHover(false)}
-        >
-          <SAToggle
-            checked={checked}
-            onChange={onChange}
-            ariaLabel={`${title} source`}
-          />
-          {showTip && (
-            <div className="absolute right-0 bottom-[calc(100%+8px)] z-10 whitespace-nowrap rounded-[4px] bg-[#1A1A1A] text-white text-[12px] leading-snug px-2 py-1 shadow">
-              Only one source can be active. Click to switch.
-              <span className="absolute -bottom-1 right-3 w-2 h-2 rotate-45 bg-[#1A1A1A]" />
-            </div>
-          )}
+        <div className="flex items-center gap-2 shrink-0 pt-0.5">
+          {badge}
+          <div
+            className="relative"
+            onMouseEnter={() => setHover(true)}
+            onMouseLeave={() => setHover(false)}
+          >
+            <SAToggle
+              checked={checked}
+              onChange={onChange}
+              ariaLabel={`${title} source`}
+            />
+            {showTip && (
+              <div className="absolute right-0 bottom-[calc(100%+8px)] z-10 whitespace-nowrap rounded-[4px] bg-[#1A1A1A] text-white text-[12px] leading-snug px-2 py-1 shadow">
+                Only one source can be active. Click to switch.
+                <span className="absolute -bottom-1 right-3 w-2 h-2 rotate-45 bg-[#1A1A1A]" />
+              </div>
+            )}
+          </div>
         </div>
       </div>
       {checked && children && (
         <div className="border-t border-[#E4E4E0] px-4 py-4">{children}</div>
       )}
-      {footer && (
-        <div className="border-t border-[#E4E4E0] px-4 py-2.5 bg-[#FBFBF9] rounded-b-[6px]">
-          {footer}
-        </div>
-      )}
     </div>
   );
 }
 
-function NetworkStatusRow({ state }: { state: RcNetworkState }) {
+/* Small inline badge shown next to the Network toggle.
+ * "Pending setup" (orange) while waiting for Seel to activate, and
+ * "Enabled" (green) once active. Nothing when Network is disabled. */
+function NetworkInlineBadge({ state }: { state: RcNetworkState }) {
   if (state === "disabled") return null;
-  if (state === "pending") {
-    return (
-      <div className="flex items-center gap-2 text-[13px] text-[#52525B]">
-        <span
-          className="w-2 h-2 rounded-full bg-[#A85A00] shrink-0"
-          aria-hidden="true"
-        />
-        <span>
-          <span className="font-semibold text-[#1A1A1A]">Pending setup</span>
-          <span className="text-[#8A8A85]"> · </span>
-          A Seel team member will contact you within 3 business days.
-        </span>
-      </div>
-    );
-  }
+  const isPending = state === "pending";
   return (
-    <div className="flex items-center gap-2 text-[13px] text-[#52525B]">
+    <span
+      className="inline-flex items-center gap-1 text-[12px] text-[#52525B]"
+      aria-label={isPending ? "Pending setup" : "Enabled"}
+    >
       <span
-        className="w-2 h-2 rounded-full bg-[#0A7A3A] shrink-0"
         aria-hidden="true"
+        className={cn(
+          "w-1.5 h-1.5 rounded-full",
+          isPending ? "bg-[#A85A00]" : "bg-[#0A7A3A]",
+        )}
       />
-      <span>
-        <span className="font-semibold text-[#1A1A1A]">Enabled</span>
-        <span className="text-[#8A8A85]"> · </span>
-        Activated Apr 21, 2026.
+      <span className="font-medium text-[#1A1A1A]">
+        {isPending ? "Pending setup" : "Enabled"}
       </span>
-    </div>
+    </span>
   );
 }
 
@@ -949,7 +862,10 @@ function SeelRCDebugSwitcher() {
               type="button"
               onClick={() => {
                 store.setRcNetworkState(opt.value);
-                store.setRcOwnEnabled(opt.value === "disabled");
+                // Keep mutex invariant: turning Network on forces Own off.
+                if (opt.value !== "disabled") {
+                  store.setRcOwnEnabled(false);
+                }
               }}
               className={cn(
                 "px-2.5 py-1 text-[12px] font-medium",
@@ -1117,9 +1033,6 @@ function ThankYouPageDetail({
               <TouchpointTagChip tag="seel_exclusive" />
             )}
           </div>
-          <p className="text-[14px] text-[#6B7280] mt-1">
-            Order confirmation recommendations.
-          </p>
         </div>
         <div className="shrink-0 pt-1" title="Available in V2.">
           <SAToggle
@@ -1140,7 +1053,7 @@ function ThankYouPageDetail({
         previews of the upcoming capability set.
       </Callout>
 
-      <HowItWorksSection touchpointId="thank_you_page" />
+      <TouchpointDescriptionBlock description={meta.description} />
 
       <DetailSection title="Setting">
         <div className="space-y-3">
@@ -1170,8 +1083,7 @@ function ThankYouPageDetail({
                         {w.name}
                       </p>
                       <p className="text-[12px] text-[#6B7280] truncate">
-                        {strategy?.name ?? "No strategy"} · {w.productCount}{" "}
-                        products · CTA "{w.ctaLabel}"
+                        {strategy?.name ?? "No strategy"} · CTA "{w.ctaLabel}"
                       </p>
                     </div>
                   </div>
@@ -1327,33 +1239,17 @@ function ThankYouWidgetDrawer({
             </Field>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Product count" htmlFor="ty_count">
-              <SAInput
-                id="ty_count"
-                type="number"
-                min={1}
-                max={10}
-                value={widget.productCount}
-                onChange={(e) =>
-                  store.updateThankYouWidget(widget.id, {
-                    productCount: Number(e.target.value) || 1,
-                  })
-                }
-              />
-            </Field>
-            <Field label="CTA label" htmlFor="ty_cta">
-              <SAInput
-                id="ty_cta"
-                value={widget.ctaLabel}
-                onChange={(e) =>
-                  store.updateThankYouWidget(widget.id, {
-                    ctaLabel: e.target.value,
-                  })
-                }
-              />
-            </Field>
-          </div>
+          <Field label="CTA label" htmlFor="ty_cta">
+            <SAInput
+              id="ty_cta"
+              value={widget.ctaLabel}
+              onChange={(e) =>
+                store.updateThankYouWidget(widget.id, {
+                  ctaLabel: e.target.value,
+                })
+              }
+            />
+          </Field>
 
           <div className="border border-[#E0E0E0] rounded-lg">
             <button
