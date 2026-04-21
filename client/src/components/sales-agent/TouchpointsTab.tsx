@@ -14,6 +14,7 @@ import {
   Field,
   InfoTip,
   Modal,
+  Panel,
   SAButton,
   SAInput,
   SASelect,
@@ -197,6 +198,7 @@ export default function TouchpointsTab() {
                       meta={t}
                       active={selected?.id === t.id}
                       onClick={() => setSelectedId(t.id)}
+                      onRequestConfirm={(c) => setConfirm(c)}
                     />
                   ))}
                 </div>
@@ -254,21 +256,57 @@ function TouchpointCard({
   meta,
   active,
   onClick,
+  onRequestConfirm,
 }: {
   meta: TouchpointMeta;
   active: boolean;
   onClick: () => void;
+  onRequestConfirm: (c: {
+    title: string;
+    body: string;
+    onConfirm: () => void;
+  }) => void;
 }) {
   const store = useSalesAgent();
   const tp = store.touchpoints.find((t) => t.id === meta.id);
   const depMet =
     !meta.dependencyKey || store.dependency[meta.dependencyKey] === true;
-  const Icon = TOUCHPOINT_ICON[meta.id];
+  const shopifyPlusMet =
+    !meta.requiresShopifyPlus || store.dependency.shopifyPlus;
+  const needsStrategy = meta.picksStrategy && !tp?.strategyId;
+  const toggleDisabled =
+    !depMet || !shopifyPlusMet || meta.previewOnly || needsStrategy;
 
+  const Icon = TOUCHPOINT_ICON[meta.id];
   const isOn = !!tp?.enabled && depMet;
 
   // Only show Seel-exclusive tag in the list
   const showTag = meta.tags?.includes("seel_exclusive");
+
+  const handleToggle = (v: boolean) => {
+    if (toggleDisabled) return;
+    if (v) {
+      onRequestConfirm({
+        title: `Turn on ${meta.label}?`,
+        body: `Once enabled, Sales Agent recommendations will be served on ${meta.label} in production. You can switch it off at any time.`,
+        onConfirm: () => store.updateTouchpoint(meta.id, { enabled: true }),
+      });
+    } else {
+      onRequestConfirm({
+        title: `Turn off ${meta.label}?`,
+        body: `Shoppers will stop seeing Sales Agent recommendations at ${meta.label}. You can turn it back on any time.`,
+        onConfirm: () => store.updateTouchpoint(meta.id, { enabled: false }),
+      });
+    }
+  };
+
+  const toggleTooltip = toggleDisabled
+    ? needsStrategy
+      ? "Select a strategy before enabling."
+      : meta.previewOnly
+        ? "Available in V2."
+        : "Dependency not met."
+    : undefined;
 
   return (
     <button
@@ -303,26 +341,31 @@ function TouchpointCard({
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1.5 mt-1.5 text-[12px]">
-            <StatusDot kind={isOn ? "on" : "off"} />
-            <span className={cn(isOn ? "text-[#235935]" : "text-[#6B7280]")}>
-              {isOn ? "On" : "Off"}
-            </span>
-            {!depMet && meta.dependencyKey && (
-              <>
-                <span className="text-[#D9D9D9]">·</span>
-                <Link href="/">
-                  <span
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-[#2121C4] hover:underline"
-                  >
-                    Set up
-                  </span>
-                </Link>
-              </>
-            )}
-          </div>
+          {!depMet && meta.dependencyKey && (
+            <div className="mt-1.5 text-[12px]">
+              <Link href="/">
+                <span
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-[#2121C4] hover:underline"
+                >
+                  Set up
+                </span>
+              </Link>
+            </div>
+          )}
         </div>
+        <span
+          onClick={(e) => e.stopPropagation()}
+          className="shrink-0 pt-0.5"
+          title={toggleTooltip}
+        >
+          <SAToggle
+            checked={isOn}
+            disabled={toggleDisabled}
+            onChange={handleToggle}
+            ariaLabel={`Enable ${meta.label}`}
+          />
+        </span>
       </div>
     </button>
   );
@@ -576,30 +619,31 @@ function TouchpointStats({ touchpointId }: { touchpointId: TouchpointId }) {
     <div className="space-y-3">
       <div className="grid grid-cols-4 gap-4">
         {cells.map((c) => (
-          <div key={c.label}>
-            <div className="flex items-center gap-1 text-[12px] text-[#6B7280]">
-              <span className="uppercase tracking-[0.06em] font-medium">
-                {c.label}
-              </span>
+          <Panel key={c.label} className="px-5 py-5">
+            <div className="flex items-center gap-1 text-[14px] text-[#5C5F62]">
+              <span>{c.label}</span>
               <InfoTip>{c.tip}</InfoTip>
             </div>
-            <p className="text-[24px] font-bold text-[#202223] tabular-nums leading-tight mt-1">
+            <p className="text-[30px] font-bold text-[#202223] tabular-nums leading-tight mt-1">
               {c.value}
             </p>
-            {c.sub && (
-              <p className="text-[12px] mt-0.5 tabular-nums">
+            {c.sub ? (
+              <div className="flex items-center gap-1.5 mt-1">
                 <span
                   className={cn(
+                    "text-[12px] font-medium tabular-nums",
                     c.sub.startsWith("+") && "text-[#235935]",
                     c.sub.startsWith("−") && "text-[#FF0000]",
                   )}
                 >
                   {c.sub}
                 </span>
-                <span className="text-[#8C8C8C] ml-1">vs previous</span>
-              </p>
+                <span className="text-[12px] text-[#8C8C8C]">vs previous</span>
+              </div>
+            ) : (
+              <div className="h-[18px] mt-1" aria-hidden="true" />
             )}
-          </div>
+          </Panel>
         ))}
       </div>
       <p className="text-[12px] text-[#8C8C8C]">
