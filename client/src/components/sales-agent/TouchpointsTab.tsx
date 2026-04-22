@@ -23,7 +23,14 @@ import {
   StatusDot,
 } from "./primitives";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   ChevronRight,
+  HelpCircle,
+  Image as ImageIcon,
   MessageSquare,
   Package,
   Search,
@@ -148,6 +155,81 @@ const TOUCHPOINT_ICON: Record<TouchpointId, TouchpointIconComponent> = {
   seel_rc: SeelRCIcon,
   wfp_email: Mail,
 };
+
+/* ── Touchpoint illustration banner (placeholder) ──────────
+   Compact banner under the detail header — will later swap
+   to a real screenshot/illustration per touchpoint. */
+function TouchpointBanner({ meta }: { meta: TouchpointMeta }) {
+  const Icon = TOUCHPOINT_ICON[meta.id];
+  return (
+    <div
+      className="relative h-[112px] w-full rounded-[10px] border border-dashed border-[#D6D2FF] bg-gradient-to-br from-[#F4F1FF] via-[#F7F7FC] to-[#ECE9FF] overflow-hidden flex items-center gap-4 px-5"
+      role="img"
+      aria-label={`${meta.label} illustration placeholder`}
+    >
+      <div className="w-14 h-14 rounded-lg bg-white/70 border border-[#E0DEFF] flex items-center justify-center shrink-0 text-[#2121C4]">
+        <Icon className="w-7 h-7" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] font-semibold text-[#2121C4] leading-tight">
+          {meta.label} preview
+        </p>
+        <p className="text-[12px] text-[#5C5F62] mt-1 leading-snug line-clamp-2">
+          {meta.description}
+        </p>
+      </div>
+      <div className="shrink-0 flex items-center gap-1 text-[11px] text-[#8C8C8C] uppercase tracking-[0.08em]">
+        <ImageIcon className="w-3.5 h-3.5" />
+        Placeholder
+      </div>
+    </div>
+  );
+}
+
+/* ── Touchpoint help tip on list cards (image preview tooltip)
+   Hover the "?" next to the label → portal tooltip with a
+   placeholder image + short description. */
+function TouchpointHelpTip({ meta }: { meta: TouchpointMeta }) {
+  const Icon = TOUCHPOINT_ICON[meta.id];
+  return (
+    <Tooltip delayDuration={120}>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex items-center justify-center shrink-0 text-[#8C8C8C] hover:text-[#2121C4] transition-colors"
+          aria-label={`About ${meta.label}`}
+        >
+          <HelpCircle className="w-3.5 h-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent
+        side="right"
+        align="start"
+        sideOffset={10}
+        className="w-[260px] p-0 bg-white text-[#202223] border border-[#E0E0E0] rounded-[10px] shadow-[0_10px_32px_-12px_rgba(0,0,0,0.25)]"
+      >
+        <div className="relative h-[130px] w-full rounded-t-[10px] border-b border-dashed border-[#E0DEFF] bg-gradient-to-br from-[#F4F1FF] via-[#F7F7FC] to-[#ECE9FF] flex items-center justify-center">
+          <div className="w-12 h-12 rounded-lg bg-white/70 border border-[#E0DEFF] flex items-center justify-center text-[#2121C4]">
+            <Icon className="w-6 h-6" />
+          </div>
+          <div className="absolute bottom-1.5 right-2 inline-flex items-center gap-1 text-[10px] text-[#8C8C8C] uppercase tracking-[0.08em]">
+            <ImageIcon className="w-3 h-3" />
+            Preview
+          </div>
+        </div>
+        <div className="px-3 py-2.5">
+          <p className="text-[13px] font-semibold text-[#202223] leading-tight">
+            {meta.label}
+          </p>
+          <p className="text-[12px] text-[#5C5F62] mt-1 leading-snug">
+            {meta.description}
+          </p>
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 export default function TouchpointsTab() {
   const store = useSalesAgent();
@@ -298,6 +380,7 @@ function TouchpointCard({
             <p className="text-[14px] font-semibold text-[#202223] truncate">
               {meta.label}
             </p>
+            <TouchpointHelpTip meta={meta} />
             {showTag && <TouchpointTagChip tag="seel_exclusive" />}
             {meta.previewOnly && (
               <span className="text-[12px] text-[#5C5F62] bg-[#E7EBF5] border border-[#DADEE9] px-1.5 py-[1px] rounded shrink-0">
@@ -431,6 +514,8 @@ function TouchpointDetail({
           />
         </div>
       </header>
+
+      <TouchpointBanner meta={meta} />
 
       {meta.requiresShopifyPlus && (
         <ShopifyPlusWidget met={store.dependency.shopifyPlus} />
@@ -1037,6 +1122,8 @@ function ThankYouPageDetail({
           />
         </div>
       </header>
+
+      <TouchpointBanner meta={meta} />
 
       {meta.requiresShopifyPlus && (
         <ShopifyPlusWidget met={store.dependency.shopifyPlus} />
