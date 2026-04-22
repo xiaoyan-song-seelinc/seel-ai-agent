@@ -11,10 +11,16 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { cn } from "@/lib/utils";
 import { useSalesAgent } from "@/lib/sales-agent/store";
 import { TOUCHPOINTS, touchpointLabel } from "@/lib/sales-agent/constants";
 import type { TouchpointId } from "@/lib/sales-agent/types";
+import {
+  Tooltip as UITooltip,
+  TooltipContent as UITooltipContent,
+  TooltipTrigger as UITooltipTrigger,
+} from "@/components/ui/tooltip";
 import { InfoTip, Panel, SAButton, SAInput } from "./primitives";
 
 type TrendKey = "total" | TouchpointId;
@@ -42,9 +48,9 @@ const METRIC_COPY: Record<
   { label: string; definition: string }
 > = {
   revenue: {
-    label: "Attributed Revenue",
+    label: "Attributed Sales",
     definition:
-      "Revenue from orders containing a product surfaced by Sales Agent (Own products only). Sum over the selected window.",
+      "Subtotal of orders attributed to Sales Agent. Uses Shopify subtotal_price (after discounts, before tax/shipping). Returns are not deducted.",
   },
   orders: {
     label: "Orders Influenced",
@@ -127,10 +133,23 @@ export default function AnalyticsTab() {
         </div>
         <TouchpointFilter selected={selected} onChange={setSelected} />
         <div className="ml-auto">
-          <SAButton variant="secondary" size="md" onClick={exportCsv}>
-            <Download className="w-3.5 h-3.5" />
-            Export CSV
-          </SAButton>
+          <UITooltip delayDuration={300}>
+            <UITooltipTrigger asChild>
+              <SAButton variant="secondary" size="md" onClick={exportCsv}>
+                <Download className="w-3.5 h-3.5" />
+                Export CSV
+              </SAButton>
+            </UITooltipTrigger>
+            <UITooltipContent
+              side="bottom"
+              align="center"
+              sideOffset={6}
+              className="max-w-[280px] whitespace-normal bg-[#1A1A1A] text-white text-[12px] font-normal leading-snug px-2.5 py-1.5 rounded-[4px]"
+            >
+              Exports the orders attributed to Sales Agent in the selected time range and touchpoint filter. Each row is one attributed order with the strategy that drove the purchase.
+              <TooltipPrimitive.Arrow width={10} height={5} className="fill-[#1A1A1A]" />
+            </UITooltipContent>
+          </UITooltip>
         </div>
       </div>
 
@@ -173,11 +192,11 @@ export default function AnalyticsTab() {
         <Panel className="p-6 col-span-2">
           <div className="flex items-center gap-1.5">
             <p className="text-[18px] font-semibold text-[#202223]">
-              Revenue trend
+              Sales trend
             </p>
             <InfoTip>
-              Attributed revenue by day. Toggle touchpoints to compare their
-              contribution on the same axis.
+              Sales amount is based on Shopify subtotal_price. See Attributed
+              Sales for full definition.
             </InfoTip>
           </div>
           {isEmpty ? (
@@ -192,11 +211,11 @@ export default function AnalyticsTab() {
         <Panel className="p-6 col-span-1">
           <div className="flex items-center gap-1.5">
             <p className="text-[18px] font-semibold text-[#202223]">
-              Revenue by touchpoint
+              Sales by touchpoint
             </p>
             <InfoTip>
-              Attributed revenue contribution per touchpoint over the selected
-              window.
+              Sales amount is based on Shopify subtotal_price. See Attributed
+              Sales for full definition.
             </InfoTip>
           </div>
           {isEmpty ? (
