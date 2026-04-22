@@ -4,13 +4,11 @@ import { cn } from "@/lib/utils";
 import { useSalesAgent } from "@/lib/sales-agent/store";
 import { COLLECTIONS, PRODUCTS } from "@/lib/sales-agent/store";
 import {
-  Callout,
   Chip,
   InfoTip,
   Panel,
   SAButton,
   SAInput,
-  SAToggle,
 } from "./primitives";
 import { ProductPicker, CollectionPicker } from "./Pickers";
 
@@ -41,7 +39,6 @@ export default function ExclusionRules({ embedded = false }: Props) {
           <ExcludedProducts onOpen={() => setProductPickerOpen(true)} />
           <ExcludedCollections onOpen={() => setCollectionPickerOpen(true)} />
           <ExcludedTags />
-          <OutOfStockBehavior />
         </div>
       </Panel>
 
@@ -239,49 +236,6 @@ function ExcludedTags() {
         )}
       </div>
     </RuleRow>
-  );
-}
-
-/* ── OOS behavior row ──────────────────────────────────── */
-function OutOfStockBehavior() {
-  const store = useSalesAgent();
-  const v = store.exclusion.outOfStockBehavior;
-  const hidden = v === "hidden";
-  return (
-    <div className="px-4 py-3">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1">
-            <p className="text-[14px] font-medium text-[#202223]">
-              Hide out-of-stock products
-            </p>
-            <InfoTip>Whether OOS products may appear in recommendations.</InfoTip>
-          </div>
-          <p className="text-[12px] text-[#6B7280] mt-0.5 leading-snug">
-            When on, products with zero inventory are skipped. When off,
-            shoppers may see items they can't buy.
-          </p>
-        </div>
-        <div className="shrink-0 pt-0.5">
-          <SAToggle
-            checked={hidden}
-            onChange={(next) =>
-              store.updateExclusion({
-                outOfStockBehavior: next ? "hidden" : "shown",
-              })
-            }
-            ariaLabel="Hide out-of-stock products"
-          />
-        </div>
-      </div>
-      {!hidden && (
-        <div className="mt-3">
-          <Callout tone="warn">
-            OOS products will be surfaced. Customers may see items they can't buy.
-          </Callout>
-        </div>
-      )}
-    </div>
   );
 }
 
