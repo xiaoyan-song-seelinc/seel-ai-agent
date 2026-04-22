@@ -46,7 +46,6 @@ export interface ExclusionRules {
   productIds: string[];
   collectionIds: string[];
   tags: string[];
-  outOfStockBehavior: "hidden" | "shown";
 }
 
 export interface BaseStrategy {

@@ -82,13 +82,12 @@ function defaultStrategies(scenario: DemoScenario): Strategy[] {
 
 function defaultExclusion(scenario: DemoScenario): ExclusionRules {
   if (scenario === "empty") {
-    return { productIds: [], collectionIds: [], tags: [], outOfStockBehavior: "hidden" };
+    return { productIds: [], collectionIds: [], tags: [] };
   }
   return {
     productIds: ["p_09"],
     collectionIds: ["c_clearance"],
     tags: ["giftcard"],
-    outOfStockBehavior: "hidden",
   };
 }
 

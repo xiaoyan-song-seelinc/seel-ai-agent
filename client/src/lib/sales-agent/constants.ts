@@ -110,7 +110,7 @@ export const STAGE_LABEL: Record<Stage, string> = {
 
 export const STRATEGY_TYPE_LABEL: Record<StrategyType, string> = {
   best_sellers: "Best Sellers",
-  similar: "Similar Products",
+  similar: "Related Products",
   new_arrivals: "New Arrivals",
   manual: "Manual Pick",
 };

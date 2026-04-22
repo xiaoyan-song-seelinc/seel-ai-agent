@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pencil } from "lucide-react";
 import {
-  Callout,
   Drawer,
   Field,
   Modal,
@@ -11,6 +10,11 @@ import {
   SASelect,
   Segmented,
 } from "./primitives";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type {
   BestSellersSortBy,
   ManualMode,
@@ -213,7 +217,7 @@ export default function StrategyDrawer({
 
   const typeOptions: { value: StrategyType; label: string }[] = [
     { value: "best_sellers", label: "Best Sellers" },
-    { value: "similar", label: "Similar" },
+    { value: "similar", label: "Related Products" },
     { value: "new_arrivals", label: "New Arrivals" },
     { value: "manual", label: "Manual Pick" },
   ];
@@ -330,27 +334,41 @@ export default function StrategyDrawer({
       >
         <div className="p-5 space-y-4">
           {existing && isReferenced && (
-            <Callout tone="warn" title="In use">
-              This strategy is currently used by:{" "}
-              {referencedBy.map(touchpointLabel).join(", ")}. Changes apply
-              immediately to these touchpoints.
-            </Callout>
+            <p className="text-[12px] text-[#6B7280] leading-snug">
+              In use by {referencedBy.map(touchpointLabel).join(", ")}. Changes
+              apply immediately.
+            </p>
           )}
 
-          <Field
-            label="Type"
-            help={
-              isReferenced
-                ? "Type is locked while this strategy is live. Duplicate to experiment."
-                : undefined
-            }
-          >
-            <Segmented
-              value={draft.type}
-              onChange={(v) => setDraft((d) => ({ ...d, type: v }))}
-              options={typeOptions}
-              disabled={isReferenced}
-            />
+          <Field label="Type">
+            {isReferenced ? (
+              <Tooltip delayDuration={150}>
+                <TooltipTrigger asChild>
+                  <span className="inline-block">
+                    <Segmented
+                      value={draft.type}
+                      onChange={(v) => setDraft((d) => ({ ...d, type: v }))}
+                      options={typeOptions}
+                      disabled
+                    />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="top"
+                  sideOffset={6}
+                  className="max-w-[260px] bg-[#202223] text-white text-[12px] leading-snug px-2.5 py-1.5 rounded-md"
+                >
+                  Type is locked while this strategy is live. Duplicate to
+                  experiment.
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <Segmented
+                value={draft.type}
+                onChange={(v) => setDraft((d) => ({ ...d, type: v }))}
+                options={typeOptions}
+              />
+            )}
           </Field>
 
           {/* Type-specific fields */}
@@ -414,13 +432,6 @@ export default function StrategyDrawer({
                 ))}
               </SASelect>
             </Field>
-          )}
-
-          {draft.type === "similar" && (
-            <Callout tone="info">
-              Reference product is the most expensive line item in the
-              shopper's most recent order.
-            </Callout>
           )}
 
           {draft.type === "manual" && (
