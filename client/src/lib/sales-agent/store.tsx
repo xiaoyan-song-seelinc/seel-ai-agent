@@ -112,12 +112,10 @@ interface SalesAgentStore {
   thankYouWidgets: ThankYouWidget[];
   analytics: AnalyticsData;
 
-  // Seel RC — Network Recommendations opt-in (mutually exclusive with Own)
-  rcOwnEnabled: boolean;
+  // Seel RC — Recommendation source (Your products / Partner products)
   rcNetworkState: RcNetworkState;
-  rcNetworkActivatedAt: string | null;
-  /** True right after a first-enable confirmation until the next Save click. */
-  rcPendingSaveToast: boolean;
+  /** Sticky: set the first time Network goes active; never auto-cleared. */
+  rcProvisionedAt: string | null;
 
   // scenario controls
   setScenario: (s: DemoScenario) => void;
@@ -128,9 +126,8 @@ interface SalesAgentStore {
   updateTouchpoint: (id: TouchpointId, patch: Partial<TouchpointConfig>) => void;
 
   // RC opt-in mutations
-  setRcOwnEnabled: (v: boolean) => void;
   setRcNetworkState: (s: RcNetworkState) => void;
-  setRcPendingSaveToast: (v: boolean) => void;
+  setRcProvisionedAt: (v: string | null) => void;
 
   // strategy mutations
   addStrategy: (s: Strategy) => void;
@@ -161,14 +158,9 @@ export function SalesAgentProvider({ children }: { children: ReactNode }) {
   const [touchpoints, setTouchpoints] = useState<TouchpointConfig[]>(() =>
     defaultTouchpoints("active"),
   );
-  const [rcOwnEnabled, setRcOwnEnabled] = useState<boolean>(true);
   const [rcNetworkState, setRcNetworkState] =
     useState<RcNetworkState>("disabled");
-  const [rcNetworkActivatedAt, setRcNetworkActivatedAt] = useState<
-    string | null
-  >(null);
-  const [rcPendingSaveToast, setRcPendingSaveToast] =
-    useState<boolean>(false);
+  const [rcProvisionedAt, setRcProvisionedAt] = useState<string | null>(null);
   const [strategies, setStrategies] = useState<Strategy[]>(() =>
     defaultStrategies("active"),
   );
@@ -188,19 +180,14 @@ export function SalesAgentProvider({ children }: { children: ReactNode }) {
     setStrategies(defaultStrategies(s));
     setExclusion(defaultExclusion(s));
     setAnalytics(defaultAnalytics(s));
-    setRcOwnEnabled(true);
     setRcNetworkState("disabled");
-    setRcNetworkActivatedAt(null);
-    setRcPendingSaveToast(false);
+    setRcProvisionedAt(null);
   };
 
   const updateRcNetworkState = (next: RcNetworkState) => {
     setRcNetworkState(next);
-    if (next === "active" && !rcNetworkActivatedAt) {
-      setRcNetworkActivatedAt("Apr 21, 2026");
-    }
-    if (next === "disabled") {
-      setRcNetworkActivatedAt(null);
+    if (next === "active") {
+      setRcProvisionedAt((prev) => prev ?? "Apr 21, 2026");
     }
   };
 
@@ -266,17 +253,14 @@ export function SalesAgentProvider({ children }: { children: ReactNode }) {
       exclusion,
       thankYouWidgets,
       analytics,
-      rcOwnEnabled,
       rcNetworkState,
-      rcNetworkActivatedAt,
-      rcPendingSaveToast,
+      rcProvisionedAt,
       setScenario,
       setPlatform,
       setDependency,
       updateTouchpoint,
-      setRcOwnEnabled,
       setRcNetworkState: updateRcNetworkState,
-      setRcPendingSaveToast,
+      setRcProvisionedAt,
       addStrategy,
       updateStrategy,
       removeStrategy,
@@ -294,10 +278,8 @@ export function SalesAgentProvider({ children }: { children: ReactNode }) {
       exclusion,
       thankYouWidgets,
       analytics,
-      rcOwnEnabled,
       rcNetworkState,
-      rcNetworkActivatedAt,
-      rcPendingSaveToast,
+      rcProvisionedAt,
     ],
   );
 

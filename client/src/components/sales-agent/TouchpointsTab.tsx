@@ -560,10 +560,8 @@ function StrategySetting({
   );
 }
 
-/* ── Seel RC Setting (Own Products / Network Products split) ─── */
-type RcModalKind =
-  | { kind: "enable" }
-  | { kind: "disable-active"; nextOwn: boolean };
+/* ── Seel RC Setting — Source radio + conditional Strategy ─── */
+type RcModalKind = "enable" | "disable-active";
 
 function SeelRCSetting({
   meta,
@@ -581,39 +579,26 @@ function SeelRCSetting({
   const tp = store.touchpoints.find((t) => t.id === meta.id)!;
   const [modal, setModal] = useState<RcModalKind | null>(null);
 
-  const networkOn = store.rcNetworkState !== "disabled";
-  const ownOn = store.rcOwnEnabled;
+  const source: "own" | "partner" =
+    store.rcNetworkState === "disabled" ? "own" : "partner";
 
-  // Own toggle. Both sources can be OFF; they only cannot both be ON.
-  const handleOwnToggle = (v: boolean) => {
-    if (!v) {
-      // Off is allowed — both sources may be off.
-      store.setRcOwnEnabled(false);
-      return;
-    }
-    if (ownOn) return;
+  const handleSelectOwn = () => {
+    if (source === "own") return;
     if (store.rcNetworkState === "active") {
-      // Enabling Own would stop an active Network setup; confirm.
-      setModal({ kind: "disable-active", nextOwn: true });
-      return;
+      setModal("disable-active");
+    } else {
+      // pending → off (no confirmation)
+      store.setRcNetworkState("disabled");
     }
-    // Network disabled or pending → just switch.
-    store.setRcNetworkState("disabled");
-    store.setRcOwnEnabled(true);
   };
 
-  // Network toggle.
-  const handleNetworkToggle = (v: boolean) => {
-    if (v) {
-      if (networkOn) return;
-      setModal({ kind: "enable" });
+  const handleSelectPartner = () => {
+    if (source === "partner") return;
+    if (store.rcProvisionedAt) {
+      // Previously onboarded — skip modal, go straight to active.
+      store.setRcNetworkState("active");
     } else {
-      if (store.rcNetworkState === "active") {
-        setModal({ kind: "disable-active", nextOwn: ownOn });
-      } else {
-        // pending → off (no confirmation). Leave Own as-is.
-        store.setRcNetworkState("disabled");
-      }
+      setModal("enable");
     }
   };
 
@@ -637,61 +622,80 @@ function SeelRCSetting({
 
   const enableConfirm = () => {
     store.setRcNetworkState("pending");
-    store.setRcOwnEnabled(false);
-    // Mark that the user just enabled Network — next Save click shows the toast.
-    store.setRcPendingSaveToast(true);
+    toast.success(
+      "Network recommendations enabled. We'll reach out within 3 business days.",
+      { duration: 3000 },
+    );
     setModal(null);
   };
 
-  const disableConfirm = (nextOwn: boolean) => {
+  const disableConfirm = () => {
     store.setRcNetworkState("disabled");
-    store.setRcOwnEnabled(nextOwn);
     setModal(null);
   };
 
   return (
-    <div className="space-y-3">
-      {/* Own Products */}
-      <RcSourceCard
-        title="Own Products"
-        checked={ownOn}
-        otherOn={networkOn}
-        onChange={handleOwnToggle}
-      >
-        <div className="space-y-3">
-          <Field label="Strategy">
-            <SASelect
-              value={tp.strategyId ?? ""}
-              onChange={(e) => handleStrategyChange(e.target.value)}
-              className="w-full"
-              disabled={!ownOn}
-            >
-              <option value="">— None selected —</option>
-              {store.strategies.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-              <option disabled>──────────</option>
-              <option value="__new__">+ Create new strategy…</option>
-            </SASelect>
-          </Field>
-        </div>
-      </RcSourceCard>
-
-      {/* Network Products */}
-      <RcSourceCard
-        title="Network Products"
-        description="Earn commission by showing partner products on attributed sales."
-        checked={networkOn}
-        otherOn={ownOn}
-        onChange={handleNetworkToggle}
-        badge={<NetworkInlineBadge state={store.rcNetworkState} />}
+    <div className="bg-white border border-[#E4E4E0] rounded-[6px] px-4 py-4">
+      <RcSourceRadio
+        name="rc-source"
+        value="own"
+        checked={source === "own"}
+        onSelect={handleSelectOwn}
+        label="Your products"
       />
 
-      {/* Enable modal */}
+      <div className="mt-3">
+        <RcSourceRadio
+          name="rc-source"
+          value="partner"
+          checked={source === "partner"}
+          onSelect={handleSelectPartner}
+          label="Partner products"
+          subtitle="Recommend from Seel's network and earn commission on attributed sales"
+        >
+          {store.rcNetworkState === "pending" && (
+            <RcNetworkStatusRow
+              tone="pending"
+              label="Request in progress"
+              detail="We'll follow up within 3 business days."
+            />
+          )}
+          {store.rcNetworkState === "active" && (
+            <RcNetworkStatusRow
+              tone="active"
+              label="Enabled"
+              detail={`Activated ${store.rcProvisionedAt ?? "Apr 21, 2026"}`}
+            />
+          )}
+        </RcSourceRadio>
+      </div>
+
+      {source === "own" && (
+        <>
+          <div className="mt-4 pt-4 border-t border-[#E4E4E0]">
+            <Field label="Strategy">
+              <SASelect
+                value={tp.strategyId ?? ""}
+                onChange={(e) => handleStrategyChange(e.target.value)}
+                className="w-full"
+              >
+                <option value="">— None selected —</option>
+                {store.strategies.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+                <option disabled>──────────</option>
+                <option value="__new__">+ Create new strategy…</option>
+              </SASelect>
+            </Field>
+          </div>
+        </>
+      )}
+
+      {/* Enable modal (first-time Partner activation) */}
       <Modal
-        open={modal?.kind === "enable"}
+        open={modal === "enable"}
         onClose={() => setModal(null)}
         title="Enable Network Recommendations"
         width="max-w-[440px]"
@@ -707,14 +711,14 @@ function SeelRCSetting({
         }
       >
         <p className="text-[14px] text-[#52525B] leading-relaxed">
-          A Seel team member will reach out within 3 business days to complete
-          setup. You can disable this anytime.
+          A Seel team member will reach out within 3 business days to follow up.
+          You can disable this anytime.
         </p>
       </Modal>
 
       {/* Active → disable modal */}
       <Modal
-        open={modal?.kind === "disable-active"}
+        open={modal === "disable-active"}
         onClose={() => setModal(null)}
         title="Disable Network Recommendations"
         width="max-w-[440px]"
@@ -723,14 +727,7 @@ function SeelRCSetting({
             <SAButton variant="ghost" onClick={() => setModal(null)}>
               Cancel
             </SAButton>
-            <SAButton
-              variant="danger"
-              onClick={() =>
-                disableConfirm(
-                  modal?.kind === "disable-active" ? modal.nextOwn : true,
-                )
-              }
-            >
+            <SAButton variant="danger" onClick={disableConfirm}>
               Disable
             </SAButton>
           </>
@@ -745,92 +742,75 @@ function SeelRCSetting({
   );
 }
 
-/* A card with a header-level toggle. The mutex tooltip shows only when the
- * opposite source is ON (because that is the only case where clicking the
- * off toggle causes a switch). An optional `badge` renders inline to the
- * left of the toggle — used for the Network pending / enabled indicator. */
-function RcSourceCard({
-  title,
-  description,
+/* Native radio row: bold label + optional secondary subtitle.
+ * Children render in the radio's right column, below the subtitle — used
+ * for the pending / active status rows on the Partner option. */
+function RcSourceRadio({
+  name,
+  value,
   checked,
-  otherOn,
-  onChange,
+  onSelect,
+  label,
+  subtitle,
   children,
-  badge,
 }: {
-  title: string;
-  description?: string;
+  name: string;
+  value: string;
   checked: boolean;
-  otherOn: boolean;
-  onChange: (v: boolean) => void;
+  onSelect: () => void;
+  label: string;
+  subtitle?: string;
   children?: React.ReactNode;
-  badge?: React.ReactNode;
 }) {
-  const [hover, setHover] = useState(false);
-  const showTip = !checked && otherOn && hover;
   return (
-    <div className="bg-white border border-[#E4E4E0] rounded-[6px]">
-      <div className="flex items-start gap-3 px-4 py-3.5">
-        <div className="flex-1 min-w-0">
-          <p className="text-[14px] font-semibold text-[#1A1A1A] leading-snug">
-            {title}
+    <label className="flex items-start gap-3 cursor-pointer">
+      <input
+        type="radio"
+        name={name}
+        value={value}
+        checked={checked}
+        onChange={onSelect}
+        className="mt-[3px] w-4 h-4 cursor-pointer"
+        style={{ accentColor: "#1A1A1A" }}
+      />
+      <div className="flex-1 min-w-0">
+        <p className="text-[14px] font-semibold text-[#1A1A1A] leading-snug">
+          {label}
+        </p>
+        {subtitle && (
+          <p className="text-[12px] text-[#52525B] leading-relaxed mt-0.5">
+            {subtitle}
           </p>
-          {description && (
-            <p className="text-[13px] text-[#52525B] leading-relaxed mt-1">
-              {description}
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-2 shrink-0 pt-0.5">
-          {badge}
-          <div
-            className="relative"
-            onMouseEnter={() => setHover(true)}
-            onMouseLeave={() => setHover(false)}
-          >
-            <SAToggle
-              checked={checked}
-              onChange={onChange}
-              ariaLabel={`${title} source`}
-            />
-            {showTip && (
-              <div className="absolute right-0 bottom-[calc(100%+8px)] z-10 whitespace-nowrap rounded-[4px] bg-[#1A1A1A] text-white text-[12px] leading-snug px-2 py-1 shadow">
-                Only one source can be active. Click to switch.
-                <span className="absolute -bottom-1 right-3 w-2 h-2 rotate-45 bg-[#1A1A1A]" />
-              </div>
-            )}
-          </div>
-        </div>
+        )}
+        {children}
       </div>
-      {checked && children && (
-        <div className="border-t border-[#E4E4E0] px-4 py-4">{children}</div>
-      )}
-    </div>
+    </label>
   );
 }
 
-/* Small inline badge shown next to the Network toggle.
- * "Pending setup" (orange) while waiting for Seel to activate, and
- * "Enabled" (green) once active. Nothing when Network is disabled. */
-function NetworkInlineBadge({ state }: { state: RcNetworkState }) {
-  if (state === "disabled") return null;
-  const isPending = state === "pending";
+/* Small orange / green indicator row shown below the Partner subtitle. */
+function RcNetworkStatusRow({
+  tone,
+  label,
+  detail,
+}: {
+  tone: "pending" | "active";
+  label: string;
+  detail: string;
+}) {
   return (
-    <span
-      className="inline-flex items-center gap-1 text-[12px] text-[#52525B]"
-      aria-label={isPending ? "Pending setup" : "Enabled"}
-    >
+    <p className="flex items-center gap-1.5 text-[12px] text-[#52525B] mt-1.5">
       <span
         aria-hidden="true"
         className={cn(
-          "w-1.5 h-1.5 rounded-full",
-          isPending ? "bg-[#A85A00]" : "bg-[#0A7A3A]",
+          "inline-block w-1.5 h-1.5 rounded-full shrink-0",
+          tone === "pending" ? "bg-[#A85A00]" : "bg-[#0A7A3A]",
         )}
       />
-      <span className="font-medium text-[#1A1A1A]">
-        {isPending ? "Pending setup" : "Enabled"}
-      </span>
-    </span>
+      <span className="font-medium text-[#1A1A1A]">{label}</span>
+      <span className="text-[#8A8A85]">·</span>
+      <span>{detail}</span>
+    </p>
   );
 }
 
@@ -854,13 +834,7 @@ function SeelRCDebugSwitcher() {
             <button
               key={opt.value}
               type="button"
-              onClick={() => {
-                store.setRcNetworkState(opt.value);
-                // Keep mutex invariant: turning Network on forces Own off.
-                if (opt.value !== "disabled") {
-                  store.setRcOwnEnabled(false);
-                }
-              }}
+              onClick={() => store.setRcNetworkState(opt.value)}
               className={cn(
                 "px-2.5 py-1 text-[12px] font-medium",
                 i > 0 && "border-l border-[#3A3A3A]",
@@ -884,17 +858,8 @@ function SeelRCDebugSwitcher() {
 
 /* ── Save bar at the bottom of the RC detail ─────────────── */
 function SeelRCSaveBar() {
-  const store = useSalesAgent();
   const onSave = () => {
-    if (store.rcPendingSaveToast) {
-      toast.success(
-        "Network recommendations enabled. We'll reach out within 3 business days.",
-        { duration: 3000 },
-      );
-      store.setRcPendingSaveToast(false);
-    } else {
-      toast.success("Settings saved.", { duration: 2000 });
-    }
+    toast.success("Settings saved.", { duration: 2000 });
   };
   return (
     <div className="flex justify-end pt-2">
