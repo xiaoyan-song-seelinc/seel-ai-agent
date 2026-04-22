@@ -99,7 +99,7 @@ function defaultAnalytics(scenario: DemoScenario): AnalyticsData {
 
 /* ── Context ──────────────────────────────────────────────── */
 
-export type RcNetworkState = "disabled" | "pending" | "active";
+export type NetworkState = "disabled" | "pending" | "active";
 
 interface SalesAgentStore {
   scenario: DemoScenario;
@@ -112,10 +112,10 @@ interface SalesAgentStore {
   thankYouWidgets: ThankYouWidget[];
   analytics: AnalyticsData;
 
-  // Seel RC — Recommendation source (Your products / Partner products)
-  rcNetworkState: RcNetworkState;
-  /** Sticky: set the first time Network goes active; never auto-cleared. */
-  rcProvisionedAt: string | null;
+  // Recommendation source state per touchpoint (Seel-exclusive touchpoints).
+  networkStateByTouchpoint: Partial<Record<TouchpointId, NetworkState>>;
+  /** Sticky: set the first time any touchpoint goes active; merchant-wide. */
+  networkProvisionedAt: string | null;
 
   // scenario controls
   setScenario: (s: DemoScenario) => void;
@@ -125,9 +125,9 @@ interface SalesAgentStore {
   // touchpoint mutations
   updateTouchpoint: (id: TouchpointId, patch: Partial<TouchpointConfig>) => void;
 
-  // RC opt-in mutations
-  setRcNetworkState: (s: RcNetworkState) => void;
-  setRcProvisionedAt: (v: string | null) => void;
+  // Network opt-in mutations
+  setNetworkState: (id: TouchpointId, state: NetworkState) => void;
+  setNetworkProvisionedAt: (v: string | null) => void;
 
   // strategy mutations
   addStrategy: (s: Strategy) => void;
@@ -158,9 +158,12 @@ export function SalesAgentProvider({ children }: { children: ReactNode }) {
   const [touchpoints, setTouchpoints] = useState<TouchpointConfig[]>(() =>
     defaultTouchpoints("active"),
   );
-  const [rcNetworkState, setRcNetworkState] =
-    useState<RcNetworkState>("disabled");
-  const [rcProvisionedAt, setRcProvisionedAt] = useState<string | null>(null);
+  const [networkStateByTouchpoint, setNetworkStateByTouchpoint] = useState<
+    Partial<Record<TouchpointId, NetworkState>>
+  >({});
+  const [networkProvisionedAt, setNetworkProvisionedAt] = useState<
+    string | null
+  >(null);
   const [strategies, setStrategies] = useState<Strategy[]>(() =>
     defaultStrategies("active"),
   );
@@ -180,14 +183,14 @@ export function SalesAgentProvider({ children }: { children: ReactNode }) {
     setStrategies(defaultStrategies(s));
     setExclusion(defaultExclusion(s));
     setAnalytics(defaultAnalytics(s));
-    setRcNetworkState("disabled");
-    setRcProvisionedAt(null);
+    setNetworkStateByTouchpoint({});
+    setNetworkProvisionedAt(null);
   };
 
-  const updateRcNetworkState = (next: RcNetworkState) => {
-    setRcNetworkState(next);
+  const setNetworkState = (id: TouchpointId, next: NetworkState) => {
+    setNetworkStateByTouchpoint((prev) => ({ ...prev, [id]: next }));
     if (next === "active") {
-      setRcProvisionedAt((prev) => prev ?? "Apr 21, 2026");
+      setNetworkProvisionedAt((prev) => prev ?? "Apr 21, 2026");
     }
   };
 
@@ -253,14 +256,14 @@ export function SalesAgentProvider({ children }: { children: ReactNode }) {
       exclusion,
       thankYouWidgets,
       analytics,
-      rcNetworkState,
-      rcProvisionedAt,
+      networkStateByTouchpoint,
+      networkProvisionedAt,
       setScenario,
       setPlatform,
       setDependency,
       updateTouchpoint,
-      setRcNetworkState: updateRcNetworkState,
-      setRcProvisionedAt,
+      setNetworkState,
+      setNetworkProvisionedAt,
       addStrategy,
       updateStrategy,
       removeStrategy,
@@ -278,8 +281,8 @@ export function SalesAgentProvider({ children }: { children: ReactNode }) {
       exclusion,
       thankYouWidgets,
       analytics,
-      rcNetworkState,
-      rcProvisionedAt,
+      networkStateByTouchpoint,
+      networkProvisionedAt,
     ],
   );
 

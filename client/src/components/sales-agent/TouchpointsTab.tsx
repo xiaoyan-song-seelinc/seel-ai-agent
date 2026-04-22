@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactElement } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { useSalesAgent, type RcNetworkState } from "@/lib/sales-agent/store";
+import { useSalesAgent, type NetworkState } from "@/lib/sales-agent/store";
 import {
   STAGE_LABEL,
   TOUCHPOINTS,
@@ -444,25 +444,21 @@ function TouchpointDetail({
         <ShopifyPlusWidget met={store.dependency.shopifyPlus} />
       )}
 
-      {meta.id === "seel_rc" && <SeelRCDebugSwitcher />}
+      {meta.picksStrategy && <NetworkStateDebugSwitcher touchpointId={meta.id} />}
 
       {meta.dependencyKey ? (
         <DependencyNotice meta={meta} />
-      ) : meta.id === "seel_rc" ? (
+      ) : meta.picksStrategy ? (
         <DetailSection title="Setting">
-          <SeelRCSetting meta={meta} onRequestConfirm={onRequestConfirm} />
+          <SourceSetting meta={meta} onRequestConfirm={onRequestConfirm} />
         </DetailSection>
-      ) : (
-        <DetailSection title="Setting">
-          <StrategySetting meta={meta} onRequestConfirm={onRequestConfirm} />
-        </DetailSection>
-      )}
+      ) : null}
 
       <DetailSection title="Statistics">
         <TouchpointStats touchpointId={meta.id} />
       </DetailSection>
 
-      {meta.id === "seel_rc" && <SeelRCSaveBar />}
+      {meta.picksStrategy && <TouchpointSaveBar />}
     </div>
   );
 }
@@ -512,72 +508,13 @@ function DependencyNotice({ meta }: { meta: TouchpointMeta }) {
   );
 }
 
-/* ── Setting: Seel RC / WFP Email ──────────────────────── */
-function StrategySetting({
-  meta,
-  onRequestConfirm,
-}: {
-  meta: TouchpointMeta;
-  onRequestConfirm: (c: {
-    title: string;
-    body: string;
-    confirmLabel: string;
-    variant?: "primary" | "danger";
-    onConfirm: () => void;
-  }) => void;
-}) {
-  const store = useSalesAgent();
-  const [, navigate] = useLocation();
-  const tp = store.touchpoints.find((t) => t.id === meta.id)!;
-
-  const handleStrategyChange = (v: string) => {
-    if (v === "__new__") {
-      navigate("/sales-agent/strategies");
-      return;
-    }
-    const next = v || null;
-    if (tp.enabled && next !== tp.strategyId) {
-      onRequestConfirm({
-        title: `Change strategy for ${meta.label}?`,
-        body: `This touchpoint is live. Changes apply immediately to shoppers in production.`,
-        confirmLabel: "Update strategy",
-        variant: "primary",
-        onConfirm: () =>
-          store.updateTouchpoint(meta.id, { strategyId: next }),
-      });
-    } else {
-      store.updateTouchpoint(meta.id, { strategyId: next });
-    }
-  };
-
-  return (
-    <div className="space-y-3">
-      <Field label="Strategy">
-        <SASelect
-          value={tp.strategyId ?? ""}
-          onChange={(e) => handleStrategyChange(e.target.value)}
-          className="w-full"
-        >
-          <option value="">— None selected —</option>
-          {store.strategies.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-          <option disabled>──────────</option>
-          <option value="__new__">+ Create new strategy…</option>
-        </SASelect>
-      </Field>
-    </div>
-  );
-}
-
-/* ── Seel RC Setting — Source radio + conditional Strategy ─── */
-type RcModalKind =
+/* ── Unified Source + Strategy setting for Seel-exclusive touchpoints.
+ *    Used by both Seel Resolution Center and WFP Confirmation Email. */
+type SourceModalKind =
   | { kind: "enable" }
   | { kind: "switch"; target: "own" | "partner" };
 
-function SeelRCSetting({
+function SourceSetting({
   meta,
   onRequestConfirm,
 }: {
@@ -593,17 +530,19 @@ function SeelRCSetting({
   const store = useSalesAgent();
   const [, navigate] = useLocation();
   const tp = store.touchpoints.find((t) => t.id === meta.id)!;
-  const [modal, setModal] = useState<RcModalKind | null>(null);
+  const [modal, setModal] = useState<SourceModalKind | null>(null);
 
+  const networkState: NetworkState =
+    store.networkStateByTouchpoint[meta.id] ?? "disabled";
   const source: "own" | "partner" =
-    store.rcNetworkState === "disabled" ? "own" : "partner";
+    networkState === "disabled" ? "own" : "partner";
 
   const handleSelectOwn = () => {
     if (source === "own") return;
     // Pending is an in-progress request, not live yet — switching is cheap
     // and doesn't warrant a prompt regardless of touchpoint state.
-    if (store.rcNetworkState === "pending") {
-      store.setRcNetworkState("disabled");
+    if (networkState === "pending") {
+      store.setNetworkState(meta.id, "disabled");
       return;
     }
     // active → own. Only confirm when the touchpoint is live; otherwise
@@ -611,22 +550,23 @@ function SeelRCSetting({
     if (tp.enabled) {
       setModal({ kind: "switch", target: "own" });
     } else {
-      store.setRcNetworkState("disabled");
+      store.setNetworkState(meta.id, "disabled");
     }
   };
 
   const handleSelectPartner = () => {
     if (source === "partner") return;
     // First-time onboarding flow is independent of touchpoint state —
-    // enabling Network is about establishing the Seel relationship.
-    if (!store.rcProvisionedAt) {
+    // enabling Network is about establishing the merchant-level Seel
+    // relationship (shared across touchpoints).
+    if (!store.networkProvisionedAt) {
       setModal({ kind: "enable" });
       return;
     }
     if (tp.enabled) {
       setModal({ kind: "switch", target: "partner" });
     } else {
-      store.setRcNetworkState("active");
+      store.setNetworkState(meta.id, "active");
     }
   };
 
@@ -651,23 +591,22 @@ function SeelRCSetting({
   };
 
   const enableConfirm = () => {
-    store.setRcNetworkState("pending");
-    toast.success(
-      "Network recommendations enabled. We'll reach out within 3 business days.",
-      { duration: 3000 },
-    );
+    store.setNetworkState(meta.id, "pending");
+    toast.success("Network recommendations enabled.", { duration: 3000 });
     setModal(null);
   };
 
   const switchConfirm = (target: "own" | "partner") => {
-    store.setRcNetworkState(target === "own" ? "disabled" : "active");
+    store.setNetworkState(meta.id, target === "own" ? "disabled" : "active");
     setModal(null);
   };
 
+  const radioGroupName = `source-${meta.id}`;
+
   return (
     <div className="bg-white border border-[#E4E4E0] rounded-[6px] px-4 py-4">
-      <RcSourceRadio
-        name="rc-source"
+      <SourceRadio
+        name={radioGroupName}
         value="own"
         checked={source === "own"}
         onSelect={handleSelectOwn}
@@ -675,22 +614,18 @@ function SeelRCSetting({
       />
 
       <div className="mt-3">
-        <RcSourceRadio
-          name="rc-source"
+        <SourceRadio
+          name={radioGroupName}
           value="partner"
           checked={source === "partner"}
           onSelect={handleSelectPartner}
           label="Partner products"
           subtitle="Recommend from Seel's network and earn commission on attributed sales"
         >
-          {store.rcNetworkState === "pending" && (
-            <RcNetworkStatusRow
-              tone="pending"
-              label="Request in progress"
-              detail="We'll follow up within 3 business days."
-            />
+          {networkState === "pending" && (
+            <NetworkStatusRow tone="pending" label="Request in progress" />
           )}
-        </RcSourceRadio>
+        </SourceRadio>
       </div>
 
       {source === "own" && (
@@ -732,8 +667,8 @@ function SeelRCSetting({
         }
       >
         <p className="text-[14px] text-[#52525B] leading-relaxed">
-          A Seel team member will reach out within 3 business days to follow up.
-          You can disable this anytime.
+          A Seel team member will reach out to follow up. You can disable this
+          anytime.
         </p>
       </Modal>
 
@@ -773,8 +708,8 @@ function SeelRCSetting({
 
 /* Native radio row: bold label + optional secondary subtitle.
  * Children render in the radio's right column, below the subtitle — used
- * for the pending / active status rows on the Partner option. */
-function RcSourceRadio({
+ * for the pending status row on the Partner option. */
+function SourceRadio({
   name,
   value,
   checked,
@@ -817,18 +752,17 @@ function RcSourceRadio({
   );
 }
 
-/* Small orange / green indicator row shown below the Partner subtitle. */
-function RcNetworkStatusRow({
+/* Small orange indicator row shown below the Partner subtitle while the
+ * merchant's network request is pending. */
+function NetworkStatusRow({
   tone,
   label,
-  detail,
 }: {
   tone: "pending" | "active";
   label: string;
-  detail: string;
 }) {
   return (
-    <p className="flex items-center gap-1.5 text-[12px] text-[#52525B] mt-1.5">
+    <p className="flex items-center gap-1.5 text-[12px] text-[#1A1A1A] mt-1.5">
       <span
         aria-hidden="true"
         className={cn(
@@ -836,17 +770,20 @@ function RcNetworkStatusRow({
           tone === "pending" ? "bg-[#A85A00]" : "bg-[#0A7A3A]",
         )}
       />
-      <span className="font-medium text-[#1A1A1A]">{label}</span>
-      <span className="text-[#8A8A85]">·</span>
-      <span>{detail}</span>
+      <span className="font-medium">{label}</span>
     </p>
   );
 }
 
-/* ── Debug switcher — prototype-only (RC detail top) ─────── */
-function SeelRCDebugSwitcher() {
+/* ── Debug switcher — prototype-only, shown above Source settings ─── */
+function NetworkStateDebugSwitcher({
+  touchpointId,
+}: {
+  touchpointId: TouchpointId;
+}) {
   const store = useSalesAgent();
-  const options: { value: RcNetworkState; label: string }[] = [
+  const current = store.networkStateByTouchpoint[touchpointId] ?? "disabled";
+  const options: { value: NetworkState; label: string }[] = [
     { value: "disabled", label: "disabled" },
     { value: "pending", label: "pending" },
     { value: "active", label: "active" },
@@ -858,12 +795,12 @@ function SeelRCDebugSwitcher() {
       </span>
       <div className="inline-flex rounded-[4px] overflow-hidden border border-[#3A3A3A]">
         {options.map((opt, i) => {
-          const active = store.rcNetworkState === opt.value;
+          const active = current === opt.value;
           return (
             <button
               key={opt.value}
               type="button"
-              onClick={() => store.setRcNetworkState(opt.value)}
+              onClick={() => store.setNetworkState(touchpointId, opt.value)}
               className={cn(
                 "px-2.5 py-1 text-[12px] font-medium",
                 i > 0 && "border-l border-[#3A3A3A]",
@@ -885,8 +822,8 @@ function SeelRCDebugSwitcher() {
   );
 }
 
-/* ── Save bar at the bottom of the RC detail ─────────────── */
-function SeelRCSaveBar() {
+/* ── Save bar at the bottom of Seel-exclusive touchpoint details ─── */
+function TouchpointSaveBar() {
   const onSave = () => {
     toast.success("Settings saved.", { duration: 2000 });
   };

@@ -68,7 +68,7 @@ export const TOUCHPOINTS: TouchpointMeta[] = [
   },
   {
     id: "wfp_email",
-    label: "WFP Policy Email",
+    label: "WFP Confirmation Email",
     stage: "post_purchase",
     description:
       "Recommendations appear inside the policy confirmation email, reaching shoppers at a high open-rate moment.",
