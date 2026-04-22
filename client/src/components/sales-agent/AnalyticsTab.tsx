@@ -34,7 +34,7 @@ const TREND_COLORS: Record<TrendKey, string> = {
   thank_you_page: "#EF4444",
 };
 
-type RangePreset = "7d" | "30d" | "90d" | "custom";
+type RangePreset = "yesterday" | "7d" | "30d" | "90d" | "custom";
 
 interface Range {
   preset: RangePreset;
@@ -234,13 +234,12 @@ export default function AnalyticsTab() {
           <p className="text-[18px] font-semibold text-[#202223]">
             Performance breakdown{" "}
             <span className="text-[14px] font-normal text-[#6B7280]">
-              (Revenue and engagement per touchpoint, widget, and strategy)
+              (Revenue and engagement per touchpoint and strategy)
             </span>
           </p>
         </div>
-        <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_minmax(0,1.4fr)_110px_90px_90px_150px] px-6 py-4 bg-[#F7F7FC] border-b border-[#F0F0F0] text-[14px] font-semibold text-[#202223]">
+        <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1.6fr)_110px_90px_90px_150px] px-6 py-4 bg-[#F7F7FC] border-b border-[#F0F0F0] text-[14px] font-semibold text-[#202223]">
           <div>Touchpoint</div>
-          <div>Widget</div>
           <div>Strategy</div>
           <div className="flex items-center gap-1 justify-end">
             <span>Impr.</span>
@@ -276,13 +275,10 @@ export default function AnalyticsTab() {
               return (
                 <div
                   key={`${r.touchpointId}-${r.widget}`}
-                  className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_minmax(0,1.4fr)_110px_90px_90px_150px] items-center px-6 py-4 text-[14px] text-[#202223] hover:bg-[#F5F5F5]"
+                  className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1.6fr)_110px_90px_90px_150px] items-center px-6 py-4 text-[14px] text-[#202223] hover:bg-[#F5F5F5]"
                 >
                   <div className="truncate font-medium">
                     {touchpointLabel(r.touchpointId)}
-                  </div>
-                  <div className="truncate text-[#6B7280] font-mono text-[12px]">
-                    {r.widget}
                   </div>
                   <div className="truncate text-[#5C5F62]">
                     {strategy?.name ?? (
@@ -334,17 +330,20 @@ function DateRangePicker({
   const [open, setOpen] = useState(false);
 
   const label =
-    value.preset === "7d"
-      ? "Last 7 days"
-      : value.preset === "30d"
-        ? "Last 30 days"
-        : value.preset === "90d"
-          ? "Last 90 days"
-          : value.start && value.end
-            ? `${value.start} → ${value.end}`
-            : "Custom";
+    value.preset === "yesterday"
+      ? "Yesterday"
+      : value.preset === "7d"
+        ? "Last 7 days"
+        : value.preset === "30d"
+          ? "Last 30 days"
+          : value.preset === "90d"
+            ? "Last 90 days"
+            : value.start && value.end
+              ? `${value.start} → ${value.end}`
+              : "Custom";
 
   const presets: { key: RangePreset; label: string }[] = [
+    { key: "yesterday", label: "Yesterday" },
     { key: "7d", label: "Last 7 days" },
     { key: "30d", label: "Last 30 days" },
     { key: "90d", label: "Last 90 days" },
