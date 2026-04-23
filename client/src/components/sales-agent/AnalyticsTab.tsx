@@ -42,7 +42,7 @@ interface Range {
 }
 
 const METRIC_COPY: Record<
-  "revenue" | "orders" | "ctr" | "aov" | "impressions",
+  "revenue" | "orders" | "ctr" | "aov" | "impressions" | "clicks",
   { label: string; definition: string }
 > = {
   revenue: {
@@ -68,6 +68,11 @@ const METRIC_COPY: Record<
     label: "Impressions",
     definition:
       "Number of times recommendations were shown at a touchpoint within the selected window.",
+  },
+  clicks: {
+    label: "Clicks",
+    definition:
+      "Number of times shoppers clicked a recommended product at a touchpoint within the selected window.",
   },
 };
 
@@ -209,18 +214,18 @@ export default function AnalyticsTab() {
       <Panel className="overflow-hidden">
         <div className="px-6 py-5 border-b border-[#F0F0F0]">
           <p className="text-[18px] font-semibold text-[#202223]">
-            Performance breakdown{" "}
-            <span className="text-[14px] font-normal text-[#6B7280]">
-              (Revenue and engagement per touchpoint and strategy)
-            </span>
+            Performance breakdown
           </p>
         </div>
-        <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1.6fr)_110px_90px_90px_150px] px-6 py-4 bg-[#F7F7FC] border-b border-[#F0F0F0] text-[14px] font-semibold text-[#202223]">
+        <div className="grid grid-cols-[minmax(0,2fr)_110px_110px_90px_90px_150px] px-6 py-4 bg-[#F7F7FC] border-b border-[#F0F0F0] text-[14px] font-semibold text-[#202223]">
           <div>Touchpoint</div>
-          <div>Strategy</div>
           <div className="flex items-center gap-1 justify-end">
             <span>Impr.</span>
             <InfoTip>{METRIC_COPY.impressions.definition}</InfoTip>
+          </div>
+          <div className="flex items-center gap-1 justify-end">
+            <span>Clicks</span>
+            <InfoTip>{METRIC_COPY.clicks.definition}</InfoTip>
           </div>
           <div className="flex items-center gap-1 justify-end">
             <span>CTR</span>
@@ -231,7 +236,7 @@ export default function AnalyticsTab() {
             <InfoTip>{METRIC_COPY.orders.definition}</InfoTip>
           </div>
           <div className="flex items-center gap-1 justify-end">
-            <span>Revenue</span>
+            <span>Sales</span>
             <InfoTip>
               {METRIC_COPY.revenue.definition} Parenthesis shows change vs the
               previous equal-length window.
@@ -246,24 +251,19 @@ export default function AnalyticsTab() {
           <div className="divide-y divide-[#F0F0F0]">
             {filteredRows.map((r) => {
               const ctr = r.impressions > 0 ? r.clicks / r.impressions : 0;
-              const strategy = store.strategies.find(
-                (s) => s.id === r.strategyId,
-              );
               return (
                 <div
                   key={`${r.touchpointId}-${r.widget}`}
-                  className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1.6fr)_110px_90px_90px_150px] items-center px-6 py-4 text-[14px] text-[#202223] hover:bg-[#F5F5F5]"
+                  className="grid grid-cols-[minmax(0,2fr)_110px_110px_90px_90px_150px] items-center px-6 py-4 text-[14px] text-[#202223] hover:bg-[#F5F5F5]"
                 >
                   <div className="truncate font-medium">
                     {touchpointLabel(r.touchpointId)}
                   </div>
-                  <div className="truncate text-[#5C5F62]">
-                    {strategy?.name ?? (
-                      <span className="text-[#8C8C8C]">—</span>
-                    )}
-                  </div>
                   <div className="text-right tabular-nums">
                     {r.impressions.toLocaleString()}
+                  </div>
+                  <div className="text-right tabular-nums">
+                    {r.clicks.toLocaleString()}
                   </div>
                   <div className="text-right tabular-nums">
                     {formatPct(ctr)}

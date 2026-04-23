@@ -160,22 +160,73 @@ const TOUCHPOINT_ICON: Record<TouchpointId, TouchpointIconComponent> = {
    Image-only placeholder under the detail header. Aspect is
    roughly 3:1 so it reads as an image, not a thin strip. Real
    artwork will slot in here later. */
-function TouchpointBanner({ meta }: { meta: TouchpointMeta }) {
+/* ── Combined hero card for touchpoint detail:
+ *    left column = stage/title/toggle + Introduction,
+ *    right column = illustration placeholder. */
+function TouchpointHero({
+  meta,
+  toggle,
+  iconClassName = "bg-[#ECE9FF] text-[#2121C4]",
+}: {
+  meta: TouchpointMeta;
+  toggle: React.ReactNode;
+  iconClassName?: string;
+}) {
   const Icon = TOUCHPOINT_ICON[meta.id];
   return (
-    <div
-      className="relative w-full aspect-[3/1] rounded-[10px] border border-dashed border-[#D6D2FF] bg-gradient-to-br from-[#F4F1FF] via-[#F7F7FC] to-[#ECE9FF] overflow-hidden flex items-center justify-center"
-      role="img"
-      aria-label={`${meta.label} illustration placeholder`}
-    >
-      <div className="w-16 h-16 rounded-lg bg-white/70 border border-[#E0DEFF] flex items-center justify-center text-[#2121C4]">
-        <Icon className="w-8 h-8" />
+    <section className="bg-white border border-[#E4E4E0] rounded-[12px] overflow-hidden">
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-stretch min-h-[260px]">
+        <div className="p-6 flex flex-col">
+          <div className="flex items-start gap-3">
+            <div
+              className={cn(
+                "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
+                iconClassName,
+              )}
+            >
+              <Icon className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[12px] text-[#8C8C8C] uppercase tracking-[0.08em]">
+                {STAGE_LABEL[meta.stage]}
+              </p>
+              <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                <h2 className="text-[24px] font-bold text-[#202223] leading-tight">
+                  {meta.label}
+                </h2>
+                {meta.tags?.includes("seel_exclusive") && (
+                  <TouchpointTagChip tag="seel_exclusive" />
+                )}
+              </div>
+            </div>
+            <div className="shrink-0 pt-1">{toggle}</div>
+          </div>
+
+          <div className="mt-6">
+            <p className="text-[12px] text-[#8C8C8C] uppercase tracking-[0.08em]">
+              Introduction
+            </p>
+            <p className="mt-2 text-[14px] text-[#202223] leading-relaxed">
+              {meta.description}
+            </p>
+          </div>
+        </div>
+
+        <div
+          className="relative overflow-hidden bg-gradient-to-br from-[#F4F1FF] via-[#F7F7FC] to-[#ECE9FF] md:border-l border-t md:border-t-0 border-[#E4E4E0] flex items-center justify-center min-h-[200px]"
+          role="img"
+          aria-label={`${meta.label} illustration placeholder`}
+        >
+          <div className="w-20 h-20 rounded-xl bg-white/70 border border-[#E0DEFF] flex items-center justify-center text-[#2121C4]">
+            <Icon className="w-10 h-10" />
+          </div>
+          <div className="absolute bottom-2 right-2.5 inline-flex items-center gap-1 text-[11px] text-[#8C8C8C] uppercase tracking-[0.08em]">
+            <ImageIcon className="w-3.5 h-3.5" />
+            Placeholder
+          </div>
+        </div>
       </div>
-      <div className="absolute bottom-2 right-2.5 inline-flex items-center gap-1 text-[11px] text-[#8C8C8C] uppercase tracking-[0.08em]">
-        <ImageIcon className="w-3.5 h-3.5" />
-        Placeholder
-      </div>
-    </div>
+    </section>
   );
 }
 
@@ -372,13 +423,17 @@ function TouchpointCard({
               {meta.label}
             </p>
             <TouchpointHelpTip meta={meta} />
-            {showTag && <TouchpointTagChip tag="seel_exclusive" />}
             {meta.previewOnly && (
               <span className="text-[12px] text-[#5C5F62] bg-[#E7EBF5] border border-[#DADEE9] px-1.5 py-[1px] rounded shrink-0">
                 preview
               </span>
             )}
           </div>
+          {showTag && (
+            <div className="mt-1.5">
+              <TouchpointTagChip tag="seel_exclusive" />
+            </div>
+          )}
           {!depMet && meta.dependencyKey && (
             <div className="mt-1.5 text-[12px]">
               <Link href="/">
@@ -437,7 +492,6 @@ function TouchpointDetail({
   }) => void;
 }) {
   const store = useSalesAgent();
-  const Icon = TOUCHPOINT_ICON[meta.id];
   if (meta.id === "thank_you_page")
     return <ThankYouPageDetail onRequestConfirm={onRequestConfirm} />;
 
@@ -474,45 +528,29 @@ function TouchpointDetail({
 
   return (
     <div className="space-y-6">
-      <header className="flex items-start gap-3 pb-1">
-        <div className="w-10 h-10 rounded-lg bg-[#ECE9FF] flex items-center justify-center shrink-0 text-[#2121C4]">
-          <Icon className="w-5 h-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-[12px] text-[#8C8C8C] uppercase tracking-[0.08em]">
-            {STAGE_LABEL[meta.stage]}
-          </p>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-[24px] font-bold text-[#202223] leading-tight">
-              {meta.label}
-            </h2>
-            {meta.tags?.includes("seel_exclusive") && (
-              <TouchpointTagChip tag="seel_exclusive" />
-            )}
-          </div>
-        </div>
-        <div
-          className="shrink-0 pt-1"
-          title={
-            toggleDisabled
-              ? needsStrategy
-                ? "Select a strategy before enabling."
-                : meta.previewOnly
-                  ? "Available in V2."
-                  : "Dependency not met."
-              : undefined
-          }
-        >
-          <SAToggle
-            checked={isOn}
-            disabled={toggleDisabled}
-            onChange={handleHeaderToggle}
-            ariaLabel={`Enable ${meta.label}`}
-          />
-        </div>
-      </header>
-
-      <TouchpointBanner meta={meta} />
+      <TouchpointHero
+        meta={meta}
+        toggle={
+          <span
+            title={
+              toggleDisabled
+                ? needsStrategy
+                  ? "Select a strategy before enabling."
+                  : meta.previewOnly
+                    ? "Available in V2."
+                    : "Dependency not met."
+                : undefined
+            }
+          >
+            <SAToggle
+              checked={isOn}
+              disabled={toggleDisabled}
+              onChange={handleHeaderToggle}
+              ariaLabel={`Enable ${meta.label}`}
+            />
+          </span>
+        }
+      />
 
       {meta.requiresShopifyPlus && (
         <ShopifyPlusWidget met={store.dependency.shopifyPlus} />
@@ -1032,34 +1070,20 @@ function ThankYouPageDetail({
 
   return (
     <div className="space-y-6">
-      <header className="flex items-start gap-3 pb-1">
-        <div className="w-10 h-10 rounded-lg bg-[#F7F7FC] border border-[#E0E0E0] flex items-center justify-center shrink-0 text-[#5C5F62]">
-          <Package className="w-5 h-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-[12px] text-[#8C8C8C] uppercase tracking-[0.08em]">
-            Post-purchase
-          </p>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-[24px] font-bold text-[#202223] leading-tight">
-              Thank You Page
-            </h2>
-            {meta.tags?.includes("seel_exclusive") && (
-              <TouchpointTagChip tag="seel_exclusive" />
-            )}
-          </div>
-        </div>
-        <div className="shrink-0 pt-1" title="Available in V2.">
-          <SAToggle
-            checked={false}
-            disabled
-            onChange={() => {}}
-            ariaLabel="Enable Thank You Page"
-          />
-        </div>
-      </header>
-
-      <TouchpointBanner meta={meta} />
+      <TouchpointHero
+        meta={meta}
+        iconClassName="bg-[#F7F7FC] border border-[#E0E0E0] text-[#5C5F62]"
+        toggle={
+          <span title="Available in V2.">
+            <SAToggle
+              checked={false}
+              disabled
+              onChange={() => {}}
+              ariaLabel="Enable Thank You Page"
+            />
+          </span>
+        }
+      />
 
       {meta.requiresShopifyPlus && (
         <ShopifyPlusWidget met={store.dependency.shopifyPlus} />
