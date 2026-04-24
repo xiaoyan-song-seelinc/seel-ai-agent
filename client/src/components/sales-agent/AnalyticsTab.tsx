@@ -396,6 +396,7 @@ function TouchpointFilter({
   onChange: (ids: TouchpointId[]) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<TouchpointId[]>(selected);
   const allIds = TOUCHPOINTS.map((t) => t.id);
   const label =
     selected.length === allIds.length
@@ -404,9 +405,26 @@ function TouchpointFilter({
         ? "None"
         : `${selected.length} touchpoints`;
 
+  const sameSelection = (a: TouchpointId[], b: TouchpointId[]) => {
+    if (a.length !== b.length) return false;
+    const set = new Set(a);
+    return b.every((x) => set.has(x));
+  };
+  const dirty = !sameSelection(draft, selected);
+
+  const openPopover = () => {
+    setDraft(selected);
+    setOpen(true);
+  };
+  const closePopover = () => setOpen(false);
+
   return (
     <div className="relative">
-      <SAButton variant="secondary" size="md" onClick={() => setOpen((v) => !v)}>
+      <SAButton
+        variant="secondary"
+        size="md"
+        onClick={() => (open ? closePopover() : openPopover())}
+      >
         {label}
         <ChevronDown className="w-3 h-3 opacity-60" />
       </SAButton>
@@ -414,21 +432,21 @@ function TouchpointFilter({
         <>
           <div
             className="fixed inset-0 z-10"
-            onClick={() => setOpen(false)}
+            onClick={closePopover}
             aria-hidden="true"
           />
           <div className="absolute z-20 mt-1 left-0 w-[240px] bg-white border border-[#E0E0E0] rounded-lg shadow-[0_10px_24px_-8px_rgba(0,0,0,0.18)] py-1">
             <button
               className="w-full text-left px-3 py-1.5 text-[12px] text-[#6B7280] hover:bg-[#F5F5F5]"
               onClick={() =>
-                onChange(selected.length === allIds.length ? [] : allIds)
+                setDraft(draft.length === allIds.length ? [] : allIds)
               }
             >
-              {selected.length === allIds.length ? "Clear All" : "Select All"}
+              {draft.length === allIds.length ? "Clear All" : "Select All"}
             </button>
             <div className="border-t border-[#F0F0F0]" />
             {TOUCHPOINTS.map((t) => {
-              const checked = selected.includes(t.id);
+              const checked = draft.includes(t.id);
               return (
                 <label
                   key={t.id}
@@ -438,8 +456,8 @@ function TouchpointFilter({
                     type="checkbox"
                     checked={checked}
                     onChange={() => {
-                      if (checked) onChange(selected.filter((x) => x !== t.id));
-                      else onChange([...selected, t.id]);
+                      if (checked) setDraft(draft.filter((x) => x !== t.id));
+                      else setDraft([...draft, t.id]);
                     }}
                     className="h-3.5 w-3.5 accent-[#2121C4]"
                   />
@@ -447,6 +465,20 @@ function TouchpointFilter({
                 </label>
               );
             })}
+            <div className="border-t border-[#F0F0F0] mt-1" />
+            <div className="flex items-center justify-end px-2 py-2">
+              <SAButton
+                variant="primary"
+                size="sm"
+                disabled={!dirty}
+                onClick={() => {
+                  onChange(draft);
+                  setOpen(false);
+                }}
+              >
+                Apply
+              </SAButton>
+            </div>
           </div>
         </>
       )}
