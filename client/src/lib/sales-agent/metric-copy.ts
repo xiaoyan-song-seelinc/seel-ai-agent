@@ -12,28 +12,28 @@ export const METRIC_COPY: Record<
 > = {
   impressions: {
     label: "Impressions",
-    definition: "Times recommendations were shown.",
+    definition: "Total times recommendations were shown to shoppers.",
   },
   clicks: {
     label: "Clicks",
-    definition: "Times a recommended product was clicked.",
+    definition: "Total clicks on recommended products.",
   },
   ctr: {
     label: "CTR",
-    definition: "Clicks ÷ impressions.",
+    definition: "Share of recommendations that got clicked within 24 hours.",
   },
   orders: {
     label: "Orders Influenced",
     definition:
-      "Orders including a recommended product, within 7 days of first click.",
+      "Orders containing a recommended product within 7 days of clicking it.",
   },
   revenue: {
     label: "Attributed Sales",
     definition:
-      "Sum of subtotal for orders attributed to Sales Agent (Your products only). Uses Shopify subtotal_price (after discounts, before tax/shipping). Returns not deducted.",
+      "Sales from recommended products that shoppers purchased (only the recommended items, not the rest of the order).",
   },
   aov: {
     label: "AOV of Influenced Orders",
-    definition: "Average order value of attributed orders.",
+    definition: "Average full-order value of influenced orders.",
   },
 };
