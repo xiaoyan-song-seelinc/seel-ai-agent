@@ -83,7 +83,7 @@ export default function StrategiesTab() {
           </div>
           <SAButton variant="primary" onClick={openNew}>
             <Plus className="w-3.5 h-3.5" />
-            New strategy
+            New Strategy
           </SAButton>
         </div>
 
