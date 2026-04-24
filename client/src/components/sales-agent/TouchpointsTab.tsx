@@ -8,7 +8,7 @@ import {
   TOUCHPOINT_TAG_META,
   type TouchpointMeta,
 } from "@/lib/sales-agent/constants";
-import { METRIC_COPY } from "@/lib/sales-agent/metric-copy";
+import { KPI_CARD_TOOLTIP, METRIC_COPY } from "@/lib/sales-agent/metric-copy";
 import type { Stage, TouchpointId, TouchpointTag } from "@/lib/sales-agent/types";
 import {
   Callout,
@@ -991,25 +991,25 @@ function TouchpointStats({ touchpointId }: { touchpointId: TouchpointId }) {
     {
       label: METRIC_COPY.revenue.label,
       value: `$${row.revenue.toLocaleString()}`,
-      tip: METRIC_COPY.revenue.definition,
+      tip: KPI_CARD_TOOLTIP.revenue,
       sub: formatDeltaInline(row.delta),
     },
     {
       label: METRIC_COPY.orders.label,
       value: row.orders.toLocaleString(),
-      tip: METRIC_COPY.orders.definition,
+      tip: KPI_CARD_TOOLTIP.orders,
       sub: formatDeltaInline(row.deltaOrders),
     },
     {
       label: METRIC_COPY.ctr.label,
       value: `${(ctr * 100).toFixed(1)}%`,
-      tip: METRIC_COPY.ctr.definition,
+      tip: KPI_CARD_TOOLTIP.ctr,
       sub: formatDeltaInline(row.deltaCtr),
     },
     {
       label: METRIC_COPY.aov.label,
       value: `$${aov.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
-      tip: METRIC_COPY.aov.definition,
+      tip: KPI_CARD_TOOLTIP.aov,
       sub: formatDeltaInline(row.deltaAov),
     },
   ];

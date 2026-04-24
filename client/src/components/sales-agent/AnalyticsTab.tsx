@@ -12,7 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useSalesAgent } from "@/lib/sales-agent/store";
 import { TOUCHPOINTS, touchpointLabel } from "@/lib/sales-agent/constants";
-import { METRIC_COPY } from "@/lib/sales-agent/metric-copy";
+import { KPI_CARD_TOOLTIP, METRIC_COPY } from "@/lib/sales-agent/metric-copy";
 import type { TouchpointId } from "@/lib/sales-agent/types";
 import { InfoTip, Panel, SAButton, SAInput } from "./primitives";
 
@@ -72,13 +72,13 @@ export default function AnalyticsTab() {
           label={METRIC_COPY.revenue.label}
           value={isEmpty ? "—" : formatCurrency(data.revenue)}
           delta={data.deltaRevenue}
-          tip={METRIC_COPY.revenue.definition}
+          tip={KPI_CARD_TOOLTIP.revenue}
         />
         <KpiCard
           label={METRIC_COPY.orders.label}
           value={isEmpty ? "—" : data.orders.toLocaleString()}
           delta={data.deltaOrders}
-          tip={METRIC_COPY.orders.definition}
+          tip={KPI_CARD_TOOLTIP.orders}
         />
         <KpiCard
           label={METRIC_COPY.ctr.label}
@@ -90,13 +90,13 @@ export default function AnalyticsTab() {
                 )
           }
           delta={data.deltaCtr}
-          tip={METRIC_COPY.ctr.definition}
+          tip={KPI_CARD_TOOLTIP.ctr}
         />
         <KpiCard
           label={METRIC_COPY.aov.label}
           value={isEmpty ? "—" : formatCurrency(data.aov)}
           delta={data.deltaAov}
-          tip={METRIC_COPY.aov.definition}
+          tip={KPI_CARD_TOOLTIP.aov}
         />
       </div>
 
