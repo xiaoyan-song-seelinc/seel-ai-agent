@@ -182,7 +182,7 @@ export default function AnalyticsTab() {
                         r.delta === 0 && "text-[#8C8C8C]",
                       )}
                     >
-                      ({formatDelta(r.delta)} vs prev)
+                      ({formatDelta(r.delta)})
                     </span>
                   </div>
                   <div className="text-right tabular-nums">
