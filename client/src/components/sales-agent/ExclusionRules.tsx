@@ -79,7 +79,7 @@ function ExcludedProducts({ onOpen }: { onOpen: () => void }) {
       action={
         <SAButton variant="secondary" size="sm" onClick={onOpen}>
           <Plus className="w-3 h-3" />
-          Add product
+          Add Product
         </SAButton>
       }
     >
@@ -124,7 +124,7 @@ function ExcludedCollections({ onOpen }: { onOpen: () => void }) {
       action={
         <SAButton variant="secondary" size="sm" onClick={onOpen}>
           <Plus className="w-3 h-3" />
-          Add collection
+          Add Collection
         </SAButton>
       }
     >
@@ -201,7 +201,7 @@ function ExcludedTags() {
             onClick={() => setEditing(true)}
           >
             <Plus className="w-3 h-3" />
-            Add tag
+            Add Tag
           </SAButton>
         )
       }

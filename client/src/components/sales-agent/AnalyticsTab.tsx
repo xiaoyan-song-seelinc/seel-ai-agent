@@ -13,6 +13,7 @@ import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { cn } from "@/lib/utils";
 import { useSalesAgent } from "@/lib/sales-agent/store";
 import { TOUCHPOINTS, touchpointLabel } from "@/lib/sales-agent/constants";
+import { METRIC_COPY } from "@/lib/sales-agent/metric-copy";
 import type { TouchpointId } from "@/lib/sales-agent/types";
 import {
   Tooltip as UITooltip,
@@ -41,41 +42,6 @@ interface Range {
   end?: string;
 }
 
-const METRIC_COPY: Record<
-  "revenue" | "orders" | "ctr" | "aov" | "impressions" | "clicks",
-  { label: string; definition: string }
-> = {
-  revenue: {
-    label: "Attributed Sales",
-    definition:
-      "Total sales from orders attributed to Sales Agent, after discounts and before tax and shipping. Returns aren't deducted.",
-  },
-  orders: {
-    label: "Orders Influenced",
-    definition:
-      "Unique orders that include a recommended product, counted within 7 days of the shopper's first click.",
-  },
-  ctr: {
-    label: "CTR",
-    definition: "Share of impressions that led to a click within 24 hours, across all Sales Agent touchpoints.",
-  },
-  aov: {
-    label: "AOV of Influenced Orders",
-    definition:
-      "Average order value for orders attributed to Sales Agent. Calculated as Attributed Sales ÷ Orders Influenced.",
-  },
-  impressions: {
-    label: "Impressions",
-    definition:
-      "Number of times recommendations were shown at a touchpoint within the selected window.",
-  },
-  clicks: {
-    label: "Clicks",
-    definition:
-      "Number of times shoppers clicked a recommended product at a touchpoint within the selected window.",
-  },
-};
-
 export default function AnalyticsTab() {
   const store = useSalesAgent();
   const [range, setRange] = useState<Range>({ preset: "30d" });
@@ -99,11 +65,13 @@ export default function AnalyticsTab() {
       "Impressions",
       "CTR",
       "Orders",
+      "AOV",
       "Attributed Sales",
       "Attributed Sales Δ",
     ];
     const lines = filteredRows.map((r) => {
       const ctr = r.impressions > 0 ? r.clicks / r.impressions : 0;
+      const aov = r.orders > 0 ? (r.revenue / r.orders).toFixed(2) : "0";
       const strategy = store.strategies.find((s) => s.id === r.strategyId)?.name ?? "—";
       return [
         touchpointLabel(r.touchpointId),
@@ -112,6 +80,7 @@ export default function AnalyticsTab() {
         r.impressions,
         (ctr * 100).toFixed(2) + "%",
         r.orders,
+        aov,
         r.revenue,
         (r.delta * 100).toFixed(1) + "%",
       ].join(",");
@@ -216,7 +185,7 @@ export default function AnalyticsTab() {
             Performance breakdown
           </p>
         </div>
-        <div className="grid grid-cols-[minmax(0,2fr)_130px_110px_90px_90px_180px] px-6 py-4 bg-[#F7F7FC] border-b border-[#F0F0F0] text-[14px] font-semibold text-[#202223]">
+        <div className="grid grid-cols-[minmax(0,2fr)_130px_110px_90px_90px_100px_180px] px-6 py-4 bg-[#F7F7FC] border-b border-[#F0F0F0] text-[14px] font-semibold text-[#202223]">
           <div>Touchpoint</div>
           <div className="flex items-center gap-1 justify-end">
             <span>Impressions</span>
@@ -233,6 +202,10 @@ export default function AnalyticsTab() {
           <div className="flex items-center gap-1 justify-end">
             <span>Orders</span>
             <InfoTip>{METRIC_COPY.orders.definition}</InfoTip>
+          </div>
+          <div className="flex items-center gap-1 justify-end">
+            <span>AOV</span>
+            <InfoTip>{METRIC_COPY.aov.definition}</InfoTip>
           </div>
           <div className="flex items-center gap-1 justify-end">
             <span>Attributed Sales</span>
@@ -252,7 +225,7 @@ export default function AnalyticsTab() {
               return (
                 <div
                   key={`${r.touchpointId}-${r.widget}`}
-                  className="grid grid-cols-[minmax(0,2fr)_130px_110px_90px_90px_180px] items-center px-6 py-4 text-[14px] text-[#202223] hover:bg-[#F5F5F5]"
+                  className="grid grid-cols-[minmax(0,2fr)_130px_110px_90px_90px_100px_180px] items-center px-6 py-4 text-[14px] text-[#202223] hover:bg-[#F5F5F5]"
                 >
                   <div className="truncate font-medium">
                     {touchpointLabel(r.touchpointId)}
@@ -268,6 +241,9 @@ export default function AnalyticsTab() {
                   </div>
                   <div className="text-right tabular-nums">
                     {r.orders.toLocaleString()}
+                  </div>
+                  <div className="text-right tabular-nums">
+                    {r.orders > 0 ? formatCurrency(r.revenue / r.orders) : "—"}
                   </div>
                   <div className="text-right tabular-nums">
                     <span className="font-medium">
@@ -448,7 +424,7 @@ function TouchpointFilter({
                 onChange(selected.length === allIds.length ? [] : allIds)
               }
             >
-              {selected.length === allIds.length ? "Clear all" : "Select all"}
+              {selected.length === allIds.length ? "Clear All" : "Select All"}
             </button>
             <div className="border-t border-[#F0F0F0]" />
             {TOUCHPOINTS.map((t) => {

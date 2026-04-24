@@ -3,6 +3,7 @@ import { Pencil } from "lucide-react";
 import {
   Drawer,
   Field,
+  InfoTip,
   Modal,
   Panel,
   SAButton,
@@ -333,13 +334,6 @@ export default function StrategyDrawer({
         }
       >
         <div className="p-5 space-y-4">
-          {existing && isReferenced && (
-            <p className="text-[12px] text-[#6B7280] leading-snug">
-              In use by {referencedBy.map(touchpointLabel).join(", ")}. Changes
-              apply immediately.
-            </p>
-          )}
-
           <Field label="Type">
             {isReferenced ? (
               <Tooltip delayDuration={150}>
@@ -373,7 +367,16 @@ export default function StrategyDrawer({
           {/* Type-specific fields */}
           {draft.type === "best_sellers" && (
             <div className="space-y-3">
-              <Field label="Time window">
+              <Field
+                label={
+                  <span className="inline-flex items-center gap-1">
+                    Time window
+                    <InfoTip>
+                      How far back to count sales. Longer windows surface stable best-sellers; shorter windows reflect recent trends.
+                    </InfoTip>
+                  </span>
+                }
+              >
                 <SASelect
                   value={String(draft.timeWindow)}
                   onChange={(e) =>
@@ -391,7 +394,16 @@ export default function StrategyDrawer({
                   ))}
                 </SASelect>
               </Field>
-              <Field label="Sort by">
+              <Field
+                label={
+                  <span className="inline-flex items-center gap-1">
+                    Sort by
+                    <InfoTip>
+                      How to rank products. Total revenue = sales dollars; Units sold = volume; Distinct orders = how many separate orders contain the product.
+                    </InfoTip>
+                  </span>
+                }
+              >
                 <SASelect
                   value={draft.sortBy}
                   onChange={(e) =>
@@ -412,8 +424,25 @@ export default function StrategyDrawer({
             </div>
           )}
 
+          {draft.type === "similar" && (
+            <Panel className="px-4 py-3 bg-[#F7F7FC] border-[#E4E4E0]">
+              <p className="text-[13px] text-[#52525B] leading-relaxed">
+                Seel recommends products similar to the most valuable item in the shopper's most recent order.
+              </p>
+            </Panel>
+          )}
+
           {draft.type === "new_arrivals" && (
-            <Field label="Time window">
+            <Field
+              label={
+                <span className="inline-flex items-center gap-1">
+                  Time window
+                  <InfoTip>
+                    How recently a product must have been added to the store.
+                  </InfoTip>
+                </span>
+              }
+            >
               <SASelect
                 value={String(draft.timeWindow)}
                 onChange={(e) =>
@@ -478,7 +507,7 @@ export default function StrategyDrawer({
                       size="sm"
                       onClick={() => setProductPickerOpen(true)}
                     >
-                      {selectedProducts.length === 0 ? "Add products" : "Edit products"}
+                      {selectedProducts.length === 0 ? "Add Products" : "Edit Products"}
                     </SAButton>
                   </div>
                   {selectedProducts.length === 0 ? (
@@ -555,7 +584,7 @@ export default function StrategyDrawer({
           <div className="space-y-2">
             {isReferenced ? (
               <p className="text-[14px] text-[#1A1A1A] leading-relaxed">
-                This strategy is used by {referencedBy.length} touchpoint(s). Saving applies the new configuration to shoppers right away.
+                This strategy is used by {referencedBy.length} touchpoint(s). Changes will apply to shoppers right away.
               </p>
             ) : (
               isDestructive && (

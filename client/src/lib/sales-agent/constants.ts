@@ -25,7 +25,7 @@ export const TOUCHPOINTS: TouchpointMeta[] = [
     label: "Search Bar",
     stage: "pre_purchase",
     description:
-      "Shoppers type full-sentence queries and get matching products instantly, with an AI chat alongside to explain and refine.",
+      "An AI concierge in your search bar — understands natural-language questions and surfaces matching products.",
     shopifyOnly: true,
     previewOnly: false,
     picksStrategy: false,
@@ -36,7 +36,7 @@ export const TOUCHPOINTS: TouchpointMeta[] = [
     label: "Support Chat",
     stage: "pre_purchase",
     description:
-      "Shoppers asking product questions in the support chat get relevant picks inline, without leaving the conversation.",
+      "Reply with matching picks when shoppers ask product questions mid-chat.",
     shopifyOnly: true,
     previewOnly: false,
     picksStrategy: false,
@@ -58,7 +58,7 @@ export const TOUCHPOINTS: TouchpointMeta[] = [
     label: "Seel Resolution Center",
     stage: "post_purchase",
     description:
-      "Shoppers browsing returns or refunds see relevant products on the page, turning return traffic into repeat orders.",
+      "Turn return traffic into repeat orders — recommend products right on the returns page.",
     shopifyOnly: false,
     previewOnly: false,
     picksStrategy: true,
@@ -69,7 +69,7 @@ export const TOUCHPOINTS: TouchpointMeta[] = [
     label: "WFP Confirmation Email",
     stage: "post_purchase",
     description:
-      "Recommendations appear inside the policy confirmation email, reaching shoppers at a high open-rate moment.",
+      "Add recommendations to your policy confirmation email, your highest-open-rate touchpoint.",
     shopifyOnly: false,
     previewOnly: false,
     picksStrategy: true,

@@ -8,6 +8,7 @@ import {
   TOUCHPOINT_TAG_META,
   type TouchpointMeta,
 } from "@/lib/sales-agent/constants";
+import { METRIC_COPY } from "@/lib/sales-agent/metric-copy";
 import type { Stage, TouchpointId, TouchpointTag } from "@/lib/sales-agent/types";
 import {
   Callout,
@@ -203,10 +204,7 @@ function TouchpointHero({
           </div>
 
           <div className="mt-6">
-            <p className="text-[12px] text-[#8C8C8C] uppercase tracking-[0.08em]">
-              Introduction
-            </p>
-            <p className="mt-2 text-[14px] text-[#202223] leading-relaxed">
+            <p className="text-[14px] text-[#202223] leading-relaxed">
               {meta.description}
             </p>
           </div>
@@ -510,16 +508,16 @@ function TouchpointDetail({
     if (v) {
       onRequestConfirm({
         title: `Turn on ${meta.label}?`,
-        body: `Shoppers will start seeing recommendations here right away. You can turn it off anytime.`,
-        confirmLabel: "Turn on",
+        body: `Product recommendations at ${meta.label} will start showing to shoppers right away. You can turn it off anytime.`,
+        confirmLabel: "Turn On",
         variant: "primary",
         onConfirm: () => store.updateTouchpoint(meta.id, { enabled: true }),
       });
     } else {
       onRequestConfirm({
         title: `Turn off ${meta.label}?`,
-        body: `Shoppers will no longer see recommendations here. You can turn it back on anytime.`,
-        confirmLabel: "Turn off",
+        body: `Product recommendations at ${meta.label} will stop showing. Any new shopper won't see them here.`,
+        confirmLabel: "Turn Off",
         variant: "danger",
         onConfirm: () => store.updateTouchpoint(meta.id, { enabled: false }),
       });
@@ -700,8 +698,8 @@ function SourceSetting({
     if (tp.enabled && next !== tp.strategyId) {
       onRequestConfirm({
         title: `Change strategy for ${meta.label}?`,
-        body: `This touchpoint is live — changes apply to shoppers right away.`,
-        confirmLabel: "Update strategy",
+        body: `Product recommendations at ${meta.label} are live. Changes will apply to shoppers right away.`,
+        confirmLabel: "Update Strategy",
         variant: "primary",
         onConfirm: () =>
           store.updateTouchpoint(meta.id, { strategyId: next }),
@@ -766,7 +764,7 @@ function SourceSetting({
               checked={source === "partner"}
               onSelect={handleSelectPartner}
               label="Partner products"
-              subtitle="Show products from other Seel merchants. Earn a commission when shoppers buy through your recommendation."
+              subtitle="Recommend from Seel's network and earn commission on attributed sales"
             >
               {networkState === "pending" && (
                 <NetworkStatusRow tone="pending" label="Request in progress" />
@@ -824,15 +822,13 @@ function SourceSetting({
                 modal?.kind === "switch" && switchConfirm(modal.target)
               }
             >
-              {modal?.kind === "switch" && modal.target === "own"
-                ? "Switch to your products"
-                : "Switch to partner products"}
+              Switch
             </SAButton>
           </>
         }
       >
         <p className="text-[14px] text-[#52525B] leading-relaxed">
-          {meta.label} is currently live. Switching will change what shoppers see right away.
+          Product recommendations at {meta.label} are live. Switching will change what shoppers see right away.
         </p>
       </Modal>
     </div>
@@ -992,24 +988,24 @@ function TouchpointStats({ touchpointId }: { touchpointId: TouchpointId }) {
     sub?: string;
   }[] = [
     {
-      label: "Impressions",
+      label: METRIC_COPY.impressions.label,
       value: row.impressions.toLocaleString(),
-      tip: "Times recommendations were shown at this touchpoint.",
+      tip: METRIC_COPY.impressions.definition,
     },
     {
-      label: "CTR",
+      label: METRIC_COPY.ctr.label,
       value: `${(ctr * 100).toFixed(1)}%`,
-      tip: "Share of impressions that led to a click within 24 hours.",
+      tip: METRIC_COPY.ctr.definition,
     },
     {
-      label: "Orders",
+      label: METRIC_COPY.orders.label,
       value: row.orders.toLocaleString(),
-      tip: "Orders attributed to this touchpoint, counted within 7 days of the shopper's first click.",
+      tip: METRIC_COPY.orders.definition,
     },
     {
-      label: "Attributed Sales",
+      label: METRIC_COPY.revenue.label,
       value: `$${row.revenue.toLocaleString()}`,
-      tip: "Total sales from orders attributed to recommendations at this touchpoint, after discounts and before tax/shipping. Your products only.",
+      tip: METRIC_COPY.revenue.definition,
       sub: formatDeltaInline(row.delta),
     },
   ];
@@ -1104,7 +1100,7 @@ function ThankYouPageDetail({
               Widgets ({store.thankYouWidgets.length})
             </p>
             <SAButton variant="secondary" size="sm" disabled>
-              Add widget
+              Add Widget
             </SAButton>
           </div>
 

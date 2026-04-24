@@ -379,7 +379,7 @@ export function Drawer({
 
 /* ── Field wrapper ──────────────────────────────────────── */
 interface FieldProps {
-  label: string;
+  label: ReactNode;
   htmlFor?: string;
   help?: string;
   children: ReactNode;
