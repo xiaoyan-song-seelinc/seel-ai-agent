@@ -30,7 +30,7 @@ export const METRIC_COPY: Record<
   revenue: {
     label: "Attributed Sales",
     definition:
-      "Sales from recommended products that shoppers purchased (only the recommended items, not the rest of the order).",
+      "Total sales from recommended items that shoppers bought. After discounts, before tax & shipping.",
   },
   aov: {
     label: "AOV of Influenced Orders",
