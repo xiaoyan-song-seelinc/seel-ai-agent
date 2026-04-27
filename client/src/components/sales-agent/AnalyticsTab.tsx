@@ -126,7 +126,7 @@ export default function AnalyticsTab() {
             Performance breakdown
           </p>
           <p className="text-[12px] text-[#6B7280] mt-1">
-            Delta only on Attributed Sales. Cross-touchpoint comparison itself is the primary signal.
+            Compare performance across every touchpoint where your AI agent is active.
           </p>
         </div>
         <div className="grid grid-cols-[minmax(0,1.4fr)_200px_130px_90px_100px_110px_130px] px-6 py-4 bg-[#F7F7FC] border-b border-[#F0F0F0] text-[14px] font-semibold text-[#202223]">

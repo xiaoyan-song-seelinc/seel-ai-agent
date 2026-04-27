@@ -25,7 +25,7 @@ export const TOUCHPOINTS: TouchpointMeta[] = [
     label: "Search Bar",
     stage: "pre_purchase",
     description:
-      "An AI concierge in your search bar — understands natural-language questions and surfaces matching products.",
+      "A shopping concierge for your storefront. Shoppers ask natural-language questions and get matched to the best-fit products.",
     shopifyOnly: true,
     previewOnly: false,
     picksStrategy: false,
@@ -36,7 +36,7 @@ export const TOUCHPOINTS: TouchpointMeta[] = [
     label: "Support Chat",
     stage: "pre_purchase",
     description:
-      "Reply with matching picks when shoppers ask product questions mid-chat.",
+      "A shopping assistant inside your support chat. Give product recommendations on the spot, in any conversation.",
     shopifyOnly: true,
     previewOnly: false,
     picksStrategy: false,
@@ -46,7 +46,8 @@ export const TOUCHPOINTS: TouchpointMeta[] = [
     id: "thank_you_page",
     label: "Thank You Page",
     stage: "post_purchase",
-    description: "Order confirmation recommendations",
+    description:
+      "AI product recommendations right after order completion. Show what's next when shoppers are most engaged.",
     shopifyOnly: true,
     previewOnly: true,
     picksStrategy: false,
@@ -58,7 +59,7 @@ export const TOUCHPOINTS: TouchpointMeta[] = [
     label: "Seel Resolution Center",
     stage: "post_purchase",
     description:
-      "Turn return traffic into repeat orders — recommend products right on the returns page.",
+      "AI product recommendations in Seel's return portal. Convert return traffic into purchases for better-fit products.",
     shopifyOnly: false,
     previewOnly: false,
     picksStrategy: true,
@@ -69,7 +70,7 @@ export const TOUCHPOINTS: TouchpointMeta[] = [
     label: "WFP Confirmation Email",
     stage: "post_purchase",
     description:
-      "Add recommendations to your policy confirmation email, your highest-open-rate touchpoint.",
+      "AI product recommendations inside your policy confirmation email. Drive product interest with our most engaged touchpoint.",
     shopifyOnly: false,
     previewOnly: false,
     picksStrategy: true,
