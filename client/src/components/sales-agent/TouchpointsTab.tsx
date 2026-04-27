@@ -1044,9 +1044,6 @@ function TouchpointStats({ touchpointId }: { touchpointId: TouchpointId }) {
           </Panel>
         ))}
       </div>
-      <p className="text-[12px] text-[#8C8C8C] text-right">
-        Your products only
-      </p>
     </div>
   );
 }
